@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { ListingWithRelations } from '@/lib/types'
@@ -55,6 +55,70 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
     }
   }
 
+  // Admin moderation state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [listingStatus, setListingStatus] = useState<string>(listing.status)
+  const [rejectReason, setRejectReason] = useState<string | null>(listing.reject_reason || null)
+  const [moderating, setModerating] = useState(false)
+  const [showRejectInput, setShowRejectInput] = useState(false)
+  const [rejectText, setRejectText] = useState('')
+
+  useEffect(() => {
+    async function checkRole() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('app_user')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile?.role === 'admin') {
+          setIsAdmin(true)
+        }
+      }
+    }
+    checkRole()
+  }, [])
+
+  const handleAdminApprove = async () => {
+    setModerating(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('listing')
+        .update({ status: 'published', reject_reason: null })
+        .eq('id', listing.id)
+      if (error) throw error
+      setListingStatus('published')
+      setRejectReason(null)
+    } catch (err: any) {
+      alert(err.message || 'Error al aprobar la publicación')
+    } finally {
+      setModerating(false)
+    }
+  }
+
+  const handleAdminReject = async () => {
+    if (!rejectText.trim()) return
+    setModerating(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('listing')
+        .update({ status: 'rejected', reject_reason: rejectText.trim() })
+        .eq('id', listing.id)
+      if (error) throw error
+      setListingStatus('rejected')
+      setRejectReason(rejectText.trim())
+      setShowRejectInput(false)
+    } catch (err: any) {
+      alert(err.message || 'Error al rechazar la publicación')
+    } finally {
+      setModerating(false)
+    }
+  }
+
   // Type metadata
   const typeMap: Record<string, { label: string; icon: string }> = {
     product: { label: 'Producto', icon: '🛍️' },
@@ -104,6 +168,89 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
           ← Volver al catálogo
         </Link>
       </div>
+
+      {/* Admin Moderation Bar */}
+      {isAdmin && (
+        <div className="mb-6 rounded-2xl border-2 border-purple-300 bg-purple-50/90 p-5 shadow-sm dark:border-purple-800 dark:bg-purple-950/40">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white font-bold text-lg shrink-0">
+                🛡️
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    Panel de Moderación (Admin)
+                  </h4>
+                  <span className="rounded-md bg-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-900 dark:bg-purple-900 dark:text-purple-200 uppercase">
+                    Estado: {listingStatus}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
+                  Como administrador, puedes aprobar este anuncio para que sea visible en el catálogo público o rechazarlo indicando el motivo.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link
+                href="/admin"
+                className="rounded-xl border border-purple-300 bg-white px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:bg-zinc-800 dark:text-purple-300"
+              >
+                Cola de Moderación →
+              </Link>
+
+              {listingStatus !== 'published' ? (
+                <button
+                  type="button"
+                  disabled={moderating}
+                  onClick={handleAdminApprove}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                >
+                  <span>✓</span>
+                  <span>{moderating ? 'Aprobando...' : 'Aprobar Publicación'}</span>
+                </button>
+              ) : (
+                <span className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
+                  <span>✓</span>
+                  <span>Aprobado / Público</span>
+                </span>
+              )}
+
+              {listingStatus !== 'rejected' && (
+                <button
+                  type="button"
+                  disabled={moderating}
+                  onClick={() => setShowRejectInput(!showRejectInput)}
+                  className="rounded-xl border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 transition-colors"
+                >
+                  ✕ Rechazar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showRejectInput && (
+            <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-800/60 flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={rejectText}
+                onChange={(e) => setRejectText(e.target.value)}
+                placeholder="Indica el motivo del rechazo (ej. Falta precio exacto, imagen inadecuada...)"
+                className="flex-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-red-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+              <button
+                type="button"
+                disabled={moderating || !rejectText.trim()}
+                onClick={handleAdminReject}
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                Confirmar Rechazo
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Owner preview alert if not published */}
       {currentStatus && (
