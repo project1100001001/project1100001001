@@ -326,6 +326,37 @@ export interface Dictionary {
     noItems: string
     noSales: string
   }
+  reviews: {
+    title: string
+    subtitle: string
+    averageRating: string
+    totalReviews: string
+    verifiedBuyer: string
+    leaveReviewBtn: string
+    modalTitle: string
+    modalSubtitle: string
+    ratingLabel: string
+    star1: string
+    star2: string
+    star3: string
+    star4: string
+    star5: string
+    commentLabel: string
+    commentPlaceholder: string
+    recommendLabel: string
+    yes: string
+    no: string
+    submitReview: string
+    submitting: string
+    successNotice: string
+    errorNotice: string
+    noReviewsYet: string
+    pendingReviewAlert: string
+    pendingReviewDesc: string
+    rateNowBtn: string
+    alreadyReviewed: string
+    ratingMandatoryNotice: string
+  }
   footer: {
     tagline: string
     rights: string

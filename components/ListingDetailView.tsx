@@ -3,14 +3,19 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { ListingWithRelations } from '@/lib/types'
+import type { ListingWithRelations, Review } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import ReviewsSection from './ReviewsSection'
 
 interface ListingDetailViewProps {
   listing: ListingWithRelations
+  initialReviews?: Review[]
 }
 
-export default function ListingDetailView({ listing }: ListingDetailViewProps) {
+export default function ListingDetailView({
+  listing,
+  initialReviews = [],
+}: ListingDetailViewProps) {
   const { t, locale } = useTranslation()
   const media = listing.listing_media?.sort((a, b) => a.position - b.position) || []
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
@@ -327,6 +332,16 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
               </dl>
             </div>
           )}
+
+          {/* Módulo de Reseñas y Calificaciones con Estrellas */}
+          <ReviewsSection
+            listingId={listing.id}
+            sellerId={listing.seller_id}
+            sellerName={listing.seller?.business_name}
+            listingTitle={listing.title}
+            listingType={listing.type}
+            initialReviews={initialReviews}
+          />
         </div>
 
         {/* Right Column: Listing Details & Seller Contact (5 cols) */}

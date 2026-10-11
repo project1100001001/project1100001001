@@ -3,7 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import type { AppUser, Seller, AdAccount, Advertiser } from '@/lib/types'
+import type { AppUser, Seller, AdAccount, Advertiser, Sale } from '@/lib/types'
 import AccountProfileView from '@/components/AccountProfileView'
 
 export const metadata = {
@@ -62,6 +62,28 @@ export default async function CuentaPage() {
         adAccount = accData[0] as AdAccount
       }
     }
+  // 5. Obtener compras realizadas por el usuario comprador (public.sale)
+  let purchases: Sale[] = []
+  try {
+    const { data: salesData } = await supabase
+      .from('sale')
+      .select(`
+        *,
+        listing:listing_id (
+          *,
+          listing_media(*),
+          category:category_id(*),
+          seller:seller_id(*)
+        )
+      `)
+      .eq('buyer_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (salesData) {
+      purchases = salesData as Sale[]
+    }
+  } catch (err: any) {
+    console.warn('Aviso consultando purchases:', err?.message || err)
   }
 
   return (
@@ -74,6 +96,7 @@ export default async function CuentaPage() {
       initialProfile={profile}
       initialSeller={seller}
       initialAdAccount={adAccount}
+      initialPurchases={purchases}
     />
   )
 }

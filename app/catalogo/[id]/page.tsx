@@ -70,9 +70,32 @@ export default async function ListingPage({ params }: PageProps) {
     )
   }
 
+  // 2. Obtener reseñas verificadas para esta publicación
+  let reviews: any[] = []
+  try {
+    const { data: reviewsData } = await supabase
+      .from('review')
+      .select(`
+        *,
+        buyer:buyer_user_id (id, full_name, city, avatar_url)
+      `)
+      .eq('listing_id', id)
+      .eq('status', 'published')
+      .order('created_at', { ascending: false })
+
+    if (reviewsData) {
+      reviews = reviewsData
+    }
+  } catch (err: any) {
+    console.warn('Aviso consultando reviews:', err?.message || err)
+  }
+
   return (
     <main className="flex-1 bg-zinc-50/50 pb-16 dark:bg-zinc-950">
-      <ListingDetailView listing={listing as ListingWithRelations} />
+      <ListingDetailView
+        listing={listing as ListingWithRelations}
+        initialReviews={reviews}
+      />
     </main>
   )
 }

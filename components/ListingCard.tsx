@@ -120,6 +120,19 @@ export default function ListingCard({ listing }: ListingCardProps) {
           </p>
         )}
 
+        {/* Rating Stars Badge */}
+        {listing.seller?.rating_avg && Number(listing.seller.rating_avg) > 0 ? (
+          <div className="mt-2.5 flex items-center gap-1.5 text-xs">
+            <span className="text-amber-400 font-bold">★</span>
+            <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">
+              {Number(listing.seller.rating_avg).toFixed(1)}
+            </span>
+            <span className="text-[11px] text-zinc-400">
+              ({listing.seller.rating_count || 0})
+            </span>
+          </div>
+        ) : null}
+
         <div className="mt-auto pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
           {/* Seller / Business */}
           <div className="flex items-center gap-1.5 truncate max-w-[65%]">

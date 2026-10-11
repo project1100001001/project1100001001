@@ -107,8 +107,28 @@ export interface Sale {
   service_duration?: string | null
   service_scheduled_for?: string | null
   notes?: string | null
+  has_reviewed?: boolean
   created_at: string
   listing?: ListingWithRelations | null
+}
+
+// ------------------------------------------------------------------
+// Módulo de Reseñas y Calificaciones (010_reviews_ratings_and_seller_reputation.sql)
+// ------------------------------------------------------------------
+
+export interface Review {
+  id: string
+  listing_id: string
+  seller_id: string
+  buyer_user_id: string
+  sale_id?: string | null
+  rating: number // 1 to 5
+  comment: string
+  recommend?: boolean
+  status: 'published' | 'hidden'
+  created_at: string
+  buyer?: AppUser | null
+  listing?: Listing | null
 }
 
 // ------------------------------------------------------------------

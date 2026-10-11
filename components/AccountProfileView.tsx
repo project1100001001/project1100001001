@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import type { AppUser, Seller, AdAccount } from '@/lib/types'
+import type { AppUser, Seller, AdAccount, Sale } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
 import Link from 'next/link'
+import ReviewRatingModal from './ReviewRatingModal'
 
 interface AccountProfileViewProps {
   user: {
@@ -15,6 +17,7 @@ interface AccountProfileViewProps {
   initialProfile: AppUser | null
   initialSeller: Seller | null
   initialAdAccount: AdAccount | null
+  initialPurchases?: Sale[]
 }
 
 export default function AccountProfileView({
@@ -22,15 +25,18 @@ export default function AccountProfileView({
   initialProfile,
   initialSeller,
   initialAdAccount,
+  initialPurchases = [],
 }: AccountProfileViewProps) {
   const { t, locale } = useTranslation()
   const supabase = createClient()
 
   // State
-  const [activeTab, setActiveTab] = useState<'view' | 'edit'>('view')
+  const [activeTab, setActiveTab] = useState<'view' | 'edit' | 'orders'>('view')
   const [profile, setProfile] = useState<AppUser | null>(initialProfile)
   const [seller, setSeller] = useState<Seller | null>(initialSeller)
   const [adAccount, setAdAccount] = useState<AdAccount | null>(initialAdAccount)
+  const [purchases, setPurchases] = useState<Sale[]>(initialPurchases)
+  const [ratingModalSale, setRatingModalSale] = useState<Sale | null>(null)
 
   // Edit fields
   const [fullName, setFullName] = useState(initialProfile?.full_name || '')
@@ -220,7 +226,7 @@ export default function AccountProfileView({
             </div>
 
             {/* Selector de pestañas / Acción de edición */}
-            <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t border-zinc-100 sm:border-0 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t border-zinc-100 sm:border-0 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => {
@@ -235,6 +241,27 @@ export default function AccountProfileView({
                 }`}
               >
                 👁️ {t.account.viewTab}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('orders')
+                  setSuccessMsg(null)
+                  setErrorMsg(null)
+                }}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'orders'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                }`}
+              >
+                <span>🛍️</span>
+                <span>{locale === 'en' ? 'Purchases & Reviews' : 'Compras & Calificaciones'}</span>
+                {purchases.filter((p) => p.status === 'completed' && !p.has_reviewed).length > 0 && (
+                  <span className="rounded-full bg-red-500 px-1.5 py-0.2 text-[9px] font-black text-white">
+                    {purchases.filter((p) => p.status === 'completed' && !p.has_reviewed).length}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -254,6 +281,30 @@ export default function AccountProfileView({
             </div>
           </div>
         </div>
+
+        {/* Alerta de Calificación Obligatoria Pendiente */}
+        {purchases.filter((p) => p.status === 'completed' && !p.has_reviewed).length > 0 && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 dark:border-amber-900/60 dark:bg-amber-950/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⭐</span>
+              <div>
+                <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                  {t.reviews.pendingReviewAlert} ({purchases.filter((p) => p.status === 'completed' && !p.has_reviewed).length})
+                </h4>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                  {t.reviews.pendingReviewDesc}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('orders')}
+              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-400 shrink-0 transition-colors"
+            >
+              {t.reviews.rateNowBtn}
+            </button>
+          </div>
+        )}
 
         {/* Feedback Alerts */}
         {successMsg && (
@@ -751,6 +802,182 @@ export default function AccountProfileView({
               </button>
             </div>
           </form>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* MODO 3: HISTORIAL DE COMPRAS Y CALIFICACIONES OBLIGATORIAS */}
+        {/* ------------------------------------------------------------------ */}
+        {activeTab === 'orders' && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                  <span>🛍️</span>
+                  <span>{locale === 'en' ? 'My Purchases & Seller Ratings' : 'Mis Compras y Calificaciones de Vendedor'}</span>
+                </h2>
+                <p className="mt-1 text-xs text-zinc-500 max-w-xl">
+                  {locale === 'en'
+                    ? 'Every completed order requires your honest rating and review to establish seller reputation and ensure authentic marketplace trust.'
+                    : 'Cada compra o servicio recibido requiere obligatoriamente tu calificación con estrellas y opinión para respaldar la veracidad y reputación del comercio.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="rounded-xl bg-zinc-100 px-3 py-1.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  {purchases.length} {locale === 'en' ? 'orders' : 'pedidos'}
+                </span>
+              </div>
+            </div>
+
+            {purchases.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-4xl">🛒</span>
+                <h3 className="mt-3 text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                  {locale === 'en' ? 'No purchases registered yet' : 'Aún no registras compras o pedidos'}
+                </h3>
+                <p className="mt-1 text-xs text-zinc-500 max-w-sm mx-auto">
+                  {locale === 'en'
+                    ? 'Explore our catalog of local products and services, and remember to rate your experience!'
+                    : 'Explora nuestro catálogo de productos y servicios locales, ¡y recuerda calificar tu experiencia!'}
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href="/catalogo"
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500"
+                  >
+                    {t.nav.catalog}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {purchases.map((purchase) => {
+                  const listingTitle = purchase.listing?.title || 'Artículo del Marketplace'
+                  const sellerName = purchase.listing?.seller?.business_name || 'Comercio Local'
+                  const isService = purchase.type === 'service'
+                  const isCompleted = purchase.status === 'completed'
+                  const hasReviewed = Boolean(purchase.has_reviewed)
+                  const coverImage = purchase.listing?.listing_media?.[0]?.url || null
+
+                  return (
+                    <div
+                      key={purchase.id}
+                      className={`rounded-2xl border bg-white p-5 shadow-xs transition-all dark:bg-zinc-900 ${
+                        !hasReviewed && isCompleted
+                          ? 'border-amber-300 bg-amber-50/20 dark:border-amber-900/60'
+                          : 'border-zinc-200 dark:border-zinc-800'
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                            {coverImage ? (
+                              <Image
+                                src={coverImage}
+                                alt={listingTitle}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-2xl">
+                                {isService ? '⏱️' : '📦'}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                {isService ? '⏱️ Servicio' : '📦 Producto'}
+                              </span>
+                              <span className="text-[11px] text-zinc-400">
+                                • {new Date(purchase.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
+                              </span>
+                            </div>
+
+                            <h3 className="mt-1 font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                              {listingTitle}
+                            </h3>
+
+                            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                              <span>
+                                Vendedor: <strong className="text-zinc-800 dark:text-zinc-200">{sellerName}</strong>
+                              </span>
+                              <span>
+                                Total: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">${Number(purchase.total_amount).toLocaleString('es-CO')} COP</strong>
+                              </span>
+                              <span>
+                                Cant: <strong>{purchase.quantity}</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Columna Derecha: Estado y Módulo Obligatorio de Calificación */}
+                        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-zinc-100 dark:border-zinc-800">
+                          {/* Estado de la Orden */}
+                          <span
+                            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                              isCompleted
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                            }`}
+                          >
+                            {isCompleted ? '✓ Completado / Entregado' : '⏳ En proceso'}
+                          </span>
+
+                          {/* Estado de Calificación */}
+                          {hasReviewed ? (
+                            <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center gap-1.5">
+                              <span>★</span>
+                              <span>{t.reviews.alreadyReviewed}</span>
+                            </span>
+                          ) : isCompleted ? (
+                            <button
+                              type="button"
+                              onClick={() => setRatingModalSale(purchase)}
+                              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-400 transition-colors flex items-center gap-1.5 animate-pulse"
+                            >
+                              <span>⭐</span>
+                              <span>{t.reviews.rateNowBtn} (Obligatorio)</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400 italic">
+                              Podrás calificar una vez completada la entrega
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal de Calificación Activo */}
+        {ratingModalSale && (
+          <ReviewRatingModal
+            isOpen={Boolean(ratingModalSale)}
+            onClose={() => setRatingModalSale(null)}
+            listingId={ratingModalSale.listing_id}
+            listingTitle={ratingModalSale.listing?.title || 'Artículo del Marketplace'}
+            sellerId={ratingModalSale.seller_id}
+            sellerName={ratingModalSale.listing?.seller?.business_name}
+            listingType={ratingModalSale.type}
+            saleId={ratingModalSale.id}
+            onSuccess={() => {
+              setPurchases((prev) =>
+                prev.map((p) =>
+                  p.id === ratingModalSale.id ? { ...p, has_reviewed: true } : p
+                )
+              )
+              setSuccessMsg(t.reviews.successNotice)
+              setTimeout(() => setSuccessMsg(null), 5000)
+              setRatingModalSale(null)
+            }}
+          />
         )}
       </div>
     </main>
