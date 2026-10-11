@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingType, Seller } from '@/lib/types'
 import Link from 'next/link'
+import { useTranslation } from '@/lib/i18n'
 
 interface ListingFormProps {
   categories: Category[]
@@ -14,6 +15,7 @@ interface ListingFormProps {
 export default function ListingForm({ categories }: ListingFormProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { t, locale } = useTranslation()
 
   // Auth & Seller state
   const [loadingAuth, setLoadingAuth] = useState(true)
@@ -88,7 +90,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
           setCity(sellerData[0].city || '')
           setShowSellerSetup(false)
         } else {
-          // No seller record exists yet
+          // El usuario no tiene perfil de vendedor aún, mostrar formulario de configuración
           setShowSellerSetup(true)
         }
       }
@@ -525,10 +527,12 @@ export default function ListingForm({ categories }: ListingFormProps) {
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Publicar nuevo anuncio
+          {locale === 'en' ? 'Post a New Listing' : 'Publicar nuevo anuncio'}
         </h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Completa la información de tu producto, servicio o artículo para el catálogo del marketplace.
+          {locale === 'en'
+            ? 'Complete your product, service, or item details for the marketplace catalog.'
+            : 'Completa la información de tu producto, servicio o artículo para el catálogo del marketplace.'}
         </p>
       </div>
 
@@ -991,7 +995,9 @@ export default function ListingForm({ categories }: ListingFormProps) {
               onClick={() => handleSubmitListing('draft')}
               className="rounded-lg border border-zinc-300 px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
             >
-              {submitting ? 'Guardando...' : 'Guardar como borrador'}
+              {submitting
+                ? t.common.loading
+                : (locale === 'en' ? 'Save as draft' : 'Guardar como borrador')}
             </button>
 
             <button
@@ -1006,10 +1012,10 @@ export default function ListingForm({ categories }: ListingFormProps) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  <span>Procesando...</span>
+                  <span>{t.common.loading}</span>
                 </>
               ) : (
-                <span>Publicar para revisión</span>
+                <span>{locale === 'en' ? 'Publish for review' : 'Publicar para revisión'}</span>
               )}
             </button>
           </div>

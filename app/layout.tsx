@@ -1,7 +1,10 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/Navbar'
+import AppSidebar from '@/components/AppSidebar'
+import AppMobileHeader from '@/components/AppMobileHeader'
+import Footer from '@/components/Footer'
+import ClientProviders from '@/components/ClientProviders'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -13,9 +16,19 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
+}
+
 export const metadata: Metadata = {
   title: 'Marketplace de Pymes y Emprendedores',
-  description: 'Catálogo comercial para conectar compradores con pequeñas empresas locales.',
+  description: 'Catálogo comercial mobile-first para conectar compradores con pequeñas empresas locales.',
 }
 
 export default function RootLayout({
@@ -26,32 +39,31 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100">
-        <Navbar />
-        <div className="flex-1 flex flex-col">{children}</div>
-        <footer className="border-t border-zinc-200 bg-white py-8 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded bg-emerald-600 font-bold text-white text-xs">
-                M
-              </span>
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                Marketplace Pymes
-              </span>
-            </div>
-            <p>Conectando emprendedores, servicios locales y compradores.</p>
-            <div className="flex gap-4">
-              <a href="/catalogo" className="hover:text-emerald-600">
-                Catálogo
-              </a>
-              <a href="/publicar" className="hover:text-emerald-600">
-                Publicar
-              </a>
+      <head>
+        {/* Anti-FOUC theme script: immediately applies .dark class before first paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('marketplace_theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;if(t==='dark'||(!t&&d)){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="min-h-full bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100 transition-colors selection:bg-emerald-500 selection:text-white">
+        <ClientProviders>
+          <div className="min-h-screen flex flex-col md:flex-row">
+            {/* Left Sidebar Navigation (Exclusive navigation driver) */}
+            <AppSidebar />
+
+            {/* Central Workspace: Clean content area without navigation links */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <AppMobileHeader />
+              <div className="flex-1 flex flex-col">{children}</div>
+              <Footer />
             </div>
           </div>
-        </footer>
+        </ClientProviders>
       </body>
     </html>
   )

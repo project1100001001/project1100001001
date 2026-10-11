@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { ListingWithRelations } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface ListingDetailViewProps {
   listing: ListingWithRelations
 }
 
 export default function ListingDetailView({ listing }: ListingDetailViewProps) {
+  const { t, locale } = useTranslation()
   const media = listing.listing_media?.sort((a, b) => a.position - b.position) || []
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
@@ -18,15 +20,15 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
   // Format price
   const formattedPrice =
     listing.price !== null
-      ? `$ ${listing.price.toLocaleString('es-CO')}`
-      : 'Cotización a solicitud'
+      ? `$ ${listing.price.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}`
+      : t.listingDetail.quoteOnRequest
 
   // Format seller whatsapp link
   const sellerPhone = listing.seller?.whatsapp || listing.seller?.phone
   const cleanPhone = sellerPhone ? sellerPhone.replace(/\D/g, '') : null
   const whatsappUrl = cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-        `Hola, me interesa tu publicación "${listing.title}" en el Marketplace.`
+        `${t.listingDetail.chatGreetingPrefix} "${listing.title}" ${t.listingDetail.chatGreetingSuffix}`
       )}`
     : null
 
@@ -41,7 +43,6 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Insertar fila en contact_event (el trigger de la BD incrementa listing.contact_count automáticamente)
       await supabase.from('contact_event').insert({
         listing_id: listing.id,
         buyer_user_id: user?.id || null,
@@ -121,31 +122,31 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
 
   // Type metadata
   const typeMap: Record<string, { label: string; icon: string }> = {
-    product: { label: 'Producto', icon: '🛍️' },
-    service: { label: 'Servicio', icon: '🛠️' },
-    article: { label: 'Artículo', icon: '📦' },
+    product: { label: t.common.product, icon: '🛍️' },
+    service: { label: t.common.service, icon: '🛠️' },
+    article: { label: t.common.article, icon: '📦' },
   }
   const typeInfo = typeMap[listing.type] || { label: listing.type, icon: '🏷️' }
 
   // Status badges
   const statusInfo: Record<string, { label: string; desc: string; bg: string; text: string }> = {
     draft: {
-      label: 'Borrador',
-      desc: 'Este anuncio es visible únicamente para ti. No está activo en el catálogo.',
+      label: t.common.draft,
+      desc: locale === 'en' ? 'Visible only to you. Not public in catalog.' : 'Este anuncio es visible únicamente para ti. No está activo en el catálogo.',
       bg: 'bg-zinc-100 dark:bg-zinc-800',
       text: 'text-zinc-700 dark:text-zinc-300',
     },
     submitted: {
-      label: 'En revisión (Submitted)',
-      desc: 'Este anuncio fue enviado al equipo de moderación. Pronto será revisado para publicación.',
+      label: t.common.inReview,
+      desc: locale === 'en' ? 'Submitted to moderation team. Will be reviewed shortly.' : 'Este anuncio fue enviado al equipo de moderación. Pronto será revisado.',
       bg: 'bg-amber-50 dark:bg-amber-950/40',
       text: 'text-amber-800 dark:text-amber-300',
     },
     rejected: {
-      label: 'Rechazado',
+      label: t.common.rejected,
       desc: listing.reject_reason
-        ? `Motivo: ${listing.reject_reason}`
-        : 'Este anuncio no cumplió con las políticas de publicación.',
+        ? `${locale === 'en' ? 'Reason' : 'Motivo'}: ${listing.reject_reason}`
+        : (locale === 'en' ? 'Does not comply with listing policies.' : 'Este anuncio no cumplió con las políticas de publicación.'),
       bg: 'bg-red-50 dark:bg-red-950/40',
       text: 'text-red-800 dark:text-red-300',
     },
@@ -159,16 +160,6 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Back button */}
-      <div className="mb-6">
-        <Link
-          href="/catalogo"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
-        >
-          ← Volver al catálogo
-        </Link>
-      </div>
-
       {/* Admin Moderation Bar */}
       {isAdmin && (
         <div className="mb-6 rounded-2xl border-2 border-purple-300 bg-purple-50/90 p-5 shadow-sm dark:border-purple-800 dark:bg-purple-950/40">
@@ -180,26 +171,21 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
               <div>
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    Panel de Moderación (Admin)
+                    {t.listingDetail.adminModeration}
                   </h4>
                   <span className="rounded-md bg-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-900 dark:bg-purple-900 dark:text-purple-200 uppercase">
-                    Estado: {listingStatus}
+                    {t.common.status}: {listingStatus}
                   </span>
                 </div>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
-                  Como administrador, puedes aprobar este anuncio para que sea visible en el catálogo público o rechazarlo indicando el motivo.
+                  {locale === 'en'
+                    ? 'As an administrator, approve this listing to make it visible in the public catalog, or reject it with notes.'
+                    : 'Como administrador, puedes aprobar este anuncio para que sea visible en el catálogo público o rechazarlo indicando el motivo.'}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Link
-                href="/admin"
-                className="rounded-xl border border-purple-300 bg-white px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:bg-zinc-800 dark:text-purple-300"
-              >
-                Cola de Moderación →
-              </Link>
-
               {listingStatus !== 'published' ? (
                 <button
                   type="button"
@@ -208,12 +194,12 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-1.5"
                 >
                   <span>✓</span>
-                  <span>{moderating ? 'Aprobando...' : 'Aprobar Publicación'}</span>
+                  <span>{moderating ? t.common.loading : t.listingDetail.approve}</span>
                 </button>
               ) : (
                 <span className="rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
                   <span>✓</span>
-                  <span>Aprobado / Público</span>
+                  <span>{t.common.approved}</span>
                 </span>
               )}
 
@@ -224,7 +210,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                   onClick={() => setShowRejectInput(!showRejectInput)}
                   className="rounded-xl border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 transition-colors"
                 >
-                  ✕ Rechazar
+                  ✕ {t.listingDetail.reject}
                 </button>
               )}
             </div>
@@ -236,7 +222,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                 type="text"
                 value={rejectText}
                 onChange={(e) => setRejectText(e.target.value)}
-                placeholder="Indica el motivo del rechazo (ej. Falta precio exacto, imagen inadecuada...)"
+                placeholder={t.listingDetail.rejectReasonPlaceholder}
                 className="flex-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-red-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <button
@@ -245,7 +231,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                 onClick={handleAdminReject}
                 className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                Confirmar Rechazo
+                {t.listingDetail.confirmReject}
               </button>
             </div>
           )}
@@ -259,7 +245,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
             <span className="text-xl">⚠️</span>
             <div>
               <strong className="block text-sm font-bold">
-                Vista previa del autor: Estado {currentStatus.label}
+                {locale === 'en' ? 'Author preview' : 'Vista previa del autor'}: {currentStatus.label}
               </strong>
               <p className="text-xs mt-0.5">{currentStatus.desc}</p>
             </div>
@@ -281,7 +267,9 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-400">
                 <span className="text-6xl">{typeInfo.icon}</span>
-                <span className="mt-2 text-xs font-medium">Sin imagen disponible</span>
+                <span className="mt-2 text-xs font-medium">
+                  {locale === 'en' ? 'No image available' : 'Sin imagen disponible'}
+                </span>
               </div>
             )}
           </div>
@@ -309,10 +297,10 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
           {/* Description Section */}
           <div className="mt-8 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-3">
-              Descripción
+              {t.listingDetail.description}
             </h2>
             <div className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-line">
-              {listing.description || 'El vendedor no incluyó una descripción adicional.'}
+              {listing.description || (locale === 'en' ? 'No additional description provided.' : 'El vendedor no incluyó una descripción adicional.')}
             </div>
           </div>
 
@@ -320,7 +308,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
           {attrsEntries.length > 0 && (
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">
-                Características y Atributos
+                {t.listingDetail.specifications}
               </h2>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {attrsEntries.map(([key, val]) => (
@@ -371,7 +359,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
 
             {/* Price Box */}
             <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
-              <span className="text-xs text-zinc-500 block mb-1">Precio</span>
+              <span className="text-xs text-zinc-500 block mb-1">{t.common.price}</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-50">
                   {formattedPrice}
@@ -390,8 +378,8 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 <span>
                   {listing.stock > 0
-                    ? `${listing.stock} disponibles en stock`
-                    : 'Agotado temporalmente'}
+                    ? `${listing.stock} ${locale === 'en' ? 'units in stock' : 'disponibles en stock'}`
+                    : (locale === 'en' ? 'Temporarily out of stock' : 'Agotado temporalmente')}
                 </span>
               </div>
             )}
@@ -399,22 +387,22 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
             {/* Seller Contact Card */}
             <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800 space-y-4">
               <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                Vendido y ofrecido por:
+                {t.listingDetail.sellerInfo}
               </span>
 
               <div className="flex items-start justify-between">
                 <div>
                   <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                    {listing.seller?.business_name || 'Negocio'}
+                    {listing.seller?.business_name || t.common.seller}
                     {listing.seller?.verified && (
-                      <span className="text-blue-500 text-sm" title="Vendedor Verificado">
+                      <span className="text-blue-500 text-sm" title={t.listingDetail.verifiedSeller}>
                         ✓
                       </span>
                     )}
                   </h4>
                   {listing.seller?.city && (
                     <span className="text-xs text-zinc-500">
-                      Ubicación: {listing.seller.city}
+                      {t.listingDetail.location}: {listing.seller.city}
                     </span>
                   )}
                 </div>
@@ -435,14 +423,14 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                     disabled={contacting}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-75"
                   >
-                    <span>{contacting ? 'Conectando...' : '💬 Contactar por WhatsApp'}</span>
+                    <span>{contacting ? t.common.loading : `💬 ${t.listingDetail.contactWhatsApp}`}</span>
                   </button>
                 ) : (
                   <button
                     disabled
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-200 px-4 py-3 text-sm font-semibold text-zinc-500 dark:bg-zinc-800"
                   >
-                    WhatsApp no registrado
+                    {locale === 'en' ? 'WhatsApp not registered' : 'WhatsApp no registrado'}
                   </button>
                 )}
 
@@ -451,7 +439,7 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
                     href={`tel:${listing.seller.phone}`}
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                   >
-                    <span>📞 Llamar: {listing.seller.phone}</span>
+                    <span>📞 {locale === 'en' ? 'Call' : 'Llamar'}: {listing.seller.phone}</span>
                   </a>
                 )}
               </div>
@@ -459,8 +447,10 @@ export default function ListingDetailView({ listing }: ListingDetailViewProps) {
 
             {/* Metadata Footer */}
             <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800/80 text-[11px] text-zinc-400 space-y-1">
-              <div>Publicado: {new Date(listing.created_at).toLocaleDateString('es-CO')}</div>
-              <div>ID de publicación: {listing.id}</div>
+              <div>
+                {t.listingDetail.publishedOn}: {new Date(listing.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
+              </div>
+              <div>ID: {listing.id}</div>
             </div>
           </div>
         </div>

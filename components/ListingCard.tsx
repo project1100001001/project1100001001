@@ -1,16 +1,21 @@
+'use client'
+
 import Link from 'next/link'
 import type { ListingWithRelations } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface ListingCardProps {
   listing: ListingWithRelations
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
+  const { t, locale } = useTranslation()
+
   // Format price
   const formattedPrice =
     listing.price !== null
-      ? `$ ${listing.price.toLocaleString('es-CO')}`
-      : 'Cotización a solicitud'
+      ? `$ ${listing.price.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}`
+      : t.common.quoteOnRequest
 
   // Primary image
   const primaryMedia = listing.listing_media?.sort((a, b) => a.position - b.position)[0]
@@ -19,15 +24,15 @@ export default function ListingCard({ listing }: ListingCardProps) {
   // Type badge styling & label
   const typeMap: Record<string, { label: string; color: string }> = {
     product: {
-      label: 'Producto',
+      label: t.common.product,
       color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
     },
     service: {
-      label: 'Servicio',
+      label: t.common.service,
       color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
     },
     article: {
-      label: 'Artículo',
+      label: t.common.article,
       color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
     },
   }
@@ -39,9 +44,9 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
   // Status badge for owner view (if draft/submitted/rejected)
   const statusBadges: Record<string, { label: string; color: string }> = {
-    draft: { label: 'Borrador', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
-    submitted: { label: 'En revisión', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
-    rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
+    draft: { label: t.common.draft, color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
+    submitted: { label: t.common.inReview, color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
+    rejected: { label: t.common.rejected, color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
   }
 
   return (
@@ -120,10 +125,10 @@ export default function ListingCard({ listing }: ListingCardProps) {
           <div className="flex items-center gap-1.5 truncate max-w-[65%]">
             <span className="text-xs">🏢</span>
             <span className="truncate font-medium text-zinc-700 dark:text-zinc-300">
-              {listing.seller?.business_name || 'Vendedor'}
+              {listing.seller?.business_name || t.common.seller}
             </span>
             {listing.seller?.verified && (
-              <span className="text-blue-500" title="Verificado">
+              <span className="text-blue-500" title={t.common.verified}>
                 ✓
               </span>
             )}

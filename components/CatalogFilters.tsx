@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { Category } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface CatalogFiltersProps {
   categories: Category[]
@@ -26,6 +27,7 @@ export default function CatalogFilters({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const { t, locale } = useTranslation()
 
   const [q, setQ] = useState(currentFilters.q || '')
   const [selectedCategory, setSelectedCategory] = useState(currentFilters.category || '')
@@ -90,9 +92,16 @@ export default function CatalogFilters({
     (sort && sort !== 'newest')
   )
 
+  const typeOptions = [
+    { id: '', label: locale === 'en' ? 'All types' : 'Todos los tipos' },
+    { id: 'product', label: locale === 'en' ? '🛍️ Products' : '🛍️ Productos' },
+    { id: 'service', label: locale === 'en' ? '🛠️ Services' : '🛠️ Servicios' },
+    { id: 'article', label: locale === 'en' ? '📦 Articles' : '📦 Artículos' },
+  ]
+
   return (
     <div className="space-y-4">
-      {/* 1. Main Search Bar */}
+      {/* 1. Main Search Bar (Touch friendly on mobile) */}
       <form onSubmit={handleSearchSubmit} className="flex gap-2">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
@@ -109,50 +118,47 @@ export default function CatalogFilters({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="¿Qué estás buscando? (ej. empanadas, plomería, laptop...)"
-            className="w-full rounded-xl border border-zinc-300 bg-white pl-11 pr-4 py-3 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            placeholder={t.common.searchPlaceholder}
+            className="w-full rounded-2xl border border-zinc-300 bg-white pl-11 pr-4 py-3 text-sm text-zinc-900 shadow-xs placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 transition-colors"
           />
         </div>
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-50"
+          className="rounded-2xl bg-emerald-600 px-5 sm:px-6 py-3 text-sm font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors disabled:opacity-50 shrink-0"
         >
-          {isPending ? 'Buscando...' : 'Buscar'}
+          {isPending ? t.common.loading : t.common.search}
         </button>
       </form>
 
-      {/* 2. Type Tabs: Todos, Productos, Servicios, Artículos */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <span className="text-xs font-medium text-zinc-500 mr-1">Tipo:</span>
-        {[
-          { id: '', label: 'Todos los tipos' },
-          { id: 'product', label: '🛍️ Productos' },
-          { id: 'service', label: '🛠️ Servicios' },
-          { id: 'article', label: '📦 Artículos' },
-        ].map((t) => {
-          const active = selectedType === t.id
+      {/* 2. Type Tabs: Horizontally swipeable on mobile */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <span className="text-xs font-semibold text-zinc-400 shrink-0 mr-1">
+          {locale === 'en' ? 'Type:' : 'Tipo:'}
+        </span>
+        {typeOptions.map((item) => {
+          const active = selectedType === item.id
           return (
             <button
-              key={t.id}
+              key={item.id}
               type="button"
               onClick={() => {
-                setSelectedType(t.id)
-                applyFilters({ type: t.id })
+                setSelectedType(item.id)
+                applyFilters({ type: item.id })
               }}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                 active
-                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
+                  ? 'bg-zinc-900 text-white shadow-2xs dark:bg-white dark:text-zinc-900'
                   : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
               }`}
             >
-              {t.label}
+              {item.label}
             </button>
           )
         })}
       </div>
 
-      {/* 3. Category Pills */}
+      {/* 3. Category Pills: Swipeable carousel on mobile */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
         <button
           type="button"
@@ -160,13 +166,13 @@ export default function CatalogFilters({
             setSelectedCategory('')
             applyFilters({ category: '' })
           }}
-          className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+          className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
             !selectedCategory
-              ? 'border border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+              ? 'border border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-2xs'
               : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400'
           }`}
         >
-          Todas las categorías
+          {t.common.allCategories}
         </button>
 
         {categories.map((cat) => {
@@ -179,9 +185,9 @@ export default function CatalogFilters({
                 setSelectedCategory(cat.slug)
                 applyFilters({ category: cat.slug })
               }}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
                 active
-                  ? 'border border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  ? 'border border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 shadow-2xs'
                   : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400'
               }`}
             >
@@ -191,21 +197,23 @@ export default function CatalogFilters({
         })}
       </div>
 
-      {/* 4. Filter bar: City, Price, Sort & Reset */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+      {/* 4. Filter bar: City, Price, Sort & Reset (Stacked nicely on mobile, row on tablet/desktop) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-3.5 dark:border-zinc-800 dark:bg-zinc-900/40">
         <div className="flex flex-wrap items-center gap-3">
           {/* City select */}
           <div className="flex items-center gap-1.5">
-            <label className="text-xs text-zinc-500">Ciudad:</label>
+            <label className="text-xs text-zinc-500 font-medium">
+              {locale === 'en' ? 'City:' : 'Ciudad:'}
+            </label>
             <select
               value={selectedCity}
               onChange={(e) => {
                 setSelectedCity(e.target.value)
                 applyFilters({ city: e.target.value })
               }}
-              className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              className="rounded-xl border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              <option value="">Todas las ciudades</option>
+              <option value="">{t.common.allCities}</option>
               {cities.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -215,43 +223,45 @@ export default function CatalogFilters({
           </div>
 
           {/* Price Range */}
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-            <span>Precio:</span>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
+            <span>{t.common.price}:</span>
             <input
               type="number"
-              placeholder="Mín"
+              placeholder={locale === 'en' ? 'Min' : 'Mín'}
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
               onBlur={() => applyFilters()}
-              className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             <span>-</span>
             <input
               type="number"
-              placeholder="Máx"
+              placeholder={locale === 'en' ? 'Max' : 'Máx'}
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
               onBlur={() => applyFilters()}
-              className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="w-20 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-800">
           {/* Sort Select */}
           <div className="flex items-center gap-1.5">
-            <label className="text-xs text-zinc-500">Ordenar:</label>
+            <label className="text-xs text-zinc-500 font-medium">
+              {locale === 'en' ? 'Sort:' : 'Ordenar:'}
+            </label>
             <select
               value={sort}
               onChange={(e) => {
                 setSort(e.target.value)
                 applyFilters({ sort: e.target.value })
               }}
-              className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              className="rounded-xl border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              <option value="newest">Más recientes</option>
-              <option value="price_asc">Menor precio</option>
-              <option value="price_desc">Mayor precio</option>
+              <option value="newest">{locale === 'en' ? 'Newest' : 'Más recientes'}</option>
+              <option value="price_asc">{locale === 'en' ? 'Lowest price' : 'Menor precio'}</option>
+              <option value="price_desc">{locale === 'en' ? 'Highest price' : 'Mayor precio'}</option>
             </select>
           </div>
 
@@ -260,9 +270,9 @@ export default function CatalogFilters({
             <button
               type="button"
               onClick={handleClearFilters}
-              className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 font-medium"
+              className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400"
             >
-              Limpiar filtros
+              {locale === 'en' ? 'Clear filters' : 'Limpiar filtros'}
             </button>
           )}
         </div>
