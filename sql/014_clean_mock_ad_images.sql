@@ -4,6 +4,11 @@
 -- para que muestren íconos y emojis temáticos idénticos al catálogo
 -- =========================================================================
 
+-- 1. Quitar restricción NOT NULL para que las campañas admitan image_url NULL
+ALTER TABLE public.ad_order 
+  ALTER COLUMN image_url DROP NOT NULL;
+
+-- 2. Limpiar URLs de imágenes de prueba (unsplash, placeholder, etc.)
 UPDATE public.ad_order
 SET image_url = NULL
 WHERE image_url ILIKE '%unsplash%'

@@ -15,11 +15,15 @@
 -- Ejecutar en el SQL Editor de Supabase.
 -- ============================================================
 
--- 1. Asegurar columnas de métricas en public.ad_order
+-- 1. Asegurar columnas de métricas en public.ad_order y permitir que image_url sea opcional (NULL)
 ALTER TABLE public.ad_order 
   ADD COLUMN IF NOT EXISTS clicks_count BIGINT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS impressions_count BIGINT NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS contacts_count BIGINT NOT NULL DEFAULT 0;
+
+-- Quitar restricción NOT NULL de image_url para permitir campañas sin obligar imagen de prueba
+ALTER TABLE public.ad_order 
+  ALTER COLUMN image_url DROP NOT NULL;
 
 -- Crear índices de apoyo si no existen
 CREATE INDEX IF NOT EXISTS idx_ad_order_clicks_count ON public.ad_order (clicks_count);
@@ -216,7 +220,10 @@ BEGIN
             v_listing.id,
             v_listing.title,
             COALESCE(v_listing.description, 'Promoción especial en catálogo.'),
-            NULL, -- Sin imagen de prueba simulada; usa íconos/emojis cuando no se sube imagen real
+            COALESCE(
+              (SELECT url FROM public.listing_media WHERE listing_id = v_listing.id AND url NOT ILIKE '%unsplash%' AND url NOT ILIKE '%placeholder%' ORDER BY position ASC LIMIT 1),
+              NULL
+            ),
             'Ver más',
             v_listing.city,
             'live',
