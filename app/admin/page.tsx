@@ -1,6 +1,7 @@
 // app/admin/page.tsx
 // Panel de control y moderación de publicaciones para administradores
 
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -249,16 +250,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <main className="flex-1 bg-zinc-50/50 py-10 dark:bg-zinc-950">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <AdminModerationPanel
-          initialListings={(listingsData as ListingWithRelations[]) || []}
-          initialAdOrders={(adOrdersData as any[]) || []}
-          initialAdAccounts={adAccountsData}
-          initialSellers={sellersData}
-          initialTransactions={recentTransactionsData}
-          initialRechargeRequests={rechargeRequestsData}
-          initialUsers={usersData}
-          defaultSection={defaultSection}
-        />
+        <Suspense
+          fallback={
+            <div className="flex justify-center items-center py-20 text-sm text-zinc-500">
+              <span>Cargando panel de administración y moderación...</span>
+            </div>
+          }
+        >
+          <AdminModerationPanel
+            initialListings={(listingsData as ListingWithRelations[]) || []}
+            initialAdOrders={(adOrdersData as any[]) || []}
+            initialAdAccounts={adAccountsData}
+            initialSellers={sellersData}
+            initialTransactions={recentTransactionsData}
+            initialRechargeRequests={rechargeRequestsData}
+            initialUsers={usersData}
+            defaultSection={defaultSection}
+          />
+        </Suspense>
       </div>
     </main>
   )

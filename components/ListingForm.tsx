@@ -88,6 +88,22 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successInfo, setSuccessInfo] = useState<{ id: string; status: string } | null>(null)
 
+  // Sincronizar tipo de publicación cuando cambia el parámetro de URL (ej. desde el menú lateral)
+  useEffect(() => {
+    if (!isLockedType && initialTypeParam && (initialTypeParam === 'product' || initialTypeParam === 'article' || initialTypeParam === 'service')) {
+      setType(initialTypeParam)
+      if (initialTypeParam === 'service') {
+        setPriceUnit('servicio')
+      } else if (initialTypeParam === 'article') {
+        setCondition('Usado - Buen estado')
+        setPriceUnit('unidad')
+      } else {
+        setCondition('Nuevo')
+        setPriceUnit('unidad')
+      }
+    }
+  }, [initialTypeParam, isLockedType])
+
   // Load user and sellers
   useEffect(() => {
     async function initUserAndSeller() {

@@ -110,6 +110,8 @@ export interface Dictionary {
     daysRemaining: string
     productsRunwayTitle: string
     productsRunwaySubtitle: string
+    articlesRunwayTitle: string
+    articlesRunwaySubtitle: string
     servicesRunwayTitle: string
     servicesRunwaySubtitle: string
     merchantsRunwayTitle: string

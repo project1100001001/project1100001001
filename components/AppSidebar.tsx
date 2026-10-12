@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import { useTranslation } from '@/lib/i18n'
@@ -11,20 +11,600 @@ import ThemeToggle from './ThemeToggle'
 import { useSidebar } from './SidebarContext'
 import { hasPermission } from '@/lib/permissions'
 
-interface CategoryItem {
-  slug: string
-  name: string
-  icon: string
+interface SidebarNavContentProps {
+  pathname: string
+  currentType: string
+  currentTab: string
+  currentSection: string
+  close: () => void
+  t: any
+  locale: string
+  role: string | null
+  pendingCount: number
 }
 
-const CATEGORIES: CategoryItem[] = [
-  { slug: 'alimentos', name: 'Alimentos artesanales', icon: '🍲' },
-  { slug: 'servicios-hogar', name: 'Servicios para el hogar', icon: '🔧' },
-  { slug: 'belleza', name: 'Belleza y Estilo', icon: '💇' },
-  { slug: 'ropa-accesorios', name: 'Ropa y Accesorios', icon: '👗' },
-  { slug: 'clases-educacion', name: 'Clases y Educación', icon: '📚' },
-  { slug: 'otros', name: 'Otros artículos', icon: '✨' },
-]
+function SidebarNavContent({
+  pathname,
+  currentType,
+  currentTab,
+  currentSection,
+  close,
+  t,
+  locale,
+  role,
+  pendingCount,
+}: SidebarNavContentProps) {
+  // Accordion open/close state for suboptions
+  const [catalogOpen, setCatalogOpen] = useState(true)
+  const [listingsOpen, setListingsOpen] = useState(true)
+  const [campaignsOpen, setCampaignsOpen] = useState(true)
+  const [adminOpen, setAdminOpen] = useState(true)
+
+  const [customSection, setCustomSection] = useState<string>('')
+  useEffect(() => {
+    const handleSec = (e: any) => {
+      if (e.detail) setCustomSection(e.detail)
+    }
+    window.addEventListener('admin-section-change', handleSec)
+    return () => window.removeEventListener('admin-section-change', handleSec)
+  }, [])
+
+  const effectiveSection = currentSection || customSection
+
+  // Determine active states
+  const isHomeActive = pathname === '/'
+
+  // Catalog
+  const isAllCatalogActive = pathname === '/catalogo' && !currentType
+  const isCatalogServiceActive = pathname === '/catalogo' && currentType === 'service'
+  const isCatalogArticleActive = pathname === '/catalogo' && currentType === 'article'
+  const isCatalogProductActive = pathname === '/catalogo' && currentType === 'product'
+
+  // Directory
+  const isDirectoryActive = pathname === '/directorio'
+
+  // Listings / Inventory
+  const isInventoryActive = (pathname === '/mis-publicaciones' || pathname === '/inventario') && !currentType
+  const isPublishServiceActive = pathname === '/publicar' && currentType === 'service'
+  const isPublishArticleActive = pathname === '/publicar' && currentType === 'article'
+  const isPublishProductActive = pathname === '/publicar' && (currentType === 'product' || (!currentType && pathname === '/publicar'))
+
+  // Campaigns
+  const isCampaignHistoryActive = pathname === '/mis-campanas'
+  const isRechargeActive = pathname === '/promocionar' && currentTab === 'recharge'
+  const isCreateCampaignActive = pathname === '/promocionar' && (currentTab === 'campaign' || (!currentTab && pathname === '/promocionar'))
+
+  // Admin
+  const isAdminListingsActive = pathname === '/admin' && (effectiveSection === '' || effectiveSection === 'listings')
+  const isAdminAdsActive = pathname === '/admin' && effectiveSection === 'ads'
+  const isAdminBalancesActive = pathname === '/admin' && effectiveSection === 'balances'
+  const isAdminUsersActive = pathname === '/admin' && effectiveSection === 'users'
+
+  return (
+    <nav className="space-y-1.5 text-xs font-semibold">
+      {/* OPCIÓN 1: Inicio */}
+      <Link
+        href="/"
+        onClick={close}
+        className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all ${
+          isHomeActive
+            ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+            : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-base">🏠</span>
+          <span>{t.nav.home}</span>
+        </div>
+        {isHomeActive && (
+          <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+        )}
+      </Link>
+
+      {/* OPCIÓN 2: Catálogo (Desplegable) */}
+      <div className="pt-2">
+        <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+          <div className="flex items-center gap-2">
+            <span>🔍</span>
+            <span>{t.nav.catalog}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCatalogOpen(!catalogOpen)}
+            className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+            aria-label={catalogOpen ? 'Colapsar catálogo' : 'Expandir catálogo'}
+          >
+            {catalogOpen ? '▼' : '▶'}
+          </button>
+        </div>
+
+        {catalogOpen && (
+          <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
+            {/* Todas las publicaciones */}
+            <Link
+              href="/catalogo"
+              onClick={close}
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all ${
+                isAllCatalogActive
+                  ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>✨</span>
+                <span>{t.nav.allListings}</span>
+              </div>
+              {isAllCatalogActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+              )}
+            </Link>
+
+            {/* Servicios */}
+            <Link
+              href="/catalogo?type=service"
+              onClick={close}
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs font-medium ${
+                isCatalogServiceActive
+                  ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>🛠️</span>
+                <span>{locale === 'en' ? 'Services' : 'Servicios'}</span>
+              </div>
+              {isCatalogServiceActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+              )}
+            </Link>
+
+            {/* Artículos (Usados) */}
+            <Link
+              href="/catalogo?type=article"
+              onClick={close}
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs font-medium ${
+                isCatalogArticleActive
+                  ? 'bg-amber-50 text-amber-800 font-bold dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-500/30 shadow-2xs'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>📦</span>
+                <span>{locale === 'en' ? 'Articles (Used)' : 'Artículos (Usados)'}</span>
+              </div>
+              {isCatalogArticleActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400 shrink-0" />
+              )}
+            </Link>
+
+            {/* Productos (Nuevos) */}
+            <Link
+              href="/catalogo?type=product"
+              onClick={close}
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs font-medium ${
+                isCatalogProductActive
+                  ? 'bg-blue-50 text-blue-800 font-bold dark:bg-blue-950/60 dark:text-blue-300 ring-1 ring-blue-500/30 shadow-2xs'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>🛍️</span>
+                <span>{locale === 'en' ? 'Products (New)' : 'Productos (Nuevos)'}</span>
+              </div>
+              {isCatalogProductActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
+              )}
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* OPCIÓN: Directorio de Vendedores */}
+      <Link
+        href="/directorio"
+        onClick={close}
+        className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+          isDirectoryActive
+            ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+            : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <span>📇</span>
+          <span>{t.nav.directory}</span>
+        </div>
+        {isDirectoryActive && (
+          <span className="h-2 w-2 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+        )}
+      </Link>
+
+      {/* OPCIÓN 3: Mis Publicaciones */}
+      {hasPermission(role, 'publish_listings') && (
+        <div className="pt-2">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+            <div className="flex items-center gap-2">
+              <span>📦</span>
+              <span>{t.nav.myListings}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setListingsOpen(!listingsOpen)}
+              className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+              aria-label={listingsOpen ? 'Colapsar publicaciones' : 'Expandir publicaciones'}
+            >
+              {listingsOpen ? '▼' : '▶'}
+            </button>
+          </div>
+
+          {listingsOpen && (
+            <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
+              <Link
+                href="/mis-publicaciones"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isInventoryActive
+                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📦</span>
+                  <span className="font-semibold">{locale === 'en' ? 'Listings & Inventory' : 'Publicaciones & Inventario'}</span>
+                </div>
+                {isInventoryActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+                )}
+              </Link>
+
+              <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                {locale === 'en' ? 'Create Listing' : 'Crear Anuncio'}
+              </div>
+
+              <Link
+                href="/publicar?type=service"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  isPublishServiceActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🛠️</span>
+                  <span>{locale === 'en' ? 'Post Service' : 'Publicar Servicio'}</span>
+                </div>
+                {isPublishServiceActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/publicar?type=article"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  isPublishArticleActive
+                    ? 'bg-amber-50 text-amber-800 font-bold dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📦</span>
+                  <span>{locale === 'en' ? 'Post Article (Used)' : 'Publicar Artículo (Usado)'}</span>
+                </div>
+                {isPublishArticleActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/publicar?type=product"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  isPublishProductActive
+                    ? 'bg-blue-50 text-blue-800 font-bold dark:bg-blue-950/60 dark:text-blue-300 ring-1 ring-blue-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🛍️</span>
+                  <span>{locale === 'en' ? 'Post Product (New)' : 'Publicar Producto (Nuevo)'}</span>
+                </div>
+                {isPublishProductActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
+                )}
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OPCIÓN 4: Mis Campañas */}
+      {hasPermission(role, 'manage_campaigns') && (
+        <div className="pt-2">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+            <div className="flex items-center gap-2">
+              <span>📢</span>
+              <span>{t.nav.myCampaigns}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCampaignsOpen(!campaignsOpen)}
+              className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+              aria-label={campaignsOpen ? 'Colapsar campañas' : 'Expandir campañas'}
+            >
+              {campaignsOpen ? '▼' : '▶'}
+            </button>
+          </div>
+
+          {campaignsOpen && (
+            <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
+              <Link
+                href="/mis-campanas"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isCampaignHistoryActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📊</span>
+                  <span>{locale === 'en' ? 'Campaign History' : 'Historial de Campañas'}</span>
+                </div>
+                {isCampaignHistoryActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/promocionar?tab=recharge"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isRechargeActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>💳</span>
+                  <span>{t.nav.recharge}</span>
+                </div>
+                {isRechargeActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/promocionar?tab=campaign"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isCreateCampaignActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🚀</span>
+                  <span className="font-bold">{t.nav.createCampaign}</span>
+                </div>
+                {isCreateCampaignActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OPCIÓN 5: Administración y Moderación */}
+      {hasPermission(role, 'moderate_content') && (
+        <div className="pt-2">
+          <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+            <div className="flex items-center gap-2">
+              <span>🛡️</span>
+              <span>{t.nav.moderation}</span>
+              {pendingCount > 0 && (
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.2 text-[9px] font-black text-white">
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminOpen(!adminOpen)}
+              className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+              aria-label={adminOpen ? 'Colapsar moderación' : 'Expandir moderación'}
+            >
+              {adminOpen ? '▼' : '▶'}
+            </button>
+          </div>
+
+          {adminOpen && (
+            <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
+              <Link
+                href="/admin?section=listings"
+                onClick={() => {
+                  close()
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'listings' }))
+                  }
+                }}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isAdminListingsActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📦</span>
+                  <span>{t.nav.adminListings}</span>
+                </div>
+                {isAdminListingsActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/admin?section=ads"
+                onClick={() => {
+                  close()
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'ads' }))
+                  }
+                }}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isAdminAdsActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📢</span>
+                  <span>{t.nav.adminAds}</span>
+                </div>
+                {isAdminAdsActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/admin?section=balances"
+                onClick={() => {
+                  close()
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'balances' }))
+                  }
+                }}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isAdminBalancesActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>💳</span>
+                  <span>{t.nav.adminBalances}</span>
+                </div>
+                {isAdminBalancesActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/admin?section=users"
+                onClick={() => {
+                  close()
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'users' }))
+                  }
+                }}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isAdminUsersActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>👥</span>
+                  <span>{t.nav.adminUsers}</span>
+                </div>
+                {isAdminUsersActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Opción informativa para Compradores */}
+      {role === 'buyer' && (
+        <div className="pt-3">
+          <Link
+            href="/cuenta"
+            onClick={close}
+            className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50/70 p-2.5 text-blue-900 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300 transition-colors"
+          >
+            <span className="text-base">🏪</span>
+            <div className="min-w-0 flex-1">
+              <span className="block font-bold text-[11px]">
+                {locale === 'en' ? 'Want to Sell?' : '¿Quieres Vender?'}
+              </span>
+              <span className="block text-[10px] text-blue-700 dark:text-blue-400">
+                {locale === 'en' ? 'Activate seller profile' : 'Registra tu negocio en tu perfil'}
+              </span>
+            </div>
+          </Link>
+        </div>
+      )}
+    </nav>
+  )
+}
+
+function SidebarNav({
+  close,
+  t,
+  locale,
+  role,
+  pendingCount,
+}: {
+  close: () => void
+  t: any
+  locale: string
+  role: string | null
+  pendingCount: number
+}) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const currentType = searchParams ? searchParams.get('type') || '' : ''
+  const currentTab = searchParams ? searchParams.get('tab') || '' : ''
+  const currentSection = searchParams ? searchParams.get('section') || searchParams.get('tab') || '' : ''
+
+  return (
+    <SidebarNavContent
+      pathname={pathname}
+      currentType={currentType}
+      currentTab={currentTab}
+      currentSection={currentSection}
+      close={close}
+      t={t}
+      locale={locale}
+      role={role}
+      pendingCount={pendingCount}
+    />
+  )
+}
+
+function SidebarNavFallback({
+  close,
+  t,
+  locale,
+  role,
+  pendingCount,
+}: {
+  close: () => void
+  t: any
+  locale: string
+  role: string | null
+  pendingCount: number
+}) {
+  const pathname = usePathname()
+
+  return (
+    <SidebarNavContent
+      pathname={pathname}
+      currentType=""
+      currentTab=""
+      currentSection=""
+      close={close}
+      t={t}
+      locale={locale}
+      role={role}
+      pendingCount={pendingCount}
+    />
+  )
+}
 
 export default function AppSidebar() {
   const pathname = usePathname()
@@ -35,27 +615,6 @@ export default function AppSidebar() {
   const [role, setRole] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
-
-  // Accordion open/close state for suboptions
-  const [catalogOpen, setCatalogOpen] = useState(true)
-  const [listingsOpen, setListingsOpen] = useState(true)
-  const [campaignsOpen, setCampaignsOpen] = useState(true)
-  const [adminOpen, setAdminOpen] = useState(true)
-  const [currentTab, setCurrentTab] = useState<string>('')
-  const [currentSection, setCurrentSection] = useState<string>('')
-
-  useEffect(() => {
-    const updateFromUrl = () => {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search)
-        setCurrentTab(params.get('tab') || params.get('filter') || '')
-        setCurrentSection(params.get('section') || '')
-      }
-    }
-    updateFromUrl()
-    window.addEventListener('popstate', updateFromUrl)
-    return () => window.removeEventListener('popstate', updateFromUrl)
-  }, [pathname])
 
   const supabase = createClient()
 
@@ -154,7 +713,7 @@ export default function AppSidebar() {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="hidden md:flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-bold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+            className="hidden md:flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-bold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
             title={t.nav.collapseSidebar}
             aria-label={t.nav.collapseSidebar}
           >
@@ -166,7 +725,7 @@ export default function AppSidebar() {
           <button
             type="button"
             onClick={close}
-            className="flex md:hidden items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            className="flex md:hidden items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 cursor-pointer"
             aria-label="Cerrar menú"
           >
             <span>✕</span>
@@ -174,374 +733,26 @@ export default function AppSidebar() {
           </button>
         </div>
 
-        {/* 2. Hierarchical Navigation (Options & Suboptions) */}
-        <nav className="space-y-1.5 text-xs font-semibold">
-          {/* OPCIÓN 1: Inicio */}
-          <Link
-            href="/"
-            onClick={close}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-              pathname === '/'
-                ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/50 dark:text-emerald-300'
-                : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <span className="text-base">🏠</span>
-            <span>{t.nav.home}</span>
-          </Link>
-
-          {/* OPCIÓN 2: Catálogo & Categorías (Desplegable) */}
-          <div className="pt-2">
-            <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
-              <div className="flex items-center gap-2">
-                <span>🔍</span>
-                <span>{t.nav.catalog}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCatalogOpen(!catalogOpen)}
-                className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200"
-              >
-                {catalogOpen ? '▼' : '▶'}
-              </button>
-            </div>
-
-            {catalogOpen && (
-              <div className="mt-1 ml-3 space-y-0.5 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-                <Link
-                  href="/catalogo"
-                  onClick={close}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                    pathname === '/catalogo'
-                      ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/40 dark:text-emerald-300'
-                      : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                  }`}
-                >
-                  <span>✨</span>
-                  <span>{t.nav.allListings}</span>
-                </Link>
-
-                <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  {locale === 'en' ? 'By Type' : 'Por Tipo'}
-                </div>
-                <Link
-                  href="/catalogo?type=product"
-                  onClick={close}
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
-                >
-                  <span>🛍️</span>
-                  <span>{locale === 'en' ? 'Products (New)' : 'Productos (Nuevos)'}</span>
-                </Link>
-                <Link
-                  href="/catalogo?type=article"
-                  onClick={close}
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
-                >
-                  <span>📦</span>
-                  <span>{locale === 'en' ? 'Articles (Used)' : 'Artículos (Usados)'}</span>
-                </Link>
-                <Link
-                  href="/catalogo?type=service"
-                  onClick={close}
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
-                >
-                  <span>🛠️</span>
-                  <span>{locale === 'en' ? 'Services' : 'Servicios'}</span>
-                </Link>
-
-                <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  {locale === 'en' ? 'Categories' : 'Categorías'}
-                </div>
-
-                {CATEGORIES.map((cat) => (
-                  <Link
-                    key={cat.slug}
-                    href={`/catalogo?category=${cat.slug}`}
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
-                  >
-                    <span>{cat.icon}</span>
-                    <span className="truncate">{cat.name}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* OPCIÓN: Directorio de Vendedores (Compradores y Exploración) */}
-          <Link
-            href="/directorio"
-            onClick={close}
-            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
-              pathname === '/directorio'
-                ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <span>📇</span>
-            <span>{t.nav.directory}</span>
-          </Link>
-
-          {/* OPCIÓN 3: Mis Publicaciones (Solo para Vendedores y Administradores) */}
-          {hasPermission(role, 'publish_listings') && (
-            <div className="pt-2">
-              <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
-                <div className="flex items-center gap-2">
-                  <span>📦</span>
-                  <span>{t.nav.myListings}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setListingsOpen(!listingsOpen)}
-                  className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200"
-                >
-                  {listingsOpen ? '▼' : '▶'}
-                </button>
-              </div>
-
-              {listingsOpen && (
-                <div className="mt-1 ml-3 space-y-0.5 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-                  <Link
-                    href="/mis-publicaciones"
-                    onClick={close}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/mis-publicaciones' || pathname === '/inventario'
-                        ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>📦</span>
-                    <span className="font-semibold">{locale === 'en' ? 'Listings & Inventory' : 'Publicaciones & Inventario'}</span>
-                  </Link>
-
-                  <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    {locale === 'en' ? 'Create Listing' : 'Crear Anuncio'}
-                  </div>
-
-                  <Link
-                    href="/publicar?type=product"
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
-                  >
-                    <span>🛍️</span>
-                    <span>{locale === 'en' ? 'Post Product (New)' : 'Publicar Producto (Nuevo)'}</span>
-                  </Link>
-
-                  <Link
-                    href="/publicar?type=article"
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
-                  >
-                    <span>📦</span>
-                    <span>{locale === 'en' ? 'Post Article (Used)' : 'Publicar Artículo (Usado)'}</span>
-                  </Link>
-
-                  <Link
-                    href="/publicar?type=service"
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
-                  >
-                    <span>🛠️</span>
-                    <span>{locale === 'en' ? 'Post Service' : 'Publicar Servicio'}</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* OPCIÓN 4: Mis Campañas (Solo para Vendedores y Administradores) */}
-          {hasPermission(role, 'manage_campaigns') && (
-            <div className="pt-2">
-              <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
-                <div className="flex items-center gap-2">
-                  <span>📢</span>
-                  <span>{t.nav.myCampaigns}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCampaignsOpen(!campaignsOpen)}
-                  className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200"
-                >
-                  {campaignsOpen ? '▼' : '▶'}
-                </button>
-              </div>
-
-              {campaignsOpen && (
-                <div className="mt-1 ml-3 space-y-0.5 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-                  <Link
-                    href="/mis-campanas"
-                    onClick={close}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/mis-campanas'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>📊</span>
-                    <span>{locale === 'en' ? 'Campaign History' : 'Historial de Campañas'}</span>
-                  </Link>
-
-                  <Link
-                    href="/promocionar?tab=recharge"
-                    onClick={() => {
-                      setCurrentTab('recharge')
-                      close()
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/promocionar' && currentTab !== 'campaign'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>💳</span>
-                    <span>{t.nav.recharge}</span>
-                  </Link>
-
-                  <Link
-                    href="/promocionar?tab=campaign"
-                    onClick={() => {
-                      setCurrentTab('campaign')
-                      close()
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/promocionar' && currentTab === 'campaign'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>🚀</span>
-                    <span className="font-bold">{t.nav.createCampaign}</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* OPCIÓN 5: Administración y Moderación (Exclusivo para Administrador) */}
-          {hasPermission(role, 'moderate_content') && (
-            <div className="pt-2">
-              <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
-                <div className="flex items-center gap-2">
-                  <span>🛡️</span>
-                  <span>{t.nav.moderation}</span>
-                  {pendingCount > 0 && (
-                    <span className="rounded-full bg-amber-500 px-1.5 py-0.2 text-[9px] font-black text-white">
-                      {pendingCount}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAdminOpen(!adminOpen)}
-                  className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200"
-                >
-                  {adminOpen ? '▼' : '▶'}
-                </button>
-              </div>
-
-              {adminOpen && (
-                <div className="mt-1 ml-3 space-y-0.5 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-                  <Link
-                    href="/admin?section=listings"
-                    onClick={() => {
-                      setCurrentSection('listings')
-                      close()
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'listings' }))
-                      }
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/admin' && (currentSection === '' || currentSection === 'listings')
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>📦</span>
-                    <span>{t.nav.adminListings}</span>
-                  </Link>
-
-                  <Link
-                    href="/admin?section=ads"
-                    onClick={() => {
-                      setCurrentSection('ads')
-                      close()
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'ads' }))
-                      }
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/admin' && currentSection === 'ads'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>📢</span>
-                    <span>{t.nav.adminAds}</span>
-                  </Link>
-
-                  <Link
-                    href="/admin?section=balances"
-                    onClick={() => {
-                      setCurrentSection('balances')
-                      close()
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'balances' }))
-                      }
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/admin' && currentSection === 'balances'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>💳</span>
-                    <span>{t.nav.adminBalances}</span>
-                  </Link>
-
-                  <Link
-                    href="/admin?section=users"
-                    onClick={() => {
-                      setCurrentSection('users')
-                      close()
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'users' }))
-                      }
-                    }}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/admin' && currentSection === 'users'
-                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>👥</span>
-                    <span>{t.nav.adminUsers}</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Opción informativa para Compradores */}
-          {role === 'buyer' && (
-            <div className="pt-3">
-              <Link
-                href="/cuenta"
-                onClick={close}
-                className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50/70 p-2.5 text-blue-900 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300 transition-colors"
-              >
-                <span className="text-base">🏪</span>
-                <div className="min-w-0 flex-1">
-                  <span className="block font-bold text-[11px]">
-                    {locale === 'en' ? 'Want to Sell?' : '¿Quieres Vender?'}
-                  </span>
-                  <span className="block text-[10px] text-blue-700 dark:text-blue-400">
-                    {locale === 'en' ? 'Activate seller profile' : 'Registra tu negocio en tu perfil'}
-                  </span>
-                </div>
-              </Link>
-            </div>
-          )}
-        </nav>
+        {/* 2. Hierarchical Navigation (Options & Suboptions) con Suspense */}
+        <Suspense
+          fallback={
+            <SidebarNavFallback
+              close={close}
+              t={t}
+              locale={locale}
+              role={role}
+              pendingCount={pendingCount}
+            />
+          }
+        >
+          <SidebarNav
+            close={close}
+            t={t}
+            locale={locale}
+            role={role}
+            pendingCount={pendingCount}
+          />
+        </Suspense>
       </div>
 
       {/* 3. Footer del Sidebar: Preferencias, Usuario y Sesión */}
@@ -586,7 +797,7 @@ export default function AppSidebar() {
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-red-50 hover:text-red-700 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-red-950/50 dark:hover:text-red-300 transition-colors"
+                className="rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-red-50 hover:text-red-700 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-red-950/50 dark:hover:text-red-300 transition-colors cursor-pointer"
                 title={t.nav.signOut}
               >
                 🚪
@@ -614,7 +825,7 @@ export default function AppSidebar() {
         <button
           type="button"
           onClick={toggleCollapsed}
-          className="hidden md:flex items-center gap-2 rounded-r-xl border-y border-r border-emerald-500 bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-xl shadow-emerald-950/30 hover:bg-emerald-500 hover:pl-3.5 transition-all fixed left-0 top-2 z-40 select-none animate-in slide-in-from-left duration-200"
+          className="hidden md:flex items-center gap-2 rounded-r-xl border-y border-r border-emerald-500 bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-xl shadow-emerald-950/30 hover:bg-emerald-500 hover:pl-3.5 transition-all fixed left-0 top-2 z-40 select-none animate-in slide-in-from-left duration-200 cursor-pointer"
           title={t.nav.expandSidebar}
           aria-label={t.nav.expandSidebar}
         >
@@ -638,7 +849,7 @@ export default function AppSidebar() {
       {isOpen && (
         <div
           onClick={close}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden animate-in fade-in duration-200 cursor-pointer"
         />
       )}
 

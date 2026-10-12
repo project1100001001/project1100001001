@@ -25,6 +25,8 @@ export default function InventoryManager({
   const supabase = createClient()
   const searchParams = useSearchParams()
   const editListingId = searchParams ? searchParams.get('edit') : null
+  const urlTab = searchParams ? searchParams.get('tab') : null
+  const urlType = searchParams ? searchParams.get('type') || searchParams.get('filter') : null
 
   // Selected seller filter (if user owns multiple)
   const [selectedSellerId, setSelectedSellerId] = useState<string>(
@@ -32,11 +34,40 @@ export default function InventoryManager({
   )
 
   // Main Tab state: 'inventory' | 'sales'
-  const [activeTab, setActiveTab] = useState<'inventory' | 'sales'>('inventory')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'sales'>(() => {
+    if (urlTab === 'sales') return 'sales'
+    return 'inventory'
+  })
 
   // Listings & Inventory state
   const [listings, setListings] = useState<ListingWithRelations[]>(initialListings)
-  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'articles' | 'services'>('all')
+  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'articles' | 'services'>(() => {
+    if (urlType === 'service' || urlType === 'services') return 'services'
+    if (urlType === 'article' || urlType === 'articles') return 'articles'
+    if (urlType === 'product' || urlType === 'products') return 'products'
+    return 'all'
+  })
+
+  useEffect(() => {
+    if (urlTab === 'sales') {
+      setActiveTab('sales')
+    } else if (urlTab === 'inventory') {
+      setActiveTab('inventory')
+    }
+  }, [urlTab])
+
+  useEffect(() => {
+    if (urlType === 'service' || urlType === 'services') {
+      setMacroTypeScope('services')
+    } else if (urlType === 'article' || urlType === 'articles') {
+      setMacroTypeScope('articles')
+    } else if (urlType === 'product' || urlType === 'products') {
+      setMacroTypeScope('products')
+    } else if (urlType === 'all') {
+      setMacroTypeScope('all')
+    }
+  }, [urlType])
+
   const [subFilter, setSubFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'pending' | 'draft' | 'paused'>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -1041,19 +1072,19 @@ export default function InventoryManager({
               <button
                 type="button"
                 onClick={() => {
-                  setMacroTypeScope('products')
+                  setMacroTypeScope('services')
                   setSubFilter('all')
                 }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  macroTypeScope === 'products'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400'
+                  macroTypeScope === 'services'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400'
                 }`}
               >
-                <span>🛍️</span>
-                <span>{t.inventory.macroScopeProducts || 'Productos (Nuevos)'}</span>
-                <span className="rounded-full bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.2 text-[10px] font-bold">
-                  {totalProducts}
+                <span>🛠️</span>
+                <span>{t.inventory.macroScopeServices || 'Servicios'}</span>
+                <span className="rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200 px-1.5 py-0.2 text-[10px] font-bold">
+                  {totalServices}
                 </span>
               </button>
 
@@ -1079,19 +1110,19 @@ export default function InventoryManager({
               <button
                 type="button"
                 onClick={() => {
-                  setMacroTypeScope('services')
+                  setMacroTypeScope('products')
                   setSubFilter('all')
                 }}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  macroTypeScope === 'services'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400'
+                  macroTypeScope === 'products'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400'
                 }`}
               >
-                <span>🛠️</span>
-                <span>{t.inventory.macroScopeServices || 'Servicios'}</span>
-                <span className="rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200 px-1.5 py-0.2 text-[10px] font-bold">
-                  {totalServices}
+                <span>🛍️</span>
+                <span>{t.inventory.macroScopeProducts || 'Productos (Nuevos)'}</span>
+                <span className="rounded-full bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.2 text-[10px] font-bold">
+                  {totalProducts}
                 </span>
               </button>
             </div>

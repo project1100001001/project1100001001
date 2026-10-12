@@ -193,12 +193,16 @@ export default function HomeClientView({
     return showcaseItems.slice(0, 5)
   }, [showcaseItems])
 
-  const productItems = useMemo(() => {
-    return showcaseItems.filter((i) => i.type !== 'service')
-  }, [showcaseItems])
-
   const serviceItems = useMemo(() => {
     return showcaseItems.filter((i) => i.type === 'service')
+  }, [showcaseItems])
+
+  const articleItems = useMemo(() => {
+    return showcaseItems.filter((i) => i.type === 'article')
+  }, [showcaseItems])
+
+  const productItems = useMemo(() => {
+    return showcaseItems.filter((i) => i.type === 'product')
   }, [showcaseItems])
 
   // Comercios únicos para la pasarela de marcas
@@ -239,14 +243,6 @@ export default function HomeClientView({
   }, [showcaseItems])
 
   // Listas con repetición para ciclo infinito continuo en carrusel
-  const loopedProductItems = useMemo(() => {
-    if (productItems.length === 0) return []
-    if (productItems.length < 5) {
-      return [...productItems, ...productItems, ...productItems]
-    }
-    return [...productItems, ...productItems]
-  }, [productItems])
-
   const loopedServiceItems = useMemo(() => {
     if (serviceItems.length === 0) return []
     if (serviceItems.length < 5) {
@@ -254,6 +250,22 @@ export default function HomeClientView({
     }
     return [...serviceItems, ...serviceItems]
   }, [serviceItems])
+
+  const loopedArticleItems = useMemo(() => {
+    if (articleItems.length === 0) return []
+    if (articleItems.length < 5) {
+      return [...articleItems, ...articleItems, ...articleItems]
+    }
+    return [...articleItems, ...articleItems]
+  }, [articleItems])
+
+  const loopedProductItems = useMemo(() => {
+    if (productItems.length === 0) return []
+    if (productItems.length < 5) {
+      return [...productItems, ...productItems, ...productItems]
+    }
+    return [...productItems, ...productItems]
+  }, [productItems])
 
   const loopedMerchantShowcases = useMemo(() => {
     if (merchantShowcases.length === 0) return []
@@ -293,8 +305,9 @@ export default function HomeClientView({
   }, [heroItems.length])
 
   // Referencias para desplazamiento horizontal de pasarelas
-  const productsScrollRef = useRef<HTMLDivElement>(null)
   const servicesScrollRef = useRef<HTMLDivElement>(null)
+  const articlesScrollRef = useRef<HTMLDivElement>(null)
+  const productsScrollRef = useRef<HTMLDivElement>(null)
   const merchantsScrollRef = useRef<HTMLDivElement>(null)
 
   // Desplazamiento rotativo fluido en loop infinito para pasarelas
@@ -327,17 +340,6 @@ export default function HomeClientView({
     }
   }
 
-  // Rotación constante continua en loop de la pasarela de productos (cada 3.5s)
-  useEffect(() => {
-    if (productItems.length <= 1) return
-
-    const timer = setInterval(() => {
-      scrollCarousel(productsScrollRef, 'right')
-    }, 3500)
-
-    return () => clearInterval(timer)
-  }, [productItems.length])
-
   // Rotación constante continua en loop de la pasarela de servicios (cada 4.0s)
   useEffect(() => {
     if (serviceItems.length <= 1) return
@@ -348,6 +350,28 @@ export default function HomeClientView({
 
     return () => clearInterval(timer)
   }, [serviceItems.length])
+
+  // Rotación constante continua en loop de la pasarela de artículos usados (cada 3.6s)
+  useEffect(() => {
+    if (articleItems.length <= 1) return
+
+    const timer = setInterval(() => {
+      scrollCarousel(articlesScrollRef, 'right')
+    }, 3600)
+
+    return () => clearInterval(timer)
+  }, [articleItems.length])
+
+  // Rotación constante continua en loop de la pasarela de productos nuevos (cada 3.8s)
+  useEffect(() => {
+    if (productItems.length <= 1) return
+
+    const timer = setInterval(() => {
+      scrollCarousel(productsScrollRef, 'right')
+    }, 3800)
+
+    return () => clearInterval(timer)
+  }, [productItems.length])
 
   // Rotación constante continua en loop de la pasarela de marcas/comercios (cada 4.5s)
   useEffect(() => {
@@ -704,196 +728,15 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. PASARELA DE PRODUCTOS EN EXHIBICIÓN (PRODUCTS RUNWAY)                   */}
-      {/* Carrusel horizontal deslizante y fluido de productos                      */}
-      {/* ========================================================================= */}
-      {productItems.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🛍️</span>
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-                  {t.home.productsRunwayTitle}
-                </h2>
-              </div>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                {t.home.productsRunwaySubtitle}
-              </p>
-            </div>
-
-            {/* Controles de Desplazamiento y Estado de Rotación */}
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
-                title="Rotación constante continua en loop activa"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="hidden sm:inline">Rotación en loop</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => scrollCarousel(productsScrollRef, 'left')}
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-                aria-label="Desplazar a la izquierda"
-                title="Publicación anterior"
-              >
-                ◀
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollCarousel(productsScrollRef, 'right')}
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-                aria-label="Desplazar a la derecha"
-                title="Siguiente publicación"
-              >
-                ▶
-              </button>
-            </div>
-          </div>
-
-          {/* Contenedor Carrusel Deslizante en Loop */}
-          <div
-            ref={productsScrollRef}
-            onScroll={() => handleLoopScroll(productsScrollRef)}
-            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {loopedProductItems.map((item, idx) => {
-              const whatsappUrl = getWhatsappUrl(item.sellerWhatsapp, item.sellerName, item.title)
-
-              return (
-                <div
-                  key={`${item.id}-${idx}`}
-                  className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-zinc-800 dark:bg-zinc-900 group"
-                >
-                  <div>
-                    {/* Imagen y Badges idénticos al explorador de catálogos */}
-                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none">
-                          <span className="text-4xl transition-transform duration-300 group-hover:scale-110">
-                            {item.type === 'service' ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Top Badges */}
-                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-                        <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
-                          {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
-                        </span>
-                        {item.isPaidCampaign && (
-                          <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
-                            📢 Patrocinado
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Bottom Category Badge */}
-                      {item.categoryName && (
-                        <div className="absolute bottom-2.5 left-2.5">
-                          <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                            {item.categoryName}
-                          </span>
-                        </div>
-                      )}
-
-                      {item.city && (
-                        <div className="absolute bottom-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                          📍 {item.city}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Datos de la Oferta */}
-                    <div className="mt-3 space-y-1">
-                      <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                        <span className="font-semibold text-purple-600 dark:text-purple-400">
-                          {item.categoryName}
-                        </span>
-                        <span>★ {item.sellerRating.toFixed(1)}</span>
-                      </div>
-
-                      <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">
-                        {item.title}
-                      </h3>
-
-                      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-
-                    {/* Precio y Disponibilidad */}
-                    <div className="mt-3 flex items-baseline justify-between border-t border-zinc-100 pt-2.5 dark:border-zinc-800">
-                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
-                        {item.price !== null
-                          ? `$ ${item.price.toLocaleString('es-CO')}`
-                          : 'Cotización'}
-                      </span>
-                      {item.attrs?.tiempo_entrega && (
-                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                          ⏱️ {item.attrs.tiempo_entrega}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Acciones de Contacto Directo */}
-                  <div className="mt-4 pt-2 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-2">
-                    {whatsappUrl ? (
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => trackAdEvent(item, 'whatsapp')}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
-                      >
-                        <span>💬</span>
-                        <span>WhatsApp</span>
-                      </a>
-                    ) : (
-                      <Link
-                        href={`/catalogo/${item.listingId}`}
-                        onClick={() => trackAdEvent(item, 'click')}
-                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      >
-                        Ver Detalle
-                      </Link>
-                    )}
-
-                    <Link
-                      href={`/catalogo/${item.listingId}`}
-                      onClick={() => trackAdEvent(item, 'click')}
-                      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      Ficha ↗
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. PASARELA DE SERVICIOS Y SOLUCIONES (SERVICES RUNWAY)                   */}
-      {/* Destaca tiempos de respuesta, ejecución y cotización rápida               */}
+      {/* 2. PASARELA DE SERVICIOS Y SOLUCIONES (SERVICES RUNWAY)                   */}
+      {/* Segundo orden: destaca tiempos de respuesta, ejecución y cotización rápida */}
       {/* ========================================================================= */}
       {serviceItems.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl">🔧</span>
+                <span className="text-xl">🛠️</span>
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
                   {t.home.servicesRunwayTitle}
                 </h2>
@@ -946,74 +789,115 @@ export default function HomeClientView({
               return (
                 <div
                   key={`${item.id}-${idx}`}
-                  className="w-80 sm:w-96 shrink-0 snap-start rounded-2xl border border-blue-200/80 bg-white p-5 shadow-xs hover:shadow-lg transition-all dark:border-blue-900/40 dark:bg-zinc-900 flex flex-col justify-between"
+                  className="w-80 sm:w-96 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-purple-200/80 bg-white p-5 shadow-xs hover:shadow-lg transition-all dark:border-purple-900/40 dark:bg-zinc-900 overflow-hidden"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          🔧 Servicio Profesional
+                  <div className="space-y-3.5">
+                    {/* 1. Fila Superior de Etiquetas (Badges & Categoría) */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                        <span className="inline-flex items-center rounded-lg border border-purple-300 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200">
+                          🛠️ Servicio Profesional
                         </span>
-                        <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-base mt-1 truncate">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-zinc-500">
-                          Por: <strong className="text-zinc-700 dark:text-zinc-300">{item.sellerName}</strong>
-                        </p>
+                        {item.isPaidCampaign && (
+                          <span className="inline-flex items-center rounded-lg bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                            📢 Patrocinado
+                          </span>
+                        )}
                       </div>
 
-                      <div className="text-right">
-                        <span className="block text-base font-black text-emerald-600 dark:text-emerald-400">
+                      {item.categoryName && (
+                        <span className="shrink-0 rounded-lg bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                          {item.categoryName}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 2. Título, Prestador y Calificación */}
+                    <div className="space-y-1 min-w-0">
+                      <h3
+                        className="font-bold text-zinc-900 dark:text-zinc-50 text-base leading-snug line-clamp-2 break-words"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </h3>
+
+                      <div className="flex items-center justify-between text-xs text-zinc-500 pt-0.5">
+                        <span className="truncate max-w-[75%]">
+                          Por: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{item.sellerName}</strong>
+                        </span>
+                        <span className="shrink-0 font-semibold text-amber-500">
+                          ★ {item.sellerRating.toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3. Descripción del Servicio */}
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed break-words">
+                      {item.description}
+                    </p>
+
+                    {/* 4. Métricas Operativas Clave */}
+                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-purple-50/60 p-2.5 text-[11px] dark:bg-zinc-800/60 border border-purple-100 dark:border-zinc-800">
+                      <div className="min-w-0">
+                        <span className="text-zinc-400 block text-[9px] uppercase font-bold truncate">
+                          Tiempo de Respuesta:
+                        </span>
+                        <strong className="text-zinc-800 dark:text-zinc-200 block truncate font-semibold text-xs mt-0.5">
+                          ⏱️ {item.attrs?.tiempo_entrega || 'Inmediata'}
+                        </strong>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-zinc-400 block text-[9px] uppercase font-bold truncate">
+                          Modalidad de Atención:
+                        </span>
+                        <strong className="text-zinc-800 dark:text-zinc-200 block truncate font-semibold text-xs mt-0.5">
+                          📍 {item.attrs?.modalidad || 'A Domicilio / Virtual'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* 5. Tarifa / Cotización y Ciudad */}
+                    <div className="flex items-baseline justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                      <div>
+                        <span className="text-[10px] text-zinc-400 block font-medium">
+                          Tarifa referencial:
+                        </span>
+                        <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
                           {item.price !== null
                             ? `$ ${item.price.toLocaleString('es-CO')}`
                             : 'A Cotizar'}
                         </span>
                       </div>
-                    </div>
 
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                      {item.description}
-                    </p>
-
-                    {/* Métricas Operativas Configuradas */}
-                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-50 p-2.5 text-[11px] dark:bg-zinc-800/60">
-                      <div>
-                        <span className="text-zinc-400 block text-[10px] uppercase font-bold">
-                          Respuesta:
+                      {item.city && (
+                        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                          📍 {item.city}
                         </span>
-                        <strong className="text-zinc-800 dark:text-zinc-200">
-                          {item.attrs?.tiempo_entrega || 'Inmediata'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[10px] uppercase font-bold">
-                          Modalidad:
-                        </span>
-                        <strong className="text-zinc-800 dark:text-zinc-200">
-                          {item.attrs?.modalidad || 'A Domicilio / Virtual'}
-                        </strong>
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+                  {/* 6. Acciones de Contacto Directo */}
+                  <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-2">
                     {whatsappUrl ? (
                       <a
                         href={whatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => trackAdEvent(item, 'whatsapp')}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
                       >
                         <span>💬</span>
-                        <span>{t.home.quoteService}</span>
+                        <span>{t.home.quoteService || 'Cotizar Servicio'}</span>
                       </a>
                     ) : null}
 
                     <Link
                       href={`/catalogo/${item.listingId}`}
                       onClick={() => trackAdEvent(item, 'click')}
-                      className="rounded-xl border border-zinc-300 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                      className={`inline-flex items-center justify-center rounded-xl border border-zinc-300 px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors ${
+                        !whatsappUrl ? 'col-span-2' : ''
+                      }`}
                     >
                       Ver Detalle
                     </Link>
@@ -1026,7 +910,366 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 4. PASARELA DE MARCAS Y COMERCIOS (MERCHANTS BRAND RUNWAY)                */}
+      {/* 3. PASARELA DE ARTÍCULOS USADOS (ARTICLES / PRE-OWNED RUNWAY)             */}
+      {/* División de productos: Artículos usados y de segunda mano primero        */}
+      {/* ========================================================================= */}
+      {articleItems.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📦</span>
+                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+                  {t.home.articlesRunwayTitle}
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {t.home.articlesRunwaySubtitle}
+              </p>
+            </div>
+
+            {/* Controles de Desplazamiento y Estado de Rotación */}
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-900"
+                title="Rotación constante continua en loop activa"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="hidden sm:inline">Rotación en loop</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => scrollCarousel(articlesScrollRef, 'left')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+                aria-label="Desplazar a la izquierda"
+                title="Artículo anterior"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCarousel(articlesScrollRef, 'right')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+                aria-label="Desplazar a la derecha"
+                title="Siguiente artículo"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+
+          {/* Contenedor Carrusel Deslizante en Loop */}
+          <div
+            ref={articlesScrollRef}
+            onScroll={() => handleLoopScroll(articlesScrollRef)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {loopedArticleItems.map((item, idx) => {
+              const whatsappUrl = getWhatsappUrl(item.sellerWhatsapp, item.sellerName, item.title)
+              const conditionLabel = item.attrs?.condition || 'Usado'
+
+              return (
+                <div
+                  key={`${item.id}-${idx}`}
+                  className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-amber-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-amber-900/30 dark:bg-zinc-900 group"
+                >
+                  <div>
+                    {/* Imagen y Badges */}
+                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none">
+                          <span className="text-4xl transition-transform duration-300 group-hover:scale-110">
+                            📦
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Top Badges */}
+                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                        <span className="rounded-md border border-amber-300 bg-amber-50/95 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-amber-800 dark:border-amber-800 dark:bg-amber-950/90 dark:text-amber-200">
+                          📦 Artículo (Usado)
+                        </span>
+                        {item.isPaidCampaign && (
+                          <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                            📢 Patrocinado
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom Condition Badge */}
+                      <div className="absolute bottom-2.5 left-2.5">
+                        <span className="rounded-md bg-zinc-900/80 px-2 py-0.5 text-[10px] font-semibold text-amber-300 backdrop-blur-md">
+                          ♻️ {conditionLabel}
+                        </span>
+                      </div>
+
+                      {item.city && (
+                        <div className="absolute bottom-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
+                          📍 {item.city}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Datos de la Oferta */}
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                        <span className="font-semibold text-amber-700 dark:text-amber-400">
+                          {item.categoryName}
+                        </span>
+                        <span>★ {item.sellerRating.toFixed(1)}</span>
+                      </div>
+
+                      <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">
+                        {item.title}
+                      </h3>
+
+                      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {/* Precio y Método */}
+                    <div className="mt-3 flex items-baseline justify-between border-t border-zinc-100 pt-2.5 dark:border-zinc-800">
+                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                        {item.price !== null
+                          ? `$ ${item.price.toLocaleString('es-CO')}`
+                          : 'Cotización'}
+                      </span>
+                      {item.attrs?.delivery_method && (
+                        <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                          🚚 {item.attrs.delivery_method}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Acciones de Contacto */}
+                  <div className="mt-4 pt-2 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-2">
+                    {whatsappUrl ? (
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => trackAdEvent(item, 'whatsapp')}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                      >
+                        <span>💬</span>
+                        <span>WhatsApp</span>
+                      </a>
+                    ) : (
+                      <Link
+                        href={`/catalogo/${item.listingId}`}
+                        onClick={() => trackAdEvent(item, 'click')}
+                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      >
+                        Ver Detalle
+                      </Link>
+                    )}
+
+                    <Link
+                      href={`/catalogo/${item.listingId}`}
+                      onClick={() => trackAdEvent(item, 'click')}
+                      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      Ficha ↗
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. PASARELA DE PRODUCTOS NUEVOS (NEW PRODUCTS RUNWAY)                     */}
+      {/* Luego productos nuevos a estrenar                                         */}
+      {/* ========================================================================= */}
+      {productItems.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🛍️</span>
+                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+                  {t.home.productsRunwayTitle}
+                </h2>
+              </div>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {t.home.productsRunwaySubtitle}
+              </p>
+            </div>
+
+            {/* Controles de Desplazamiento y Estado de Rotación */}
+            <div className="flex items-center gap-2">
+              <span
+                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-blue-700 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
+                title="Rotación constante continua en loop activa"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                <span className="hidden sm:inline">Rotación en loop</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => scrollCarousel(productsScrollRef, 'left')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+                aria-label="Desplazar a la izquierda"
+                title="Producto anterior"
+              >
+                ◀
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCarousel(productsScrollRef, 'right')}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+                aria-label="Desplazar a la derecha"
+                title="Siguiente producto"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+
+          {/* Contenedor Carrusel Deslizante en Loop */}
+          <div
+            ref={productsScrollRef}
+            onScroll={() => handleLoopScroll(productsScrollRef)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {loopedProductItems.map((item, idx) => {
+              const whatsappUrl = getWhatsappUrl(item.sellerWhatsapp, item.sellerName, item.title)
+
+              return (
+                <div
+                  key={`${item.id}-${idx}`}
+                  className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-blue-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-blue-900/30 dark:bg-zinc-900 group"
+                >
+                  <div>
+                    {/* Imagen y Badges */}
+                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none">
+                          <span className="text-4xl transition-transform duration-300 group-hover:scale-110">
+                            🛍️
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Top Badges */}
+                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                        <span className="rounded-md border border-blue-300 bg-blue-50/95 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-blue-800 dark:border-blue-800 dark:bg-blue-950/90 dark:text-blue-200">
+                          🛍️ Producto (Nuevo)
+                        </span>
+                        {item.isPaidCampaign && (
+                          <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                            📢 Patrocinado
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom Nuevo Badge */}
+                      <div className="absolute bottom-2.5 left-2.5">
+                        <span className="rounded-md bg-blue-600/90 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                          ✨ Nuevo de Fábrica
+                        </span>
+                      </div>
+
+                      {item.city && (
+                        <div className="absolute bottom-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
+                          📍 {item.city}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Datos de la Oferta */}
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                        <span className="font-semibold text-blue-700 dark:text-blue-400">
+                          {item.categoryName}
+                        </span>
+                        <span>★ {item.sellerRating.toFixed(1)}</span>
+                      </div>
+
+                      <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">
+                        {item.title}
+                      </h3>
+
+                      <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {/* Precio y Entrega */}
+                    <div className="mt-3 flex items-baseline justify-between border-t border-zinc-100 pt-2.5 dark:border-zinc-800">
+                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                        {item.price !== null
+                          ? `$ ${item.price.toLocaleString('es-CO')}`
+                          : 'Cotización'}
+                      </span>
+                      {item.attrs?.tiempo_entrega && (
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                          ⏱️ {item.attrs.tiempo_entrega}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Acciones de Contacto */}
+                  <div className="mt-4 pt-2 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-2">
+                    {whatsappUrl ? (
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => trackAdEvent(item, 'whatsapp')}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                      >
+                        <span>💬</span>
+                        <span>WhatsApp</span>
+                      </a>
+                    ) : (
+                      <Link
+                        href={`/catalogo/${item.listingId}`}
+                        onClick={() => trackAdEvent(item, 'click')}
+                        className="inline-flex items-center justify-center rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      >
+                        Ver Detalle
+                      </Link>
+                    )}
+
+                    <Link
+                      href={`/catalogo/${item.listingId}`}
+                      onClick={() => trackAdEvent(item, 'click')}
+                      className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      Ficha ↗
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. PASARELA DE MARCAS Y COMERCIOS (MERCHANTS BRAND RUNWAY)                */}
       {/* Muestra los comercios con campañas y sus catálogos activos                */}
       {/* ========================================================================= */}
       {merchantShowcases.length > 0 && (
@@ -1151,7 +1394,7 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 5. ACCESO RÁPIDO A CATEGORÍAS                                             */}
+      {/* 6. ACCESO RÁPIDO A CATEGORÍAS                                             */}
       {/* ========================================================================= */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-4">
@@ -1180,7 +1423,7 @@ export default function HomeClientView({
       </section>
 
       {/* ========================================================================= */}
-      {/* 6. BANNER PARA VENDEDORES: IMPULSA TU CAMPAÑA                             */}
+      {/* 7. BANNER PARA VENDEDORES: IMPULSA TU CAMPAÑA                             */}
       {/* ========================================================================= */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 p-6 sm:p-10 text-white shadow-xl">

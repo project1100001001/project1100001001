@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type {
@@ -44,11 +45,23 @@ export default function AdminModerationPanel({
   const [roleSuccessNotice, setRoleSuccessNotice] = useState<string | null>(null)
   const [roleErrorNotice, setRoleErrorNotice] = useState<string | null>(null)
 
+  const searchParams = useSearchParams()
+
   useEffect(() => {
     if (defaultSection) {
       setSection(defaultSection)
     }
   }, [defaultSection])
+
+  useEffect(() => {
+    if (searchParams) {
+      const sec = searchParams.get('section') || searchParams.get('tab')
+      if (sec && ['listings', 'ads', 'balances', 'users'].includes(sec)) {
+        setSection(sec as any)
+        setSearchQuery('')
+      }
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const handleSectionChange = (e: any) => {
