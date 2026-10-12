@@ -649,12 +649,16 @@ export default function CampaignsList({
             <div className="mt-6 space-y-6">
               {/* Tarjeta de Creatividad del Anuncio */}
               <div className="flex items-center gap-4 rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60">
-                <div className="h-18 w-18 shrink-0 overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-700">
-                  <img
-                    src={selectedAnalyticsOrder.image_url || '/placeholder.png'}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                <div className="h-18 w-18 shrink-0 overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                  {selectedAnalyticsOrder.image_url ? (
+                    <img
+                      src={selectedAnalyticsOrder.image_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-3xl select-none">📢</span>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400">

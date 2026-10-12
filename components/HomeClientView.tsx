@@ -17,7 +17,7 @@ interface ShowcaseItem {
   title: string
   headline: string
   description: string
-  imageUrl: string
+  imageUrl: string | null
   allImages: string[]
   price: number | null
   priceUnit: string | null
@@ -88,7 +88,7 @@ export default function HomeClientView({
         title: listing.title,
         headline: ad.headline || listing.title,
         description: ad.body || listing.description || '',
-        imageUrl: ad.image_url || mediaUrls[0] || '/placeholder.png',
+        imageUrl: ad.image_url || mediaUrls[0] || null,
         allImages: mediaUrls,
         price: listing.price,
         priceUnit: listing.price_unit,
@@ -121,7 +121,7 @@ export default function HomeClientView({
         title: listing.title,
         headline: listing.title,
         description: listing.description || '',
-        imageUrl: mediaUrls[0] || '/placeholder.png',
+        imageUrl: mediaUrls[0] || null,
         allImages: mediaUrls,
         price: listing.price,
         priceUnit: listing.price_unit,
@@ -333,7 +333,7 @@ export default function HomeClientView({
 
   const currentHero = heroItems[heroIndex] || heroItems[0]
   const currentHeroPhoto =
-    currentHero?.allImages?.[selectedPhotoIndex] || currentHero?.imageUrl || '/placeholder.png'
+    currentHero?.allImages?.[selectedPhotoIndex] || currentHero?.imageUrl || null
 
   // Registro analítico de eventos de campaña en tiempo real
   const trackAdEvent = (item: ShowcaseItem, eventType: 'impression' | 'click' | 'whatsapp') => {
@@ -572,12 +572,23 @@ export default function HomeClientView({
 
                 {/* Columna Derecha: Imagen Principal con Miniaturas */}
                 <div className="lg:col-span-5 flex flex-col items-center">
-                  <div className="relative w-full aspect-4/3 max-w-md overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-xl border border-zinc-200/80 dark:border-zinc-700/80 group">
-                    <img
-                      src={currentHeroPhoto}
-                      alt={currentHero.title}
-                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
+                  <div className="relative w-full aspect-4/3 max-w-md overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-xl border border-zinc-200/80 dark:border-zinc-700/80 group flex items-center justify-center">
+                    {currentHeroPhoto ? (
+                      <img
+                        src={currentHeroPhoto}
+                        alt={currentHero.title}
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-8 text-center select-none">
+                        <span className="text-7xl drop-shadow-sm transition-transform duration-500 group-hover:scale-110">
+                          {categoryIcons[currentHero.categorySlug] || (currentHero.type === 'service' ? '🔧' : '📦')}
+                        </span>
+                        <span className="mt-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                          {currentHero.categoryName || (currentHero.type === 'service' ? 'Servicio Comercial' : 'Producto')}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Badge Flotante de Precio */}
                     <div className="absolute bottom-3 left-3 rounded-xl bg-black/75 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">
@@ -702,12 +713,23 @@ export default function HomeClientView({
                 >
                   <div>
                     {/* Imagen y Badges */}
-                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
+                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-4 text-center select-none">
+                          <span className="text-5xl transition-transform duration-500 group-hover:scale-110">
+                            {categoryIcons[item.categorySlug] || (item.type === 'service' ? '🔧' : '🛍️')}
+                          </span>
+                          <span className="mt-2 text-[10px] font-bold text-zinc-400">
+                            {item.categoryName || 'Oferta'}
+                          </span>
+                        </div>
+                      )}
 
                       {item.isPaidCampaign && (
                         <div className="absolute top-2 left-2 rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
@@ -1015,8 +1037,8 @@ export default function HomeClientView({
                     </span>
                   </div>
 
-                  {/* Muestra de fotos de catálogo */}
-                  {merchant.sampleImages.length > 0 && (
+                  {/* Muestra de fotos de catálogo o íconos temáticos */}
+                  {merchant.sampleImages.length > 0 ? (
                     <div className="mt-3 grid grid-cols-3 gap-1.5">
                       {merchant.sampleImages.map((img, idx) => (
                         <div
@@ -1026,6 +1048,18 @@ export default function HomeClientView({
                           <img src={img} alt="Catálogo" className="h-full w-full object-cover" />
                         </div>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      <div className="aspect-square rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg select-none">
+                        🛍️
+                      </div>
+                      <div className="aspect-square rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg select-none">
+                        📦
+                      </div>
+                      <div className="aspect-square rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg select-none">
+                        ✨
+                      </div>
                     </div>
                   )}
                 </div>
