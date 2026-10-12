@@ -216,7 +216,7 @@ BEGIN
             v_listing.id,
             v_listing.title,
             COALESCE(v_listing.description, 'Promoción especial en catálogo.'),
-            'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80',
+            NULL, -- Sin imagen de prueba simulada; usa íconos/emojis cuando no se sube imagen real
             'Ver más',
             v_listing.city,
             'live',

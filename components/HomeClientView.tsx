@@ -46,6 +46,25 @@ const categoryIcons: Record<string, string> = {
   otros: '✨',
 }
 
+// Filtra rigurosamente imágenes de prueba externas para mostrar íconos/emojis reales como en el catálogo
+const isValidUserUploadedImage = (url?: string | null): boolean => {
+  if (!url || typeof url !== 'string') return false
+  const trimmed = url.trim().toLowerCase()
+  if (
+    trimmed === '' ||
+    trimmed === '/placeholder.png' ||
+    trimmed.includes('placeholder') ||
+    trimmed.includes('unsplash.com') ||
+    trimmed.includes('picsum.photos') ||
+    trimmed.includes('dummyimage') ||
+    trimmed.includes('via.placeholder') ||
+    trimmed.includes('example.com')
+  ) {
+    return false
+  }
+  return true
+}
+
 export default function HomeClientView({
   categories,
   campaignAds,
@@ -74,13 +93,25 @@ export default function HomeClientView({
         daysLeft = ad.package.duration_days
       }
 
+      // Obtener exclusivamente imágenes legítimas cargadas por el usuario (mismo criterio que en /catalogo)
       const mediaUrls: string[] = []
-      if (ad.image_url) mediaUrls.push(ad.image_url)
-      if (listing.listing_media?.length) {
-        listing.listing_media.forEach((m: any) => {
-          if (m.url && !mediaUrls.includes(m.url)) mediaUrls.push(m.url)
-        })
+      if (listing.listing_media && Array.isArray(listing.listing_media)) {
+        listing.listing_media
+          .slice()
+          .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+          .forEach((m: any) => {
+            if (isValidUserUploadedImage(m?.url) && !mediaUrls.includes(m.url)) {
+              mediaUrls.push(m.url)
+            }
+          })
       }
+
+      // Si la campaña adjuntó una imagen personalizada real (no test/unsplash)
+      if (isValidUserUploadedImage(ad.image_url) && !mediaUrls.includes(ad.image_url)) {
+        mediaUrls.unshift(ad.image_url)
+      }
+
+      const primaryImage = mediaUrls[0] || null
 
       items.push({
         id: `ad-${ad.id}`,
@@ -88,7 +119,7 @@ export default function HomeClientView({
         title: listing.title,
         headline: ad.headline || listing.title,
         description: ad.body || listing.description || '',
-        imageUrl: ad.image_url || mediaUrls[0] || null,
+        imageUrl: primaryImage,
         allImages: mediaUrls,
         price: listing.price,
         priceUnit: listing.price_unit,
@@ -113,7 +144,19 @@ export default function HomeClientView({
     allPublishedListings.forEach((listing) => {
       if (seenListingIds.has(listing.id)) return
 
-      const mediaUrls = (listing.listing_media || []).map((m) => m.url).filter(Boolean)
+      const mediaUrls: string[] = []
+      if (listing.listing_media && Array.isArray(listing.listing_media)) {
+        listing.listing_media
+          .slice()
+          .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+          .forEach((m: any) => {
+            if (isValidUserUploadedImage(m?.url) && !mediaUrls.includes(m.url)) {
+              mediaUrls.push(m.url)
+            }
+          })
+      }
+
+      const primaryImage = mediaUrls[0] || null
 
       items.push({
         id: `listing-${listing.id}`,
@@ -121,7 +164,7 @@ export default function HomeClientView({
         title: listing.title,
         headline: listing.title,
         description: listing.description || '',
-        imageUrl: mediaUrls[0] || null,
+        imageUrl: primaryImage,
         allImages: mediaUrls,
         price: listing.price,
         priceUnit: listing.price_unit,
@@ -580,15 +623,29 @@ export default function HomeClientView({
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center p-8 text-center select-none">
-                        <span className="text-7xl drop-shadow-sm transition-transform duration-500 group-hover:scale-110">
-                          {categoryIcons[currentHero.categorySlug] || (currentHero.type === 'service' ? '🔧' : '📦')}
+                      <div className="flex flex-col items-center justify-center p-8 text-center select-none text-zinc-400">
+                        <span className="text-7xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110">
+                          {currentHero.type === 'service' ? '🛠️' : currentHero.type === 'article' ? '📦' : '🛍️'}
                         </span>
-                        <span className="mt-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
-                          {currentHero.categoryName || (currentHero.type === 'service' ? 'Servicio Comercial' : 'Producto')}
-                        </span>
+                        {currentHero.categoryName && (
+                          <span className="mt-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                            {currentHero.categoryName}
+                          </span>
+                        )}
                       </div>
                     )}
+
+                    {/* Top Badges coincidentes con el explorador de catálogo */}
+                    <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[11px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
+                        {currentHero.type === 'service' ? '🛠️ Servicio' : currentHero.type === 'article' ? '📦 Artículo' : '🛍️ Producto'}
+                      </span>
+                      {currentHero.isPaidCampaign && (
+                        <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
+                          📢 Patrocinado
+                        </span>
+                      )}
+                    </div>
 
                     {/* Badge Flotante de Precio */}
                     <div className="absolute bottom-3 left-3 rounded-xl bg-black/75 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">
@@ -712,7 +769,7 @@ export default function HomeClientView({
                   className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-zinc-800 dark:bg-zinc-900 group"
                 >
                   <div>
-                    {/* Imagen y Badges */}
+                    {/* Imagen y Badges idénticos al explorador de catálogos */}
                     <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
                       {item.imageUrl ? (
                         <img
@@ -721,25 +778,39 @@ export default function HomeClientView({
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="flex flex-col items-center justify-center p-4 text-center select-none">
-                          <span className="text-5xl transition-transform duration-500 group-hover:scale-110">
-                            {categoryIcons[item.categorySlug] || (item.type === 'service' ? '🔧' : '🛍️')}
-                          </span>
-                          <span className="mt-2 text-[10px] font-bold text-zinc-400">
-                            {item.categoryName || 'Oferta'}
+                        <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none">
+                          <span className="text-4xl transition-transform duration-300 group-hover:scale-110">
+                            {item.type === 'service' ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
                           </span>
                         </div>
                       )}
 
-                      {item.isPaidCampaign && (
-                        <div className="absolute top-2 left-2 rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
-                          📢 Patrocinado
-                        </div>
-                      )}
-
-                      <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                        📍 {item.city || 'Colombia'}
+                      {/* Top Badges */}
+                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                        <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
+                          {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo' : '🛍️ Producto'}
+                        </span>
+                        {item.isPaidCampaign && (
+                          <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                            📢 Patrocinado
+                          </span>
+                        )}
                       </div>
+
+                      {/* Bottom Category Badge */}
+                      {item.categoryName && (
+                        <div className="absolute bottom-2.5 left-2.5">
+                          <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
+                            {item.categoryName}
+                          </span>
+                        </div>
+                      )}
+
+                      {item.city && (
+                        <div className="absolute bottom-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
+                          📍 {item.city}
+                        </div>
+                      )}
                     </div>
 
                     {/* Datos de la Oferta */}
