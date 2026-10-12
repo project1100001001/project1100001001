@@ -16,6 +16,8 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialInventoryParam = searchParams ? searchParams.get('inventory_id') || '' : ''
+  const initialTypeParam = searchParams ? (searchParams.get('type') as ListingType) || '' : ''
+  const initialEditIdParam = searchParams ? searchParams.get('edit_id') || searchParams.get('edit') || '' : ''
   const supabase = createClient()
   const { t, locale } = useTranslation()
 
@@ -28,7 +30,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
   // Inventory Integration state (prioridad módulo de inventario)
   const [inventoryListings, setInventoryListings] = useState<ListingWithRelations[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [selectedInventoryId, setSelectedInventoryId] = useState<string>(initialInventoryParam)
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string>(initialInventoryParam || initialEditIdParam)
   const [inventoryItemData, setInventoryItemData] = useState<ListingWithRelations | null>(null)
   const [inventoryPriceConfirmed, setInventoryPriceConfirmed] = useState<boolean>(true)
   const [matchedInventorySuggestion, setMatchedInventorySuggestion] = useState<ListingWithRelations | null>(null)
@@ -43,18 +45,23 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [sellerError, setSellerError] = useState<string | null>(null)
 
   // Listing Form fields
-  const [type, setType] = useState<ListingType>('product')
+  const [type, setType] = useState<ListingType>(() => {
+    if (initialTypeParam === 'product' || initialTypeParam === 'article' || initialTypeParam === 'service') {
+      return initialTypeParam
+    }
+    return 'product'
+  })
   const [categoryId, setCategoryId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priceType, setPriceType] = useState<'fixed' | 'quote'>('fixed')
   const [price, setPrice] = useState<string>('')
-  const [priceUnit, setPriceUnit] = useState('unidad')
+  const [priceUnit, setPriceUnit] = useState(() => (initialTypeParam === 'service' ? 'servicio' : 'unidad'))
   const [city, setCity] = useState('')
   const [stock, setStock] = useState<string>('1')
 
   // Dynamic attributes (attrs jsonb)
-  const [condition, setCondition] = useState('Nuevo')
+  const [condition, setCondition] = useState(() => (initialTypeParam === 'article' ? 'Usado - Buen estado' : 'Nuevo'))
   const [modality, setModality] = useState('Presencial')
   const [deliveryMethod, setDeliveryMethod] = useState('Domicilio local')
   const [customAttrs, setCustomAttrs] = useState<{ key: string; value: string }[]>([])
@@ -76,6 +83,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [uploadingImage, setUploadingImage] = useState(false)
 
   // Status & Submit
+  const isLockedType = Boolean(selectedInventoryId || initialInventoryParam || initialEditIdParam)
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successInfo, setSuccessInfo] = useState<{ id: string; status: string } | null>(null)
@@ -130,7 +138,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
           const inv = data as ListingWithRelations[]
           setInventoryListings(inv)
 
-          const targetId = selectedInventoryId || initialInventoryParam
+          const targetId = selectedInventoryId || initialInventoryParam || initialEditIdParam
           if (targetId) {
             const found = inv.find((item) => item.id === targetId)
             if (found) {
@@ -146,7 +154,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
     }
 
     loadSellerInventory()
-  }, [selectedSellerId, supabase, initialInventoryParam])
+  }, [selectedSellerId, supabase, initialInventoryParam, initialEditIdParam])
 
   const applyInventoryItem = (item: ListingWithRelations) => {
     setSelectedInventoryId(item.id)
@@ -171,8 +179,12 @@ export default function ListingForm({ categories }: ListingFormProps) {
     }
 
     // Atributos dinámicos
+    if (item.type === 'product') {
+      setCondition('Nuevo')
+    } else if (item.type === 'article') {
+      setCondition(item.attrs?.condition || 'Usado - Buen estado')
+    }
     if (item.attrs) {
-      if (item.attrs.condition) setCondition(item.attrs.condition)
       if (item.attrs.modality || item.attrs.modalidad) setModality(item.attrs.modality || item.attrs.modalidad)
       if (item.attrs.delivery_method) setDeliveryMethod(item.attrs.delivery_method)
     }
@@ -366,12 +378,13 @@ export default function ListingForm({ categories }: ListingFormProps) {
       // Build attrs jsonb
       const attrsObj: Record<string, any> = {}
       if (type === 'product') {
-        attrsObj.condition = condition
+        attrsObj.condition = 'Nuevo'
         attrsObj.delivery_method = deliveryMethod
       } else if (type === 'service') {
         attrsObj.modality = modality
       } else if (type === 'article') {
-        attrsObj.condition = condition
+        attrsObj.condition = condition.includes('Usado') || condition.includes('Reacondicionado') ? condition : 'Usado - Buen estado'
+        attrsObj.delivery_method = deliveryMethod
       }
 
       customAttrs.forEach((attr) => {
@@ -792,58 +805,95 @@ export default function ListingForm({ categories }: ListingFormProps) {
           <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
             1. ¿Qué deseas publicar?
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setType('product')
-                setPriceUnit('unidad')
-              }}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${
-                type === 'product'
-                  ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-600'
-                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <span className="text-2xl">🛍️</span>
-              <span className="font-semibold text-sm">Producto</span>
-              <span className="text-xs text-zinc-500">Alimentos, ropa, artesanías, inventario</span>
-            </button>
+          
+          {isLockedType ? (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4.5 dark:border-zinc-800 dark:bg-zinc-900/60 shadow-xs">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                  {locale === 'en' ? 'Listing Classification' : 'Clasificación de la Publicación'}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[11px] font-bold dark:bg-emerald-950 dark:text-emerald-300">
+                  🔒 {locale === 'en' ? 'Type Defined & Locked' : 'Tipo Clasificado / Fijo'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3.5">
+                <span className="text-3xl">
+                  {type === 'service' ? '🛠️' : type === 'article' ? '📦' : '🛍️'}
+                </span>
+                <div>
+                  <h4 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    {type === 'service'
+                      ? (locale === 'en' ? '🛠️ Professional Service' : '🛠️ Servicio Profesional')
+                      : type === 'article'
+                      ? (locale === 'en' ? '📦 Article (Used / Pre-owned)' : '📦 Artículo (Usado / Segunda mano)')
+                      : (locale === 'en' ? '🛍️ Product (New / Brand new)' : '🛍️ Producto (Nuevo / A estrenar)')}
+                  </h4>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {type === 'service'
+                      ? (locale === 'en' ? 'Classified as service offering. Delivery time and capacity apply.' : 'Clasificado como servicio. Aplican tiempos de respuesta y cupos.')
+                      : type === 'article'
+                      ? (locale === 'en' ? 'Classified strictly as used item. State of conservation applies.' : 'Clasificado exclusivamente para cosas usadas. Requiere especificar estado de conservación.')
+                      : (locale === 'en' ? 'Classified strictly as new product. Brand new condition applies.' : 'Clasificado exclusivamente para cosas nuevas. La condición está fijada a Nuevo.')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setType('product')
+                  setCondition('Nuevo')
+                  setPriceUnit('unidad')
+                }}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
+                  type === 'product'
+                    ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-300 ring-2 ring-blue-600'
+                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <span className="text-2xl">🛍️</span>
+                <span className="font-bold text-sm">Producto (Nuevo)</span>
+                <span className="text-xs text-zinc-500">Únicamente cosas nuevas a estrenar, alimentos o inventario de fábrica</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setType('service')
-                setPriceUnit('servicio')
-              }}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${
-                type === 'service'
-                  ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-600'
-                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <span className="text-2xl">🛠️</span>
-              <span className="font-semibold text-sm">Servicio</span>
-              <span className="text-xs text-zinc-500">Hogar, belleza, clases, asesorías</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setType('article')
+                  setCondition('Usado - Buen estado')
+                  setPriceUnit('unidad')
+                }}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
+                  type === 'article'
+                    ? 'border-amber-600 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 ring-2 ring-amber-600'
+                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <span className="text-2xl">📦</span>
+                <span className="font-bold text-sm">Artículo (Usado)</span>
+                <span className="text-xs text-zinc-500">Únicamente cosas usadas, segunda mano, antigüedades o de ocasión</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setType('article')
-                setPriceUnit('unidad')
-              }}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${
-                type === 'article'
-                  ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-600'
-                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <span className="text-2xl">📦</span>
-              <span className="font-semibold text-sm">Artículo / Ocasión</span>
-              <span className="text-xs text-zinc-500">Equipos, herramientas, segunda mano</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setType('service')
+                  setPriceUnit('servicio')
+                }}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
+                  type === 'service'
+                    ? 'border-purple-600 bg-purple-50/50 dark:bg-purple-950/20 text-purple-900 dark:text-purple-300 ring-2 ring-purple-600'
+                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <span className="text-2xl">🛠️</span>
+                <span className="font-bold text-sm">Servicio</span>
+                <span className="text-xs text-zinc-500">Hogar, belleza, clases, oficios, mantenimiento y asesorías profesionales</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 2. Categoría y Título */}
@@ -1072,25 +1122,40 @@ export default function ListingForm({ categories }: ListingFormProps) {
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            {(type === 'product' || type === 'article') && (
+            {type === 'product' && (
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                  Condición
+                  Condición del Producto
+                </label>
+                <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm font-semibold text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                  <span>✨</span>
+                  <span>Nuevo (A estrenar / De fábrica)</span>
+                  <span className="ml-auto text-[10px] font-normal uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                    Exclusivo Nuevo
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {type === 'article' && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                  Estado de Conservación (Artículo Usado) *
                 </label>
                 <select
                   value={condition}
                   onChange={(e) => setCondition(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 font-medium"
                 >
-                  <option value="Nuevo">Nuevo</option>
-                  <option value="Como nuevo">Como nuevo</option>
-                  <option value="Buen estado">Usado - Buen estado</option>
-                  <option value="Aceptable">Usado - Aceptable</option>
+                  <option value="Usado - Como nuevo">Usado - Como nuevo (Excelente estado)</option>
+                  <option value="Usado - Buen estado">Usado - Buen estado (Funcional con detalles mínimos)</option>
+                  <option value="Usado - Aceptable">Usado - Aceptable (Signos visibles de uso)</option>
+                  <option value="Reacondicionado">Reacondicionado / Restaurado</option>
                 </select>
               </div>
             )}
 
-            {type === 'product' && (
+            {(type === 'product' || type === 'article') && (
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
                   Método de entrega

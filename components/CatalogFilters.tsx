@@ -94,9 +94,9 @@ export default function CatalogFilters({
 
   const typeOptions = [
     { id: '', label: locale === 'en' ? 'All types' : 'Todos los tipos' },
-    { id: 'product', label: locale === 'en' ? '🛍️ Products' : '🛍️ Productos' },
+    { id: 'product', label: locale === 'en' ? '🛍️ Products (New)' : '🛍️ Productos (Nuevos)' },
+    { id: 'article', label: locale === 'en' ? '📦 Articles (Used / Pre-owned)' : '📦 Artículos (Usados / Segunda mano)' },
     { id: 'service', label: locale === 'en' ? '🛠️ Services' : '🛠️ Servicios' },
-    { id: 'article', label: locale === 'en' ? '📦 Articles' : '📦 Artículos' },
   ]
 
   return (

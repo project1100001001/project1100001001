@@ -36,7 +36,7 @@ export default function InventoryManager({
 
   // Listings & Inventory state
   const [listings, setListings] = useState<ListingWithRelations[]>(initialListings)
-  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'services'>('all')
+  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'articles' | 'services'>('all')
   const [subFilter, setSubFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'pending' | 'draft' | 'paused'>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -144,14 +144,16 @@ export default function InventoryManager({
     }
 
     const isService = l.type === 'service'
-    const isProduct = l.type === 'product' || l.type === 'article'
+    const isProduct = l.type === 'product'
+    const isArticle = l.type === 'article'
     const currentStock = l.stock ?? 0
     const attrs = l.attrs || {}
     const leadTime = (attrs.tiempo_entrega || attrs.disponibilidad || '').toLowerCase()
     const modality = (attrs.modalidad || attrs.modality || '').toLowerCase()
 
-    // 1. Macro Filter: Artículos/Productos vs Servicios
+    // 1. Macro Filter: Productos (Nuevos) vs Artículos (Usados) vs Servicios
     if (macroTypeScope === 'products' && !isProduct) return false
+    if (macroTypeScope === 'articles' && !isArticle) return false
     if (macroTypeScope === 'services' && !isService) return false
 
     // 2. Status filter
@@ -161,7 +163,7 @@ export default function InventoryManager({
     if (statusFilter === 'paused' && l.status !== 'paused' && l.status !== 'archived') return false
 
     // 3. Subfilter contextual según el modo seleccionado
-    if (macroTypeScope === 'products') {
+    if (macroTypeScope === 'products' || macroTypeScope === 'articles') {
       if (subFilter === 'in_stock' && currentStock <= 0) return false
       if (subFilter === 'low_stock' && (currentStock > 3 || currentStock <= 0)) return false
       if (subFilter === 'out_of_stock' && currentStock > 0) return false
@@ -174,6 +176,7 @@ export default function InventoryManager({
     } else {
       // macroTypeScope === 'all'
       if (subFilter === 'products' && !isProduct) return false
+      if (subFilter === 'articles' && !isArticle) return false
       if (subFilter === 'services' && !isService) return false
       if (subFilter === 'low_stock' && (currentStock > 3 || currentStock === 0)) return false
       if (subFilter === 'out_of_stock' && currentStock > 0) return false
@@ -198,17 +201,25 @@ export default function InventoryManager({
   const pausedCount = listings.filter((l) => l.status === 'paused' || l.status === 'archived').length
 
   // Summary Metrics segmented by Item Type
-  const productItems = listings.filter((l) => l.type === 'product' || l.type === 'article')
+  const productItems = listings.filter((l) => l.type === 'product')
+  const articleItems = listings.filter((l) => l.type === 'article')
   const serviceItems = listings.filter((l) => l.type === 'service')
 
   const totalProducts = productItems.length
+  const totalArticles = articleItems.length
   const totalServices = serviceItems.length
 
-  // Products metrics
+  // Products metrics (Nuevos)
   const totalStockUnits = productItems.reduce((acc, l) => acc + (l.stock ?? 0), 0)
   const lowStockCount = productItems.filter((l) => (l.stock ?? 0) > 0 && (l.stock ?? 0) <= 3).length
   const outOfStockCount = productItems.filter((l) => (l.stock ?? 0) === 0).length
   const inStockCount = productItems.filter((l) => (l.stock ?? 0) > 3).length
+
+  // Articles metrics (Usados)
+  const totalArticleUnits = articleItems.reduce((acc, l) => acc + (l.stock ?? 0), 0)
+  const lowArticleStockCount = articleItems.filter((l) => (l.stock ?? 0) > 0 && (l.stock ?? 0) <= 3).length
+  const outOfArticleStockCount = articleItems.filter((l) => (l.stock ?? 0) === 0).length
+  const inArticleStockCount = articleItems.filter((l) => (l.stock ?? 0) > 3).length
 
   // Services metrics (Execution times, response times, daily capacity)
   const totalServiceCapacity = serviceItems.reduce((acc, l) => acc + (l.stock ?? (Number(l.attrs?.capacidad_diaria) || 10)), 0)
@@ -468,6 +479,12 @@ export default function InventoryManager({
         attrsObj.disponibilidad = 'Mismo día'
         attrsObj.modalidad = 'Presencial'
         attrsObj.capacidad_diaria = numericStock
+      } else if (newItemType === 'product') {
+        attrsObj.condition = 'Nuevo'
+        attrsObj.delivery_method = 'Domicilio local'
+      } else if (newItemType === 'article') {
+        attrsObj.condition = 'Usado - Buen estado'
+        attrsObj.delivery_method = 'Domicilio local'
       }
 
       const { data, error } = await supabase
@@ -616,8 +633,11 @@ export default function InventoryManager({
         ...(editingFullListing.attrs || {}),
       }
 
-      if (fullType === 'product' || fullType === 'article') {
-        updatedAttrs.condition = fullCondition
+      if (fullType === 'product') {
+        updatedAttrs.condition = 'Nuevo'
+        updatedAttrs.delivery_method = fullDeliveryMethod
+      } else if (fullType === 'article') {
+        updatedAttrs.condition = fullCondition.includes('Usado') || fullCondition.includes('Reacondicionado') ? fullCondition : 'Usado - Buen estado'
         updatedAttrs.delivery_method = fullDeliveryMethod
       } else if (fullType === 'service') {
         updatedAttrs.modalidad = fullModality
@@ -998,7 +1018,7 @@ export default function InventoryManager({
 
           {/* 🌟 FILTRO MACRO GENERAL: PRODUCTOS VS SERVICIOS */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-zinc-100/90 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
-            <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -1030,10 +1050,29 @@ export default function InventoryManager({
                     : 'text-zinc-600 hover:text-blue-600 dark:text-zinc-400 dark:hover:text-blue-400'
                 }`}
               >
-                <span>📦</span>
-                <span>{t.inventory.macroScopeProducts || 'Productos & Artículos'}</span>
+                <span>🛍️</span>
+                <span>{t.inventory.macroScopeProducts || 'Productos (Nuevos)'}</span>
                 <span className="rounded-full bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200 px-1.5 py-0.2 text-[10px] font-bold">
                   {totalProducts}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMacroTypeScope('articles')
+                  setSubFilter('all')
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                  macroTypeScope === 'articles'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400'
+                }`}
+              >
+                <span>📦</span>
+                <span>{t.inventory.macroScopeArticles || 'Artículos (Usados)'}</span>
+                <span className="rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-1.5 py-0.2 text-[10px] font-bold">
+                  {totalArticles}
                 </span>
               </button>
 
@@ -1049,8 +1088,8 @@ export default function InventoryManager({
                     : 'text-zinc-600 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400'
                 }`}
               >
-                <span>⏱️</span>
-                <span>{t.inventory.macroScopeServices || 'Servicios & Prestaciones'}</span>
+                <span>🛠️</span>
+                <span>{t.inventory.macroScopeServices || 'Servicios'}</span>
                 <span className="rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200 px-1.5 py-0.2 text-[10px] font-bold">
                   {totalServices}
                 </span>
@@ -1062,7 +1101,13 @@ export default function InventoryManager({
               {macroTypeScope === 'products' && (
                 <span className="flex items-center gap-1.5 font-semibold text-blue-700 dark:text-blue-400">
                   <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                  <span>Control de bodega, unidades en stock y reposición</span>
+                  <span>Control de bodega, unidades nuevas en stock y reposición</span>
+                </span>
+              )}
+              {macroTypeScope === 'articles' && (
+                <span className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Control de artículos usados, segunda mano y piezas únicas</span>
                 </span>
               )}
               {macroTypeScope === 'services' && (
@@ -1085,13 +1130,13 @@ export default function InventoryManager({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <div className="rounded-2xl border border-blue-200 bg-white p-4 shadow-xs dark:border-blue-900/60 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
-                  📦 {t.inventory.macroScopeProducts}
+                  🛍️ {t.inventory.macroScopeProducts}
                 </span>
                 <div className="mt-2 flex items-baseline justify-between">
                   <span className="text-2xl font-black text-blue-700 dark:text-blue-300">
                     {totalProducts}
                   </span>
-                  <span className="text-xs text-blue-600/80">en catálogo</span>
+                  <span className="text-xs text-blue-600/80">nuevos en catálogo</span>
                 </div>
               </div>
 
@@ -1128,6 +1173,58 @@ export default function InventoryManager({
                     {outOfStockCount}
                   </span>
                   <span className="text-xs text-red-600/80">reposición</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {macroTypeScope === 'articles' && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="rounded-2xl border border-amber-200 bg-white p-4 shadow-xs dark:border-amber-900/60 dark:bg-zinc-900">
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+                  📦 {t.inventory.macroScopeArticles}
+                </span>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-black text-amber-700 dark:text-amber-300">
+                    {totalArticles}
+                  </span>
+                  <span className="text-xs text-amber-600/80">usados en catálogo</span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
+                  🔢 {t.inventory.totalUnitsInStock}
+                </span>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                    {totalArticleUnits}
+                  </span>
+                  <span className="text-xs text-zinc-400">disponibles</span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
+                  ⚠️ {t.inventory.lowStock}
+                </span>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                    {lowArticleStockCount}
+                  </span>
+                  <span className="text-xs text-amber-600/80">≤ 3 unidades</span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
+                  🚫 {t.inventory.outOfStock}
+                </span>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-black text-red-600 dark:text-red-400">
+                    {outOfArticleStockCount}
+                  </span>
+                  <span className="text-xs text-red-600/80">agotados</span>
                 </div>
               </div>
             </div>
@@ -1269,6 +1366,33 @@ export default function InventoryManager({
                 </>
               )}
 
+              {macroTypeScope === 'articles' && (
+                <>
+                  {[
+                    { id: 'all', label: t.inventory.allFilter, count: totalArticles },
+                    { id: 'in_stock', label: `${t.inventory.inStock} (>3)`, count: inArticleStockCount },
+                    { id: 'low_stock', label: `${t.inventory.lowStock} (≤3)`, count: lowArticleStockCount },
+                    { id: 'out_of_stock', label: t.inventory.outOfStock, count: outOfArticleStockCount },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setSubFilter(f.id)}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                        subFilter === f.id
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
+                      }`}
+                    >
+                      <span>{f.label}</span>
+                      <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px]">
+                        {f.count}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+
               {macroTypeScope === 'services' && (
                 <>
                   {[
@@ -1302,9 +1426,10 @@ export default function InventoryManager({
                   {[
                     { id: 'all', label: t.inventory.allFilter, count: listings.length },
                     { id: 'products', label: t.inventory.productsFilter, count: totalProducts },
+                    { id: 'articles', label: t.inventory.articlesFilter, count: totalArticles },
                     { id: 'services', label: t.inventory.servicesFilter, count: totalServices },
-                    { id: 'low_stock', label: t.inventory.lowStockFilter, count: lowStockCount },
-                    { id: 'out_of_stock', label: t.inventory.outOfStockFilter, count: outOfStockCount },
+                    { id: 'low_stock', label: t.inventory.lowStockFilter, count: lowStockCount + lowArticleStockCount },
+                    { id: 'out_of_stock', label: t.inventory.outOfStockFilter, count: outOfStockCount + outOfArticleStockCount },
                   ].map((f) => (
                     <button
                       key={f.id}
@@ -1335,7 +1460,11 @@ export default function InventoryManager({
                   placeholder={
                     macroTypeScope === 'services'
                       ? (locale === 'en' ? 'Search service, lead time...' : 'Buscar servicio, duración...')
-                      : (locale === 'en' ? 'Search items...' : 'Buscar artículos, código...')
+                      : macroTypeScope === 'articles'
+                      ? (locale === 'en' ? 'Search used article, status...' : 'Buscar artículo usado, estado...')
+                      : macroTypeScope === 'products'
+                      ? (locale === 'en' ? 'Search new product, code...' : 'Buscar producto nuevo, código...')
+                      : (locale === 'en' ? 'Search items...' : 'Buscar publicaciones, código...')
                   }
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 shadow-xs focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
@@ -1355,12 +1484,16 @@ export default function InventoryManager({
           {/* Listado / Tabla de Artículos con Ajustes */}
           {filteredListings.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-4xl">{macroTypeScope === 'services' ? '⏱️' : '📦'}</span>
+              <span className="text-4xl">
+                {macroTypeScope === 'services' ? '🛠️' : macroTypeScope === 'articles' ? '📦' : '🛍️'}
+              </span>
               <p className="mt-3 text-sm text-zinc-500">
                 {macroTypeScope === 'services'
                   ? (locale === 'en' ? 'No services found matching the active filters.' : 'No se encontraron servicios con los filtros activos.')
+                  : macroTypeScope === 'articles'
+                  ? (locale === 'en' ? 'No used articles found matching the active filters.' : 'No se encontraron artículos usados con los filtros activos.')
                   : macroTypeScope === 'products'
-                  ? (locale === 'en' ? 'No products found matching the active filters.' : 'No se encontraron productos físicos con los filtros activos.')
+                  ? (locale === 'en' ? 'No new products found matching the active filters.' : 'No se encontraron productos nuevos con los filtros activos.')
                   : t.inventory.noItems}
               </p>
             </div>
@@ -1418,7 +1551,7 @@ export default function InventoryManager({
                               />
                             ) : (
                               <div className="flex h-full w-full items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                                {isService ? '⏱️' : '📦'}
+                                {isService ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
                               </div>
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold">
@@ -1433,10 +1566,16 @@ export default function InventoryManager({
                               className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                                 isService
                                   ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                  : item.type === 'article'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                                   : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                               }`}
                             >
-                              {isService ? '⏱️ Servicio' : '📦 Producto'}
+                              {isService
+                                ? '🛠️ Servicio'
+                                : item.type === 'article'
+                                ? '📦 Artículo (Usado)'
+                                : '🛍️ Producto (Nuevo)'}
                             </span>
                             {item.category && (
                               <span className="text-[11px] text-zinc-400">
@@ -2304,9 +2443,9 @@ export default function InventoryManager({
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'product', label: '🛍️ Producto', unit: 'unidad' },
+                    { id: 'product', label: '🛍️ Producto (Nuevo)', unit: 'unidad' },
+                    { id: 'article', label: '📦 Artículo (Usado)', unit: 'unidad' },
                     { id: 'service', label: '🛠️ Servicio', unit: 'servicio' },
-                    { id: 'article', label: '📦 Artículo', unit: 'unidad' },
                   ].map((tOption) => (
                     <button
                       key={tOption.id}
@@ -2511,25 +2650,35 @@ export default function InventoryManager({
 
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
-                    Tipo de Artículo
+                    Tipo de Publicación
                   </label>
-                  <select
-                    value={fullType}
-                    onChange={(e) => {
-                      const newT = e.target.value as ListingType
-                      setFullType(newT)
-                      if (newT === 'service') {
-                        setFullPriceUnit('servicio')
-                      } else {
-                        setFullPriceUnit('unidad')
-                      }
-                    }}
-                    className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    <option value="product">🛍️ Producto</option>
-                    <option value="service">🛠️ Servicio</option>
-                    <option value="article">📦 Artículo</option>
-                  </select>
+                  {fullType === 'product' && (
+                    <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-xs font-bold text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+                      <span>🛍️</span>
+                      <span>Producto (Nuevo)</span>
+                      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider bg-blue-200/60 dark:bg-blue-900/60 px-1.5 py-0.5 rounded text-blue-900 dark:text-blue-200">
+                        Fijo / Clasificado
+                      </span>
+                    </div>
+                  )}
+                  {fullType === 'article' && (
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs font-bold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                      <span>📦</span>
+                      <span>Artículo (Usado)</span>
+                      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider bg-amber-200/60 dark:bg-amber-900/60 px-1.5 py-0.5 rounded text-amber-900 dark:text-amber-200">
+                        Fijo / Clasificado
+                      </span>
+                    </div>
+                  )}
+                  {fullType === 'service' && (
+                    <div className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-2 text-xs font-bold text-purple-800 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300">
+                      <span>🛠️</span>
+                      <span>Servicio</span>
+                      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider bg-purple-200/60 dark:bg-purple-900/60 px-1.5 py-0.5 rounded text-purple-900 dark:text-purple-200">
+                        Fijo / Clasificado
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2821,21 +2970,35 @@ export default function InventoryManager({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
-                      Condición del Producto
-                    </label>
-                    <select
-                      value={fullCondition}
-                      onChange={(e) => setFullCondition(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                    >
-                      <option value="Nuevo">Nuevo</option>
-                      <option value="Usado - Como nuevo">Usado - Como nuevo</option>
-                      <option value="Usado - Buen estado">Usado - Buen estado</option>
-                      <option value="Reacondicionado">Reacondicionado</option>
-                    </select>
-                  </div>
+                  {fullType === 'product' && (
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                        Condición del Producto
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs font-semibold text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                        <span>✨</span>
+                        <span>Nuevo (A estrenar / De fábrica)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {fullType === 'article' && (
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                        Estado de Conservación (Artículo Usado)
+                      </label>
+                      <select
+                        value={fullCondition}
+                        onChange={(e) => setFullCondition(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="Usado - Como nuevo">Usado - Como nuevo</option>
+                        <option value="Usado - Buen estado">Usado - Buen estado</option>
+                        <option value="Usado - Aceptable">Usado - Aceptable</option>
+                        <option value="Reacondicionado">Reacondicionado / Restaurado</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
@@ -2987,7 +3150,7 @@ export default function InventoryManager({
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-4xl">
-                      {previewItem.type === 'service' ? '⏱️' : '📦'}
+                      {previewItem.type === 'service' ? '🛠️' : previewItem.type === 'article' ? '📦' : '🛍️'}
                     </div>
                   )}
                 </div>

@@ -638,7 +638,7 @@ export default function HomeClientView({
                     {/* Top Badges coincidentes con el explorador de catálogo */}
                     <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
                       <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[11px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
-                        {currentHero.type === 'service' ? '🛠️ Servicio' : currentHero.type === 'article' ? '📦 Artículo' : '🛍️ Producto'}
+                        {currentHero.type === 'service' ? '🛠️ Servicio' : currentHero.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
                       </span>
                       {currentHero.isPaidCampaign && (
                         <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
@@ -788,7 +788,7 @@ export default function HomeClientView({
                       {/* Top Badges */}
                       <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
                         <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
-                          {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo' : '🛍️ Producto'}
+                          {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
                         </span>
                         {item.isPaidCampaign && (
                           <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">

@@ -221,6 +221,38 @@ export default function AppSidebar() {
                   <span>{t.nav.allListings}</span>
                 </Link>
 
+                <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  {locale === 'en' ? 'By Type' : 'Por Tipo'}
+                </div>
+                <Link
+                  href="/catalogo?type=product"
+                  onClick={close}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
+                >
+                  <span>🛍️</span>
+                  <span>{locale === 'en' ? 'Products (New)' : 'Productos (Nuevos)'}</span>
+                </Link>
+                <Link
+                  href="/catalogo?type=article"
+                  onClick={close}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
+                >
+                  <span>📦</span>
+                  <span>{locale === 'en' ? 'Articles (Used)' : 'Artículos (Usados)'}</span>
+                </Link>
+                <Link
+                  href="/catalogo?type=service"
+                  onClick={close}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-medium"
+                >
+                  <span>🛠️</span>
+                  <span>{locale === 'en' ? 'Services' : 'Servicios'}</span>
+                </Link>
+
+                <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  {locale === 'en' ? 'Categories' : 'Categorías'}
+                </div>
+
                 {CATEGORIES.map((cat) => (
                   <Link
                     key={cat.slug}
@@ -282,17 +314,35 @@ export default function AppSidebar() {
                     <span className="font-semibold">{locale === 'en' ? 'Listings & Inventory' : 'Publicaciones & Inventario'}</span>
                   </Link>
 
+                  <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    {locale === 'en' ? 'Create Listing' : 'Crear Anuncio'}
+                  </div>
+
                   <Link
-                    href="/publicar"
+                    href="/publicar?type=product"
                     onClick={close}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/publicar'
-                        ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-zinc-800'
-                    }`}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
                   >
-                    <span>➕</span>
-                    <span className="font-bold">{t.nav.publish}</span>
+                    <span>🛍️</span>
+                    <span>{locale === 'en' ? 'Post Product (New)' : 'Publicar Producto (Nuevo)'}</span>
+                  </Link>
+
+                  <Link
+                    href="/publicar?type=article"
+                    onClick={close}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
+                  >
+                    <span>📦</span>
+                    <span>{locale === 'en' ? 'Post Article (Used)' : 'Publicar Artículo (Usado)'}</span>
+                  </Link>
+
+                  <Link
+                    href="/publicar?type=service"
+                    onClick={close}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors text-xs font-semibold"
+                  >
+                    <span>🛠️</span>
+                    <span>{locale === 'en' ? 'Post Service' : 'Publicar Servicio'}</span>
                   </Link>
                 </div>
               )}

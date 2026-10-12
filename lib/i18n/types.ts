@@ -328,6 +328,7 @@ export interface Dictionary {
     tabSales: string
     allFilter: string
     productsFilter: string
+    articlesFilter: string
     servicesFilter: string
     lowStockFilter: string
     outOfStockFilter: string
@@ -402,6 +403,7 @@ export interface Dictionary {
     priceHistoryRestore: string
     macroScopeAll: string
     macroScopeProducts: string
+    macroScopeArticles: string
     macroScopeServices: string
     totalUnitsInStock: string
     totalCapacitySlots: string
