@@ -79,10 +79,21 @@ export interface Listing {
   published_at: string | null
 }
 
+export interface PriceHistoryRecord {
+  id?: string
+  listing_id?: string
+  price: number
+  price_unit?: string | null
+  changed_at: string
+  note?: string | null
+  user_email?: string | null
+}
+
 export interface ListingWithRelations extends Listing {
   category?: Category | null
   seller?: Seller | null
   listing_media?: ListingMedia[]
+  price_history?: PriceHistoryRecord[]
 }
 
 // ------------------------------------------------------------------
@@ -211,11 +222,18 @@ export interface AdOrder {
   price_paid: number
   created_at: string
   submitted_at: string | null
+  clicks_count?: number
+  impressions_count?: number
+  contacts_count?: number
+  daysRemaining?: number
+  hoursRemaining?: number
+  progressPercent?: number
+  isExpired?: boolean
 }
 
 export interface AdOrderWithRelations extends AdOrder {
   package?: AdPackage | null
-  listing?: Listing | null
+  listing?: (Listing & { seller?: Seller | null }) | null
   account?: AdAccount | null
 }
 

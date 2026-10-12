@@ -1,6 +1,7 @@
 // app/publicar/page.tsx
 // Página de publicación para el vendedor
 
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import ListingForm from '@/components/ListingForm'
 import type { Category } from '@/lib/types'
@@ -25,7 +26,15 @@ export default async function PublicarPage() {
 
   return (
     <main className="flex-1 bg-zinc-50/50 dark:bg-zinc-950 pb-16">
-      <ListingForm categories={(categories as Category[]) || []} />
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center py-20 text-sm text-zinc-500">
+            <span>Cargando formulario y sincronizando inventario...</span>
+          </div>
+        }
+      >
+        <ListingForm categories={(categories as Category[]) || []} />
+      </Suspense>
     </main>
   )
 }

@@ -51,6 +51,34 @@ export default function AdminModerationPanel({
   }, [defaultSection])
 
   useEffect(() => {
+    const handleSectionChange = (e: any) => {
+      if (e.detail && ['listings', 'ads', 'balances', 'users'].includes(e.detail)) {
+        setSection(e.detail)
+        setSearchQuery('')
+      }
+    }
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        const sec = params.get('section') || params.get('tab')
+        if (sec && ['listings', 'ads', 'balances', 'users'].includes(sec)) {
+          setSection(sec as any)
+          setSearchQuery('')
+        } else if (!sec) {
+          setSection('listings')
+          setSearchQuery('')
+        }
+      }
+    }
+    window.addEventListener('admin-section-change', handleSectionChange)
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('admin-section-change', handleSectionChange)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  useEffect(() => {
     setUsers(initialUsers)
   }, [initialUsers])
 
@@ -224,6 +252,11 @@ export default function AdminModerationPanel({
     setProcessingId(adOrderId)
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      const now = new Date()
+      const targetAd = adOrders.find((a) => a.id === adOrderId)
+      const durationDays = targetAd?.package?.duration_days || 7
+      const startsAt = targetAd?.starts_at || now.toISOString()
+      const endsAt = targetAd?.ends_at || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString()
 
       const { error } = await supabase
         .from('ad_order')
@@ -231,7 +264,9 @@ export default function AdminModerationPanel({
           status: 'live',
           reject_reason: null,
           reviewed_by: user?.id || null,
-          reviewed_at: new Date().toISOString(),
+          reviewed_at: now.toISOString(),
+          starts_at: startsAt,
+          ends_at: endsAt,
         })
         .eq('id', adOrderId)
 
@@ -245,7 +280,9 @@ export default function AdminModerationPanel({
                 status: 'live',
                 reject_reason: null,
                 reviewed_by: user?.id || null,
-                reviewed_at: new Date().toISOString(),
+                reviewed_at: now.toISOString(),
+                starts_at: startsAt,
+                ends_at: endsAt,
               }
             : item
         )
@@ -773,6 +810,41 @@ export default function AdminModerationPanel({
     }
   }
 
+  const sectionHeaderInfo = {
+    listings: {
+      icon: '📦',
+      title: locale === 'en' ? 'Listings Moderation Queue' : 'Moderación de Anuncios y Publicaciones',
+      subtitle:
+        locale === 'en'
+          ? 'Review, approve, or reject products and services submitted by sellers.'
+          : 'Revisión y aprobación o rechazo de artículos y servicios enviados por vendedores.',
+    },
+    ads: {
+      icon: '📢',
+      title: locale === 'en' ? 'Sponsored Campaigns Moderation' : 'Moderación de Campañas Patrocinadas',
+      subtitle:
+        locale === 'en'
+          ? 'Review and approve sponsored advertising campaigns in the catalog.'
+          : 'Revisión y activación de campañas publicitarias patrocinadas en el catálogo.',
+    },
+    balances: {
+      icon: '💳',
+      title: locale === 'en' ? 'Wallets & Balance Recharges' : 'Gestión de Billeteras y Recargas',
+      subtitle:
+        locale === 'en'
+          ? 'Approve payment receipts, manage advertiser accounts, and balance top-ups.'
+          : 'Aprobación de comprobantes de pago, cuentas de anunciantes y recargas de saldo.',
+    },
+    users: {
+      icon: '👥',
+      title: locale === 'en' ? 'Users, Roles & Permissions' : 'Gestión de Usuarios, Roles y Permisos',
+      subtitle:
+        locale === 'en'
+          ? 'Control system user accounts, assign roles (Buyer, Seller, Admin) and manage permissions.'
+          : 'Control de cuentas de usuario, asignación de roles (Comprador, Vendedor, Administrador) y permisos.',
+    },
+  }[section]
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -788,15 +860,15 @@ export default function AdminModerationPanel({
         </div>
       )}
 
-      {/* Header and Section Switcher */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-            <span>🛡️</span>
-            <span>{t.admin.title}</span>
+            <span>{sectionHeaderInfo.icon}</span>
+            <span>{sectionHeaderInfo.title}</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {t.admin.subtitle}
+            {sectionHeaderInfo.subtitle}
           </p>
         </div>
 
@@ -810,115 +882,6 @@ export default function AdminModerationPanel({
             className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
-      </div>
-
-      {/* Top Level Category Switcher: Listings vs Ads vs Balances */}
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setSection('listings')
-            setSearchQuery('')
-          }}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-            section === 'listings'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300'
-          }`}
-        >
-          <span>📦 {t.admin.tabListings}</span>
-          {pendingListingsCount > 0 && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                section === 'listings' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {pendingListingsCount} {locale === 'en' ? 'pending' : 'pend.'}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSection('ads')
-            setSearchQuery('')
-          }}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-            section === 'ads'
-              ? 'bg-purple-600 text-white shadow-sm'
-              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300'
-          }`}
-        >
-          <span>📢 {t.admin.tabAds}</span>
-          {pendingAdsCount > 0 && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                section === 'ads' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {pendingAdsCount} {locale === 'en' ? 'pending' : 'pend.'}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSection('balances')
-            setSearchQuery('')
-          }}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-            section === 'balances'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300'
-          }`}
-        >
-          <span>💳 {t.admin.tabBalances}</span>
-          {pendingRechargesCount > 0 ? (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                section === 'balances'
-                  ? 'bg-amber-400 text-zinc-900'
-                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-              }`}
-            >
-              {pendingRechargesCount} por aprobar
-            </span>
-          ) : (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                section === 'balances'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-              }`}
-            >
-              {adAccounts.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSection('users')
-            setSearchQuery('')
-          }}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-            section === 'users'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300'
-          }`}
-        >
-          <span>👥 {t.admin.tabUsers}</span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-              section === 'users' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
-            }`}
-          >
-            {users.length}
-          </span>
-        </button>
       </div>
 
       {/* ---------------- SECTION 1: LISTINGS ---------------- */}

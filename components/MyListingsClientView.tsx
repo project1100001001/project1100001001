@@ -115,6 +115,14 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2.5">
+                            <Link
+                              href={`/inventario?edit=${l.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shrink-0 shadow-2xs"
+                              title={t.inventory.editItem || 'Editar Artículo Completo'}
+                            >
+                              <span>🛠️</span>
+                              <span>{t.myListings.editBtn || 'Editar'}</span>
+                            </Link>
                             {l.status === 'published' && (
                               <Link
                                 href={`/promocionar?listing_id=${l.id}`}

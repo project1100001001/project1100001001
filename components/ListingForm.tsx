@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { Category, ListingType, Seller } from '@/lib/types'
+import type { Category, ListingType, ListingWithRelations, Seller } from '@/lib/types'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
 
@@ -14,6 +14,8 @@ interface ListingFormProps {
 
 export default function ListingForm({ categories }: ListingFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialInventoryParam = searchParams ? searchParams.get('inventory_id') || '' : ''
   const supabase = createClient()
   const { t, locale } = useTranslation()
 
@@ -22,6 +24,14 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [sellers, setSellers] = useState<Seller[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState<string>('')
+
+  // Inventory Integration state (prioridad módulo de inventario)
+  const [inventoryListings, setInventoryListings] = useState<ListingWithRelations[]>([])
+  const [loadingInventory, setLoadingInventory] = useState(false)
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string>(initialInventoryParam)
+  const [inventoryItemData, setInventoryItemData] = useState<ListingWithRelations | null>(null)
+  const [inventoryPriceConfirmed, setInventoryPriceConfirmed] = useState<boolean>(true)
+  const [matchedInventorySuggestion, setMatchedInventorySuggestion] = useState<ListingWithRelations | null>(null)
   
   // New seller registration state (if user has no seller profile yet)
   const [showSellerSetup, setShowSellerSetup] = useState(false)
@@ -99,6 +109,104 @@ export default function ListingForm({ categories }: ListingFormProps) {
 
     initUserAndSeller()
   }, [supabase])
+
+  // Cargar inventario del vendedor seleccionado para sincronización prioritaria
+  useEffect(() => {
+    async function loadSellerInventory() {
+      if (!selectedSellerId) return
+      setLoadingInventory(true)
+      try {
+        const { data, error } = await supabase
+          .from('listing')
+          .select(`
+            *,
+            category:category_id(*),
+            listing_media(*)
+          `)
+          .eq('seller_id', selectedSellerId)
+          .order('created_at', { ascending: false })
+
+        if (!error && data) {
+          const inv = data as ListingWithRelations[]
+          setInventoryListings(inv)
+
+          const targetId = selectedInventoryId || initialInventoryParam
+          if (targetId) {
+            const found = inv.find((item) => item.id === targetId)
+            if (found) {
+              applyInventoryItem(found)
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('Error cargando inventario en formulario:', err)
+      } finally {
+        setLoadingInventory(false)
+      }
+    }
+
+    loadSellerInventory()
+  }, [selectedSellerId, supabase, initialInventoryParam])
+
+  const applyInventoryItem = (item: ListingWithRelations) => {
+    setSelectedInventoryId(item.id)
+    setInventoryItemData(item)
+    setListingId(item.id)
+    setTitle(item.title || '')
+    setType(item.type)
+    if (item.category_id) {
+      setCategoryId(item.category_id)
+    }
+    setPrice(item.price !== null && item.price !== undefined ? String(item.price) : '')
+    setPriceUnit(item.price_unit || (item.type === 'service' ? 'servicio' : 'unidad'))
+    setPriceType(item.price !== null ? 'fixed' : 'quote')
+    setStock(item.stock !== null && item.stock !== undefined ? String(item.stock) : '1')
+    setCity(item.city || '')
+    setDescription(item.description || '')
+    setInventoryPriceConfirmed(true)
+
+    // Medios
+    if (item.listing_media && item.listing_media.length > 0) {
+      setMediaUrls(item.listing_media.map((m) => m.url))
+    }
+
+    // Atributos dinámicos
+    if (item.attrs) {
+      if (item.attrs.condition) setCondition(item.attrs.condition)
+      if (item.attrs.modality || item.attrs.modalidad) setModality(item.attrs.modality || item.attrs.modalidad)
+      if (item.attrs.delivery_method) setDeliveryMethod(item.attrs.delivery_method)
+    }
+  }
+
+  const handleSelectInventoryItem = (id: string) => {
+    if (!id || id === 'new') {
+      setSelectedInventoryId('')
+      setInventoryItemData(null)
+      setInventoryPriceConfirmed(false)
+      return
+    }
+    const found = inventoryListings.find((item) => item.id === id)
+    if (found) {
+      applyInventoryItem(found)
+    }
+  }
+
+  // Detección de artículo existente en inventario mientras el vendedor escribe el título
+  useEffect(() => {
+    if (selectedInventoryId) {
+      setMatchedInventorySuggestion(null)
+      return
+    }
+    const clean = title.trim().toLowerCase()
+    if (clean.length >= 3 && inventoryListings.length > 0) {
+      const match = inventoryListings.find(
+        (inv) => inv.title && inv.title.toLowerCase().includes(clean)
+      )
+      setMatchedInventorySuggestion(match || null)
+    } else {
+      setMatchedInventorySuggestion(null)
+    }
+  }, [title, selectedInventoryId, inventoryListings])
 
   // Select initial category matching type
   useEffect(() => {
@@ -273,43 +381,82 @@ export default function ListingForm({ categories }: ListingFormProps) {
       const numericPrice = priceType === 'fixed' && price ? parseInt(price, 10) : null
       const numericStock = type === 'service' ? null : stock ? parseInt(stock, 10) : null
 
-      // 1. Insert into public.listing
-      const { data: listingData, error: listingError } = await supabase
-        .from('listing')
-        .insert({
-          id: listingId,
-          seller_id: selectedSellerId,
-          category_id: categoryId,
-          type,
-          title: title.trim(),
-          description: description.trim() || null,
-          price: numericPrice,
-          price_unit: priceType === 'fixed' ? priceUnit : null,
-          city: city.trim() || null,
-          status: targetStatus,
-          stock: numericStock,
-          attrs: attrsObj,
-        })
-        .select()
-        .single()
+      let listingData: any = null
 
-      if (listingError) throw listingError
+      if (selectedInventoryId) {
+        // Actualizar artículo existente de inventario y confirmar publicación
+        const { data: updatedData, error: updateError } = await supabase
+          .from('listing')
+          .update({
+            category_id: categoryId,
+            type,
+            title: title.trim(),
+            description: description.trim() || null,
+            price: numericPrice,
+            price_unit: priceType === 'fixed' ? priceUnit : null,
+            city: city.trim() || null,
+            status: targetStatus,
+            stock: numericStock,
+            attrs: attrsObj,
+          })
+          .eq('id', selectedInventoryId)
+          .select()
+          .single()
 
-      // 2. Insert media items if any
-      if (mediaUrls.length > 0 && listingData?.id) {
-        const mediaToInsert = mediaUrls.map((url, idx) => ({
-          listing_id: listingData.id,
-          url,
-          kind: 'image',
-          position: idx,
-        }))
+        if (updateError) throw updateError
+        listingData = updatedData
 
-        const { error: mediaError } = await supabase
-          .from('listing_media')
-          .insert(mediaToInsert)
+        // Reemplazar fotos si hay urls
+        if (mediaUrls.length > 0 && listingData?.id) {
+          await supabase.from('listing_media').delete().eq('listing_id', listingData.id)
+          const mediaToInsert = mediaUrls.map((url, idx) => ({
+            listing_id: listingData.id,
+            url,
+            kind: 'image',
+            position: idx,
+          }))
+          await supabase.from('listing_media').insert(mediaToInsert)
+        }
+      } else {
+        // 1. Insert into public.listing (se añade de inmediato al inventario maestro)
+        const { data: insertedData, error: listingError } = await supabase
+          .from('listing')
+          .insert({
+            id: listingId,
+            seller_id: selectedSellerId,
+            category_id: categoryId,
+            type,
+            title: title.trim(),
+            description: description.trim() || null,
+            price: numericPrice,
+            price_unit: priceType === 'fixed' ? priceUnit : null,
+            city: city.trim() || null,
+            status: targetStatus,
+            stock: numericStock,
+            attrs: attrsObj,
+          })
+          .select()
+          .single()
 
-        if (mediaError) {
-          console.error('Error guardando fotos:', mediaError)
+        if (listingError) throw listingError
+        listingData = insertedData
+
+        // 2. Insert media items if any
+        if (mediaUrls.length > 0 && listingData?.id) {
+          const mediaToInsert = mediaUrls.map((url, idx) => ({
+            listing_id: listingData.id,
+            url,
+            kind: 'image',
+            position: idx,
+          }))
+
+          const { error: mediaError } = await supabase
+            .from('listing_media')
+            .insert(mediaToInsert)
+
+          if (mediaError) {
+            console.error('Error guardando fotos:', mediaError)
+          }
         }
       }
 
@@ -492,9 +639,9 @@ export default function ListingForm({ categories }: ListingFormProps) {
           </Link>
           <Link
             href="/mis-publicaciones"
-            className="rounded-lg border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
           >
-            Ir a mis publicaciones
+            📦 Mis Publicaciones & Inventario
           </Link>
           <button
             onClick={() => {
@@ -571,6 +718,72 @@ export default function ListingForm({ categories }: ListingFormProps) {
             ))}
           </select>
         )}
+      </div>
+
+      {/* Sincronización con Inventario Maestro (Prioridad de Inventario) */}
+      <div className="mb-6 rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-white p-5 shadow-xs dark:from-emerald-950/40 dark:via-zinc-900 dark:to-zinc-900 dark:border-emerald-700/50">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-xs">
+              📦
+            </span>
+            <div>
+              <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                <span>Vincular con Artículo de tu Inventario Maestro</span>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 uppercase tracking-wider">
+                  Prioridad Inventario
+                </span>
+              </h2>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                El precio y existencias provienen de tu inventario. Selecciona un artículo existente para importar su información:
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/mis-publicaciones"
+            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 self-start sm:self-auto"
+          >
+            <span>Publicaciones & Inventario</span>
+            <span>↗</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+          <div className="sm:col-span-2">
+            <select
+              value={selectedInventoryId}
+              onChange={(e) => handleSelectInventoryItem(e.target.value)}
+              className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="">➕ Crear nuevo artículo independiente (se integrará al inventario)</option>
+              {inventoryListings.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  📦 {inv.title} — ${Number(inv.price || 0).toLocaleString('es-CO')} COP / {inv.price_unit || (inv.type === 'service' ? 'servicio' : 'unidad')} ({inv.type === 'service' ? 'Servicio' : `${inv.stock ?? 0} disponibles`})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-1">
+            {selectedInventoryId && inventoryItemData ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-100/90 px-3 py-2 text-xs font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
+                <span className="truncate">✓ Precio: ${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP</span>
+                <button
+                  type="button"
+                  onClick={() => handleSelectInventoryItem('new')}
+                  className="text-emerald-900 dark:text-emerald-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] underline"
+                >
+                  Desvincular
+                </button>
+              </div>
+            ) : (
+              <span className="text-[11px] text-zinc-500 block">
+                {loadingInventory ? 'Cargando inventario...' : `${inventoryListings.length} artículos en tu inventario`}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -664,6 +877,23 @@ export default function ListingForm({ categories }: ListingFormProps) {
               placeholder="Ej. Torta de chocolate artesanal 1kg / Clases de inglés online personalizadas"
               className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm text-zinc-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
+            {matchedInventorySuggestion && (
+              <div className="mt-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span>💡</span>
+                  <span className="truncate">
+                    Encontrado en tu inventario: <strong>&quot;{matchedInventorySuggestion.title}&quot;</strong> (${Number(matchedInventorySuggestion.price || 0).toLocaleString('es-CO')} COP).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => applyInventoryItem(matchedInventorySuggestion)}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs hover:bg-emerald-500 transition-colors"
+                >
+                  Importar y Confirmar Precio
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -701,9 +931,58 @@ export default function ListingForm({ categories }: ListingFormProps) {
 
         {/* 4. Precio y Modalidad de Cobro */}
         <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
-          <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-            Precio
-          </label>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              4. Precio y Modalidad de Cobro
+            </label>
+            {selectedInventoryId && inventoryItemData && (
+              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 flex items-center gap-1">
+                <span>🔒</span>
+                <span>Precio Maestro de Inventario</span>
+              </span>
+            )}
+          </div>
+
+          {/* Tarjeta de Confirmación de Información de Inventario */}
+          {selectedInventoryId && inventoryItemData && (
+            <div className="mb-5 rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white p-4 sm:p-5 dark:border-emerald-700 dark:bg-zinc-900 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-emerald-200 shadow-2xs dark:bg-zinc-900 dark:border-emerald-900">
+                <div>
+                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                    📦 Tarifa Configurada en Inventario
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                      ${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP
+                    </span>
+                    <span className="text-xs font-bold text-zinc-400">
+                      / {inventoryItemData.price_unit || (type === 'service' ? 'servicio' : 'unidad')}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setInventoryPriceConfirmed(!inventoryPriceConfirmed)}
+                  className={`rounded-xl px-4 py-2.5 text-xs font-black transition-all flex items-center justify-center gap-2 shadow-2xs ${
+                    inventoryPriceConfirmed
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                      : 'bg-zinc-200 text-zinc-800 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-200'
+                  }`}
+                >
+                  <span>{inventoryPriceConfirmed ? '✓ Confirmado desde Inventario' : 'Confirmar Precio de Inventario'}</span>
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-start gap-2 text-xs text-emerald-900 dark:text-emerald-300">
+                <span>ℹ️</span>
+                <p className="leading-relaxed">
+                  <strong>Prioridad del módulo de inventario:</strong> Este anuncio busca y adopta directamente la tarifa ya configurada en el inventario. Solo requieres confirmar los datos para publicar tu anuncio.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-4 mb-4">
             <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-zinc-700 dark:text-zinc-300">
               <input
@@ -732,7 +1011,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                  Monto en COP ($)
+                  Monto en COP ($) {selectedInventoryId && <span className="text-emerald-600 font-bold">(Sincronizado)</span>}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500 text-sm">
@@ -759,10 +1038,16 @@ export default function ListingForm({ categories }: ListingFormProps) {
                   value={priceUnit}
                   onChange={(e) => setPriceUnit(e.target.value)}
                   placeholder="Ej. unidad, hora, servicio, kg, sesión, día"
-                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
             </div>
+          )}
+
+          {selectedInventoryId && inventoryItemData && price !== String(inventoryItemData.price || '') && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900">
+              ⚠️ <strong>Sincronización:</strong> Modificaste el precio respecto al valor de inventario (${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP). Al publicar el anuncio, este nuevo valor actualizará también el Inventario Maestro.
+            </p>
           )}
         </div>
 

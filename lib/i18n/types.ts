@@ -18,6 +18,7 @@ export interface Dictionary {
     categories: string
     recharge: string
     createCampaign: string
+    adminListings: string
     adminAds: string
     adminBalances: string
     settings: string
@@ -26,6 +27,10 @@ export interface Dictionary {
     myAccount: string
     adminUsers: string
     inventory: string
+    directory: string
+    allSellers: string
+    verifiedSellers: string
+    whatsappSellers: string
   }
   common: {
     search: string
@@ -98,6 +103,28 @@ export interface Dictionary {
     ctaSubtitle: string
     ctaPublishBtn: string
     ctaExploreBtn: string
+    runwayTitle: string
+    runwaySubtitle: string
+    sponsoredBadge: string
+    campaignActiveBadge: string
+    daysRemaining: string
+    productsRunwayTitle: string
+    productsRunwaySubtitle: string
+    servicesRunwayTitle: string
+    servicesRunwaySubtitle: string
+    merchantsRunwayTitle: string
+    merchantsRunwaySubtitle: string
+    viewProductDetails: string
+    contactWhatsappDirect: string
+    quoteService: string
+    serviceLeadTime: string
+    serviceDurationTime: string
+    serviceModality: string
+    stockAvailable: string
+    boostYourProductCta: string
+    boostYourProductDesc: string
+    startCampaignBtn: string
+    featuredRunwayBadge: string
   }
   catalog: {
     title: string
@@ -169,6 +196,29 @@ export interface Dictionary {
     impressions: string
     clicks: string
     status: string
+    metricsTitle: string
+    timeRemaining: string
+    daysRemainingLabel: string
+    hoursRemainingLabel: string
+    totalClicks: string
+    whatsappContacts: string
+    impressionsCount: string
+    ctrRate: string
+    cpcApprox: string
+    viewAnalyticsBtn: string
+    analyticsModalTitle: string
+    analyticsModalSubtitle: string
+    campaignDuration: string
+    campaignStarted: string
+    campaignEnds: string
+    campaignProgress: string
+    campaignLiveBadge: string
+    campaignExpiredBadge: string
+    campaignInReviewBadge: string
+    targetAudience: string
+    allLocations: string
+    adCreativePreview: string
+    closeModal: string
   }
   auth: {
     welcome: string
@@ -325,6 +375,44 @@ export interface Dictionary {
     notes: string
     noItems: string
     noSales: string
+    masterPrice: string
+    adjustPrice: string
+    savePrice: string
+    priceUpdated: string
+    publishAd: string
+    addNewItem: string
+    newItemTitle: string
+    syncNotice: string
+    confirmPrice: string
+    priceConfirmed: string
+    fromInventory: string
+    editItem: string
+    editItemModalTitle: string
+    itemUpdated: string
+    priceHistoryTitle: string
+    priceHistorySubtitle: string
+    priceHistoryEmpty: string
+    priceHistoryDate: string
+    priceHistoryPrice: string
+    priceHistoryCurrentBadge: string
+    priceHistoryPreviousBadge: string
+    priceHistoryNoteLabel: string
+    priceHistoryNotePlaceholder: string
+    priceHistoryNewRecordTitle: string
+    priceHistoryRestore: string
+    macroScopeAll: string
+    macroScopeProducts: string
+    macroScopeServices: string
+    totalUnitsInStock: string
+    totalCapacitySlots: string
+    responseTimeLead: string
+    executionDuration: string
+    filterSameDay: string
+    filterScheduled: string
+    filterInPerson: string
+    filterVirtual: string
+    deliveryMethodLabel: string
+    conditionLabel: string
   }
   reviews: {
     title: string
@@ -356,6 +444,49 @@ export interface Dictionary {
     rateNowBtn: string
     alreadyReviewed: string
     ratingMandatoryNotice: string
+  }
+  directory: {
+    title: string
+    subtitle: string
+    searchPlaceholder: string
+    allCategories: string
+    allCities: string
+    allVerification: string
+    verifiedOnly: string
+    withWhatsappOnly: string
+    withPhoneOnly: string
+    allContacts: string
+    contactWhatsapp: string
+    contactPhone: string
+    viewCatalog: string
+    copyContact: string
+    contactCopied: string
+    noSellersFound: string
+    noSellersSubtitle: string
+    clearFilters: string
+    totalSellers: string
+    activeOffers: string
+    sellerSince: string
+    sortBy: string
+    sortNameAsc: string
+    sortNameDesc: string
+    sortRating: string
+    sortOffers: string
+    verifiedBadge: string
+    unverifiedBadge: string
+    contactDirect: string
+    openChat: string
+    callNow: string
+    businessDetails: string
+    modalTitle: string
+    modalSubtitle: string
+    publishedOffers: string
+    noOffersYet: string
+    locationLabel: string
+    categoryLabel: string
+    ratingLabel: string
+    directWhatsappNotice: string
+    viewDetailBtn: string
   }
   footer: {
     tagline: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type {
   Listing,
@@ -23,6 +23,7 @@ interface PromotionFormProps {
   publishedListings: Listing[]
   preselectedListingId?: string
   packages: AdPackage[]
+  initialTab?: 'recharge' | 'campaign'
 }
 
 export default function PromotionForm({
@@ -34,6 +35,7 @@ export default function PromotionForm({
   publishedListings,
   preselectedListingId,
   packages,
+  initialTab,
 }: PromotionFormProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -92,13 +94,27 @@ export default function PromotionForm({
   const [successOrder, setSuccessOrder] = useState<any | null>(null)
 
   // Active tab state: 'recharge' | 'campaign'
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams ? searchParams.get('tab') : null
+
   const currentBalance = adAccount?.balance || 0
   const minRequiredPrice = packages[0]?.price || 30000
   const hasApprovedBalance = currentBalance >= (selectedCampaignPackage?.price || minRequiredPrice)
 
-  const [activeTab, setActiveTab] = useState<'recharge' | 'campaign'>(
-    initialAdAccount && initialAdAccount.balance >= minRequiredPrice ? 'campaign' : 'recharge'
-  )
+  const [activeTab, setActiveTab] = useState<'recharge' | 'campaign'>(() => {
+    if (initialTab) return initialTab
+    if (tabFromUrl === 'campaign') return 'campaign'
+    if (tabFromUrl === 'recharge') return 'recharge'
+    return initialAdAccount && initialAdAccount.balance >= minRequiredPrice ? 'campaign' : 'recharge'
+  })
+
+  useEffect(() => {
+    if (tabFromUrl === 'campaign') {
+      setActiveTab('campaign')
+    } else if (tabFromUrl === 'recharge') {
+      setActiveTab('recharge')
+    }
+  }, [tabFromUrl])
 
   // Auto-fill ad creative content when listing changes
   useEffect(() => {
@@ -425,6 +441,9 @@ export default function PromotionForm({
           ends_at: endsAt,
           price_paid: selectedCampaignPackage.price,
           submitted_at: startsAt,
+          clicks_count: 0,
+          impressions_count: 0,
+          contacts_count: 0,
         })
         .select()
         .single()
@@ -595,52 +614,7 @@ export default function PromotionForm({
         )}
       </div>
 
-      {/* 2. Pestañas de Proceso Independiente */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex gap-4">
-          {/* Tab 1: Recarga de Saldo */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('recharge')}
-            className={`flex items-center gap-2.5 pb-3 pt-1 border-b-2 text-sm font-bold transition-colors ${
-              activeTab === 'recharge'
-                ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
-                : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-            }`}
-          >
-            <span>💳 {t.promotions.tabRecharge}</span>
-            {pendingRequests.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                {pendingRequests.length} {locale === 'en' ? 'in review' : 'en revisión'}
-              </span>
-            )}
-          </button>
 
-          {/* Tab 2: Configuración de la Campaña (Bloqueado / Habilitado) */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('campaign')}
-            className={`flex items-center gap-2.5 pb-3 pt-1 border-b-2 text-sm font-bold transition-colors ${
-              activeTab === 'campaign'
-                ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
-                : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-            }`}
-          >
-            <span>
-              {isCampaignUnlocked ? `🎨 ${t.promotions.tabCampaign}` : `🔒 ${t.promotions.tabCampaign} (${locale === 'en' ? 'Locked' : 'Bloqueado'})`}
-            </span>
-            {isCampaignUnlocked ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                {locale === 'en' ? 'Unlocked ✅' : 'Habilitado ✅'}
-              </span>
-            ) : (
-              <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                {locale === 'en' ? 'Requires Balance' : 'Requiere Saldo'}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
 
       {/* ======================================================== */}
       {/* PESTAÑA 1: PROCESO INDEPENDIENTE DE RECARGA DE SALDO     */}
@@ -952,19 +926,10 @@ export default function PromotionForm({
                         </span>
                       )}
                       {req.status === 'approved' && (
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                            <span>✅</span>
-                            <span>Aprobada y Acreditada</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab('campaign')}
-                            className="rounded-lg bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-700 hover:bg-purple-100 dark:bg-purple-950 dark:text-purple-300"
-                          >
-                            Ir a Configurar Campaña →
-                          </button>
-                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          <span>✅</span>
+                          <span>Aprobada y Acreditada</span>
+                        </span>
                       )}
                       {req.status === 'rejected' && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
@@ -1047,17 +1012,10 @@ export default function PromotionForm({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <p className="text-xs text-zinc-500">
-                    Dirígete al Paso 1 para transferir y registrar tu comprobante de recarga.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('recharge')}
-                    className="rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-500 transition-colors inline-flex items-center gap-2"
-                  >
-                    <span>👉 Ir al Paso 1: Recargar Saldo y Enviar Comprobante</span>
-                  </button>
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 p-3.5 text-xs text-purple-900 dark:text-purple-200">
+                    <span>👈 Para adquirir saldo y desbloquear la campaña, utiliza la opción <strong>Recarga de Saldo</strong> en el menú lateral izquierdo.</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -1305,14 +1263,7 @@ export default function PromotionForm({
                   Costo: <strong>${Number(selectedCampaignPackage.price).toLocaleString('es-CO')} COP</strong> (se descontará de tu saldo de ${currentBalance.toLocaleString('es-CO')}).
                 </div>
 
-                <div className="flex gap-3 w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('recharge')}
-                    className="w-full sm:w-auto rounded-xl border border-zinc-300 px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 text-center transition-colors"
-                  >
-                    ← Volver a Recarga
-                  </button>
+                <div className="w-full sm:w-auto">
 
                   <button
                     type="submit"

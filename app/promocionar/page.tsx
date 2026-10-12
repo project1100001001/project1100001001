@@ -51,6 +51,9 @@ export default async function PromocionarPage({ searchParams }: PageProps) {
   const listingIdParam = typeof resolvedSearchParams.listing_id === 'string'
     ? resolvedSearchParams.listing_id
     : undefined
+  const tabParam = resolvedSearchParams.tab === 'campaign' || resolvedSearchParams.tab === 'recharge'
+    ? (resolvedSearchParams.tab as 'recharge' | 'campaign')
+    : undefined
 
   const supabase = await createClient()
 
@@ -212,18 +215,13 @@ export default async function PromocionarPage({ searchParams }: PageProps) {
     <main className="flex-1 bg-zinc-50/50 py-10 dark:bg-zinc-950">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 border-b border-zinc-200 pb-5 dark:border-zinc-800">
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
-            <Link href="/mis-publicaciones" className="hover:underline">
-              Mis Publicaciones
-            </Link>
-            <span>/</span>
-            <span className="text-zinc-800 dark:text-zinc-200 font-medium">Promocionar</span>
-          </div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Promocionar Producto o Servicio
+            {tabParam === 'campaign' ? 'Configurar Campaña' : 'Recarga de Saldo'}
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Adquiere un paquete publicitario mediante recarga de saldo y configura tu campaña destacada.
+            {tabParam === 'campaign'
+              ? 'Personaliza y activa tu anuncio publicitario patrocinado con tu saldo disponible.'
+              : 'Adquiere saldo publicitario mediante transferencia y comprobante de pago.'}
           </p>
         </div>
 
@@ -236,6 +234,7 @@ export default async function PromocionarPage({ searchParams }: PageProps) {
           publishedListings={publishedListings as Listing[]}
           preselectedListingId={listingIdParam}
           packages={packages}
+          initialTab={tabParam}
         />
       </div>
     </main>

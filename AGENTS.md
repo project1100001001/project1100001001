@@ -15,9 +15,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
    - Se debe estructurar de manera jerárquica con las **opciones principales y sus respectivas subopciones** desplegables/colapsables:
      - Inicio (`/`)
      - Catálogo y Exploración (`/catalogo` con subopciones por categoría)
-     - Mis Publicaciones (`/mis-publicaciones` y `+ Publicar`)
-     - Publicidad y Campañas (`/mis-campanas` y `Recargar / Promocionar`)
-     - Moderación y Administración (`/admin` con subopciones para solicitudes, campañas y billeteras)
+     - Directorio de Vendedores (`/directorio`)
+     - Mis Publicaciones (`/mis-publicaciones` y `Publicar Anuncio`)
+     - Mis Campañas (`/mis-campanas`, `Recarga de Saldo` y `Configurar Campaña`)
+     - Moderación y Administración (`/admin` con subopciones para anuncios, campañas, billeteras y usuarios)
      - Configuración y Preferencias (Idioma `ES|EN`, Modo Claro/Oscuro, Sesión)
    - **Abatible / Guardable (Collapsible)**: La barra debe poder abatirse o guardarse mediante un botón claramente visible (`[◀ Guardar menú]`) y volver a desplegarse con un botón flotante visible e inequívoco en el borde izquierdo (`[▶ Mostrar menú]`).
 2. **Zona Central Limpia (Prohibido enlaces de navegación en el centro)**:

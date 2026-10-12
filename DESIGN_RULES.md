@@ -23,17 +23,20 @@ Este documento registra los fundamentos y decisiones de diseño aprobadas por el
        - *Ropa y Accesorios*
        - *Clases y Educación*
        - *Otros*
-    3. **Mis Publicaciones (`/mis-publicaciones`)**:
+    3. **Directorio de Vendedores (`/directorio`)**: Enlace directo al directorio de comercios (los filtros de rubro, ciudad, verificación y contacto residen exclusivamente en la ventana principal).
+    4. **Mis Publicaciones (`/mis-publicaciones`)**:
        - *Ver mis Anuncios*
-       - *+ Publicar nuevo Anuncio (`/publicar`)*
-    4. **Publicidad & Campañas (`/mis-campanas`)**:
-       - *Mis Campañas Patrocinadas*
-       - *+ Promocionar / Recarga de Saldo (`/promocionar`)*
-    5. **Administración y Moderación (`/admin`)**:
-       - *Cola de Moderación*
-       - *Campañas de Anuncios*
-       - *Billeteras y Recargas de Saldo*
-    6. **Preferencias y Sesión (Pie del Sidebar)**:
+       - *Publicar Anuncio (`/publicar`)*
+    5. **Mis Campañas (`/mis-campanas`)**:
+       - *Historial de Campañas (`/mis-campanas`)*
+       - *Recarga de Saldo (`/promocionar?tab=recharge`)*
+       - *Configurar Campaña (`/promocionar?tab=campaign`)*
+    6. **Administración y Moderación (`/admin`)**:
+       - *Moderación de Anuncios (`/admin?section=listings`)*
+       - *Campañas Patrocinadas (`/admin?section=ads`)*
+       - *Billeteras y Recargas (`/admin?section=balances`)*
+       - *Usuarios y Roles (`/admin?section=users`)*
+    7. **Preferencias y Sesión (Pie del Sidebar)**:
        - *Selector de Idioma (`ES | EN`)*
        - *Alternador de Modo Claro / Oscuro*
        - *Perfil / Iniciar Sesión / Cerrar Sesión*
@@ -53,3 +56,14 @@ Este documento registra los fundamentos y decisiones de diseño aprobadas por el
 
 ## 3. Modo Claro / Modo Oscuro
 - Todas las superficies, bordes, textos e iconos deben utilizar clases adaptables de Tailwind CSS (ej. `bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50`).
+
+---
+
+## 4. Portada Principal: Pasarelas de Presentación de Campañas (Showcase Runways)
+- **Sin Campo de Búsqueda Central**: La portada principal (`/`) no lleva formulario ni campo de búsqueda invasivo en el hero. La búsqueda estructurada reside en el **Catálogo (`/catalogo`)** y el **Directorio (`/directorio`)**.
+- **Pasarelas Dinámicas de Campañas**: La portada se compone de pasarelas de exhibición dinámicas, fluidas y ultralivianas:
+  1. *Gran Vitrina Principal (Hero Runway)*: Exhibe publicaciones con campañas patrocinadas activas, tiempo restante de vigencia pagada, fotos de la publicación, ficha técnica y botón de contacto directo por WhatsApp.
+  2. *Pasarela de Productos Destacados*: Carrusel horizontal interactivo de artículos promocionados.
+  3. *Pasarela de Servicios y Soluciones*: Destaca tiempos de respuesta, duración estimada y modalidad operativa.
+  4. *Pasarela de Marcas y Catálogos Comerciales*: Exhibe las marcas con campañas activas y sus mini-catálogos.
+- **Rendimiento y Ligereza**: Las transiciones se ejecutan mediante CSS y estado reactivo limpio para evitar retrasos, caídas o fallas de rendimiento.

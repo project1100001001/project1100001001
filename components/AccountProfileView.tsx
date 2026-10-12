@@ -496,12 +496,9 @@ export default function AccountProfileView({
                         <span className="font-extrabold text-purple-900 dark:text-purple-100 text-base">
                           $ {adAccount.balance.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')} COP
                         </span>
-                        <Link
-                          href="/promocionar"
-                          className="rounded-lg bg-purple-600 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-purple-500"
-                        >
-                          + Recargar
-                        </Link>
+                        <span className="rounded-md bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:text-purple-200">
+                          {locale === 'en' ? 'Active Wallet' : 'Billetera Activa'}
+                        </span>
                       </div>
                     </div>
                   )}

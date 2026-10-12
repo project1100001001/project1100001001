@@ -41,6 +41,21 @@ export default function AppSidebar() {
   const [listingsOpen, setListingsOpen] = useState(true)
   const [campaignsOpen, setCampaignsOpen] = useState(true)
   const [adminOpen, setAdminOpen] = useState(true)
+  const [currentTab, setCurrentTab] = useState<string>('')
+  const [currentSection, setCurrentSection] = useState<string>('')
+
+  useEffect(() => {
+    const updateFromUrl = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search)
+        setCurrentTab(params.get('tab') || params.get('filter') || '')
+        setCurrentSection(params.get('section') || '')
+      }
+    }
+    updateFromUrl()
+    window.addEventListener('popstate', updateFromUrl)
+    return () => window.removeEventListener('popstate', updateFromUrl)
+  }, [pathname])
 
   const supabase = createClient()
 
@@ -221,6 +236,20 @@ export default function AppSidebar() {
             )}
           </div>
 
+          {/* OPCIÓN: Directorio de Vendedores (Compradores y Exploración) */}
+          <Link
+            href="/directorio"
+            onClick={close}
+            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+              pathname === '/directorio'
+                ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
+                : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+            }`}
+          >
+            <span>📇</span>
+            <span>{t.nav.directory}</span>
+          </Link>
+
           {/* OPCIÓN 3: Mis Publicaciones (Solo para Vendedores y Administradores) */}
           {hasPermission(role, 'publish_listings') && (
             <div className="pt-2">
@@ -244,26 +273,13 @@ export default function AppSidebar() {
                     href="/mis-publicaciones"
                     onClick={close}
                     className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/mis-publicaciones'
-                        ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span>📋</span>
-                    <span>{locale === 'en' ? 'Manage Listings' : 'Gestionar Anuncios'}</span>
-                  </Link>
-
-                  <Link
-                    href="/inventario"
-                    onClick={close}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/inventario'
+                      pathname === '/mis-publicaciones' || pathname === '/inventario'
                         ? 'bg-emerald-50 text-emerald-700 font-bold dark:bg-emerald-950/40 dark:text-emerald-300'
                         : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
                     }`}
                   >
                     <span>📦</span>
-                    <span className="font-semibold">{t.nav.inventory}</span>
+                    <span className="font-semibold">{locale === 'en' ? 'Listings & Inventory' : 'Publicaciones & Inventario'}</span>
                   </Link>
 
                   <Link
@@ -283,7 +299,7 @@ export default function AppSidebar() {
             </div>
           )}
 
-          {/* OPCIÓN 4: Publicidad & Campañas (Solo para Vendedores y Administradores) */}
+          {/* OPCIÓN 4: Mis Campañas (Solo para Vendedores y Administradores) */}
           {hasPermission(role, 'manage_campaigns') && (
             <div className="pt-2">
               <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
@@ -312,20 +328,39 @@ export default function AppSidebar() {
                     }`}
                   >
                     <span>📊</span>
-                    <span>{locale === 'en' ? 'My Ad Campaigns' : 'Mis Campañas'}</span>
+                    <span>{locale === 'en' ? 'Campaign History' : 'Historial de Campañas'}</span>
                   </Link>
 
                   <Link
-                    href="/promocionar"
-                    onClick={close}
+                    href="/promocionar?tab=recharge"
+                    onClick={() => {
+                      setCurrentTab('recharge')
+                      close()
+                    }}
                     className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/promocionar'
+                      pathname === '/promocionar' && currentTab !== 'campaign'
+                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
+                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>💳</span>
+                    <span>{t.nav.recharge}</span>
+                  </Link>
+
+                  <Link
+                    href="/promocionar?tab=campaign"
+                    onClick={() => {
+                      setCurrentTab('campaign')
+                      close()
+                    }}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+                      pathname === '/promocionar' && currentTab === 'campaign'
                         ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
                         : 'text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-zinc-800'
                     }`}
                   >
                     <span>🚀</span>
-                    <span className="font-bold">{locale === 'en' ? '+ Top-up / Boost' : '+ Recargar / Promocionar'}</span>
+                    <span className="font-bold">{t.nav.createCampaign}</span>
                   </Link>
                 </div>
               )}
@@ -357,34 +392,79 @@ export default function AppSidebar() {
               {adminOpen && (
                 <div className="mt-1 ml-3 space-y-0.5 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
                   <Link
-                    href="/admin"
-                    onClick={close}
+                    href="/admin?section=listings"
+                    onClick={() => {
+                      setCurrentSection('listings')
+                      close()
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'listings' }))
+                      }
+                    }}
                     className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      pathname === '/admin'
+                      pathname === '/admin' && (currentSection === '' || currentSection === 'listings')
                         ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
                         : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
                     }`}
                   >
-                    <span>⚖️</span>
-                    <span>{locale === 'en' ? 'Moderation Queue' : 'Cola de Moderación'}</span>
+                    <span>📦</span>
+                    <span>{t.nav.adminListings}</span>
                   </Link>
 
                   <Link
-                    href="/admin?section=users"
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+                    href="/admin?section=ads"
+                    onClick={() => {
+                      setCurrentSection('ads')
+                      close()
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'ads' }))
+                      }
+                    }}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+                      pathname === '/admin' && currentSection === 'ads'
+                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
+                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
                   >
-                    <span>👥</span>
-                    <span>{t.nav.adminUsers}</span>
+                    <span>📢</span>
+                    <span>{t.nav.adminAds}</span>
                   </Link>
 
                   <Link
                     href="/admin?section=balances"
-                    onClick={close}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+                    onClick={() => {
+                      setCurrentSection('balances')
+                      close()
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'balances' }))
+                      }
+                    }}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+                      pathname === '/admin' && currentSection === 'balances'
+                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
+                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
                   >
                     <span>💳</span>
                     <span>{t.nav.adminBalances}</span>
+                  </Link>
+
+                  <Link
+                    href="/admin?section=users"
+                    onClick={() => {
+                      setCurrentSection('users')
+                      close()
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'users' }))
+                      }
+                    }}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+                      pathname === '/admin' && currentSection === 'users'
+                        ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-950/40 dark:text-purple-300'
+                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>👥</span>
+                    <span>{t.nav.adminUsers}</span>
                   </Link>
                 </div>
               )}
@@ -484,12 +564,12 @@ export default function AppSidebar() {
         <button
           type="button"
           onClick={toggleCollapsed}
-          className="hidden md:flex items-center gap-2 rounded-r-2xl border-y border-r border-emerald-500 bg-emerald-600 px-3.5 py-2.5 text-xs font-black text-white shadow-xl shadow-emerald-950/30 hover:bg-emerald-500 hover:pl-4 transition-all fixed left-0 top-6 z-40 select-none animate-in slide-in-from-left duration-200"
+          className="hidden md:flex items-center gap-2 rounded-r-xl border-y border-r border-emerald-500 bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-xl shadow-emerald-950/30 hover:bg-emerald-500 hover:pl-3.5 transition-all fixed left-0 top-2 z-40 select-none animate-in slide-in-from-left duration-200"
           title={t.nav.expandSidebar}
           aria-label={t.nav.expandSidebar}
         >
-          <span className="text-sm">▶</span>
-          <span className="tracking-wide uppercase text-[11px]">{t.nav.expandSidebar}</span>
+          <span className="text-xs">▶</span>
+          <span className="tracking-wide uppercase text-[10px] font-black">{t.nav.expandSidebar}</span>
         </button>
       )}
 

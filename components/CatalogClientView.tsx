@@ -18,6 +18,7 @@ interface CatalogClientViewProps {
     minPrice: string
     maxPrice: string
     sort: string
+    seller?: string
   }
   listings: ListingWithRelations[]
 }
@@ -67,6 +68,21 @@ export default function CatalogClientView({
 
       {/* Results Section */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {currentFilters.seller && (
+          <div className="mb-6 flex items-center justify-between rounded-2xl bg-purple-50 p-4 text-xs font-semibold text-purple-900 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+            <div className="flex items-center gap-2">
+              <span>🏪</span>
+              <span>Mostrando ofertas del comercio seleccionado en el Directorio</span>
+            </div>
+            <Link
+              href="/catalogo"
+              className="rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs text-white hover:bg-purple-500 font-bold transition-colors shadow-xs"
+            >
+              Ver todo el catálogo
+            </Link>
+          </div>
+        )}
+
         <div className="mb-6 flex items-center justify-between">
           <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
             {listings.length === 1

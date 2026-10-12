@@ -64,6 +64,12 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     query = query.eq('type', typeFilter)
   }
 
+  // Filtro por vendedor
+  const sellerFilter = typeof params.seller === 'string' ? params.seller.trim() : ''
+  if (sellerFilter) {
+    query = query.eq('seller_id', sellerFilter)
+  }
+
   // Filtro por ciudad
   if (cityFilter) {
     query = query.ilike('city', `%${cityFilter}%`)
@@ -114,6 +120,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
         minPrice,
         maxPrice,
         sort,
+        seller: sellerFilter,
       }}
       listings={listings}
     />
