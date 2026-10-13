@@ -11,7 +11,18 @@ export const metadata = {
   description: 'Publica un nuevo artículo, producto o servicio en el catálogo del marketplace',
 }
 
-export default async function PublicarPage() {
+interface PageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function PublicarPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const rawType = typeof params.type === 'string' ? params.type.trim() : ''
+  const fixedType: 'product' | 'service' = rawType === 'service' ? 'service' : 'product'
+  const initialCondition = rawType === 'article' ? 'Usado - Buen estado' : ''
+  const editId = typeof params.edit_id === 'string' ? params.edit_id : typeof params.edit === 'string' ? params.edit : ''
+  const inventoryId = typeof params.inventory_id === 'string' ? params.inventory_id : ''
+
   const supabase = await createClient()
 
   // Obtener categorías directamente desde la base de datos
@@ -29,11 +40,17 @@ export default async function PublicarPage() {
       <Suspense
         fallback={
           <div className="flex justify-center items-center py-20 text-sm text-zinc-500">
-            <span>Cargando formulario y sincronizando inventario...</span>
+            <span>Cargando formulario de publicación...</span>
           </div>
         }
       >
-        <ListingForm categories={(categories as Category[]) || []} />
+        <ListingForm
+          categories={(categories as Category[]) || []}
+          fixedType={fixedType}
+          initialCondition={initialCondition}
+          initialInventoryId={inventoryId}
+          initialEditId={editId}
+        />
       </Suspense>
     </main>
   )

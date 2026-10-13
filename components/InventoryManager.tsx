@@ -39,10 +39,9 @@ export default function InventoryManager({
     return 'inventory'
   })
 
-  // Listings & Inventory state
-  const [listings, setListings] = useState<ListingWithRelations[]>(initialListings)
-  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'articles' | 'services'>(() => {
-    if (urlType === 'service' || urlType === 'services') return 'services'
+  // Listings & Inventory state (estrictamente productos nuevos y usados)
+  const [listings, setListings] = useState<ListingWithRelations[]>(initialListings.filter((l) => l.type !== 'service'))
+  const [macroTypeScope, setMacroTypeScope] = useState<'all' | 'products' | 'articles'>(() => {
     if (urlType === 'article' || urlType === 'articles') return 'articles'
     if (urlType === 'product' || urlType === 'products') return 'products'
     return 'all'
@@ -57,9 +56,7 @@ export default function InventoryManager({
   }, [urlTab])
 
   useEffect(() => {
-    if (urlType === 'service' || urlType === 'services') {
-      setMacroTypeScope('services')
-    } else if (urlType === 'article' || urlType === 'articles') {
+    if (urlType === 'article' || urlType === 'articles') {
       setMacroTypeScope('articles')
     } else if (urlType === 'product' || urlType === 'products') {
       setMacroTypeScope('products')
@@ -174,18 +171,16 @@ export default function InventoryManager({
       if (!matchTitle && !matchCat && !matchCity && !matchDuration) return false
     }
 
-    const isService = l.type === 'service'
+    // En la ventana de inventario NO mezclar productos y servicios: excluir estrictamente servicios
+    if (l.type === 'service') return false
+
     const isProduct = l.type === 'product'
     const isArticle = l.type === 'article'
     const currentStock = l.stock ?? 0
-    const attrs = l.attrs || {}
-    const leadTime = (attrs.tiempo_entrega || attrs.disponibilidad || '').toLowerCase()
-    const modality = (attrs.modalidad || attrs.modality || '').toLowerCase()
 
-    // 1. Macro Filter: Productos (Nuevos) vs Artículos (Usados) vs Servicios
+    // 1. Macro Filter: Productos (Nuevos) vs Artículos (Usados)
     if (macroTypeScope === 'products' && !isProduct) return false
     if (macroTypeScope === 'articles' && !isArticle) return false
-    if (macroTypeScope === 'services' && !isService) return false
 
     // 2. Status filter
     if (statusFilter === 'published' && l.status !== 'published') return false
@@ -198,17 +193,10 @@ export default function InventoryManager({
       if (subFilter === 'in_stock' && currentStock <= 0) return false
       if (subFilter === 'low_stock' && (currentStock > 3 || currentStock <= 0)) return false
       if (subFilter === 'out_of_stock' && currentStock > 0) return false
-    } else if (macroTypeScope === 'services') {
-      const isSameDay = leadTime.includes('mismo') || leadTime.includes('inmediat') || leadTime.includes('hoy')
-      if (subFilter === 'same_day' && !isSameDay) return false
-      if (subFilter === 'scheduled' && isSameDay) return false
-      if (subFilter === 'in_person' && !modality.includes('presencial')) return false
-      if (subFilter === 'remote' && !(modality.includes('virtual') || modality.includes('remoto') || modality.includes('domicilio'))) return false
     } else {
       // macroTypeScope === 'all'
       if (subFilter === 'products' && !isProduct) return false
       if (subFilter === 'articles' && !isArticle) return false
-      if (subFilter === 'services' && !isService) return false
       if (subFilter === 'low_stock' && (currentStock > 3 || currentStock === 0)) return false
       if (subFilter === 'out_of_stock' && currentStock > 0) return false
     }
@@ -1047,7 +1035,7 @@ export default function InventoryManager({
             ))}
           </div>
 
-          {/* 🌟 FILTRO MACRO GENERAL: PRODUCTOS VS SERVICIOS */}
+          {/* 🌟 FILTRO MACRO GENERAL: PRODUCTOS NUEVOS VS ARTÍCULOS USADOS */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-zinc-100/90 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
             <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xs">
               <button
@@ -1063,47 +1051,9 @@ export default function InventoryManager({
                 }`}
               >
                 <span>🌐</span>
-                <span>{t.inventory.macroScopeAll || 'Todos los Items'}</span>
+                <span>{locale === 'en' ? 'All Products' : 'Todos los Productos'}</span>
                 <span className="rounded-full bg-zinc-200/80 dark:bg-zinc-700 px-1.5 py-0.2 text-[10px] font-bold">
-                  {listings.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMacroTypeScope('services')
-                  setSubFilter('all')
-                }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  macroTypeScope === 'services'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-purple-600 dark:text-zinc-400 dark:hover:text-purple-400'
-                }`}
-              >
-                <span>🛠️</span>
-                <span>{t.inventory.macroScopeServices || 'Servicios'}</span>
-                <span className="rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200 px-1.5 py-0.2 text-[10px] font-bold">
-                  {totalServices}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMacroTypeScope('articles')
-                  setSubFilter('all')
-                }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  macroTypeScope === 'articles'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'text-zinc-600 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400'
-                }`}
-              >
-                <span>📦</span>
-                <span>{t.inventory.macroScopeArticles || 'Artículos (Usados)'}</span>
-                <span className="rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-1.5 py-0.2 text-[10px] font-bold">
-                  {totalArticles}
+                  {totalProducts + totalArticles}
                 </span>
               </button>
 
@@ -1125,6 +1075,25 @@ export default function InventoryManager({
                   {totalProducts}
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMacroTypeScope('articles')
+                  setSubFilter('all')
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                  macroTypeScope === 'articles'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400'
+                }`}
+              >
+                <span>📦</span>
+                <span>{t.inventory.macroScopeArticles || 'Artículos (Usados)'}</span>
+                <span className="rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-1.5 py-0.2 text-[10px] font-bold">
+                  {totalArticles}
+                </span>
+              </button>
             </div>
 
             {/* Etiqueta descriptiva contextual */}
@@ -1141,16 +1110,10 @@ export default function InventoryManager({
                   <span>Control de artículos usados, segunda mano y piezas únicas</span>
                 </span>
               )}
-              {macroTypeScope === 'services' && (
-                <span className="flex items-center gap-1.5 font-semibold text-purple-700 dark:text-purple-400">
-                  <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
-                  <span>Control de tiempos de ejecución, respuesta y cupos diarios</span>
-                </span>
-              )}
               {macroTypeScope === 'all' && (
                 <span className="flex items-center gap-1.5 font-semibold text-zinc-600 dark:text-zinc-300">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>Vista consolidada con catálogo completo</span>
+                  <span>Control de existencias físicas para productos nuevos y de segunda mano</span>
                 </span>
               )}
             </div>
@@ -1261,70 +1224,18 @@ export default function InventoryManager({
             </div>
           )}
 
-          {macroTypeScope === 'services' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <div className="rounded-2xl border border-purple-200 bg-white p-4 shadow-xs dark:border-purple-900/60 dark:bg-zinc-900">
-                <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">
-                  ⏱️ {t.inventory.macroScopeServices}
-                </span>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-black text-purple-700 dark:text-purple-300">
-                    {totalServices}
-                  </span>
-                  <span className="text-xs text-purple-600/80">servicios</span>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                  👥 {t.inventory.totalCapacitySlots}
-                </span>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-black text-zinc-900 dark:text-zinc-50">
-                    {totalServiceCapacity}
-                  </span>
-                  <span className="text-xs text-zinc-400">cupos / día</span>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                  ⚡ {t.inventory.filterSameDay}
-                </span>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                    {sameDayServicesCount}
-                  </span>
-                  <span className="text-xs text-emerald-600/80">inmediato</span>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                  📍 {locale === 'en' ? 'Modalities' : 'Modalidades'}
-                </span>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-sm font-black text-zinc-800 dark:text-zinc-200">
-                    {inPersonServicesCount} <span className="text-xs font-normal text-zinc-500">pres.</span> / {remoteServicesCount} <span className="text-xs font-normal text-zinc-500">virt.</span>
-                  </span>
-                  <span className="text-xs text-purple-600/80">{scheduledServicesCount} con cita</span>
-                </div>
-              </div>
-            </div>
-          )}
-
           {macroTypeScope === 'all' && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                  {locale === 'en' ? 'Total Items' : 'Total Artículos'}
+                  {locale === 'en' ? 'Total Products' : 'Total Productos'}
                 </span>
                 <div className="mt-2 flex items-baseline justify-between">
                   <span className="text-2xl font-black text-zinc-900 dark:text-zinc-50">
                     {listings.length}
                   </span>
                   <span className="text-xs text-zinc-400">
-                    {totalProducts} prod / {totalServices} serv
+                    {totalProducts} nuevos / {totalArticles} usados
                   </span>
                 </div>
               </div>
@@ -1343,13 +1254,13 @@ export default function InventoryManager({
 
               <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
                 <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
-                  ⏱️ {t.inventory.totalCapacitySlots}
+                  🛍️ {locale === 'en' ? 'New Products' : 'Productos Nuevos'}
                 </span>
                 <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
-                    {totalServiceCapacity}
+                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    {totalProducts}
                   </span>
-                  <span className="text-xs text-purple-600/80">cupos / día</span>
+                  <span className="text-xs text-emerald-600/80">a estrenar</span>
                 </div>
               </div>
 
@@ -1424,41 +1335,12 @@ export default function InventoryManager({
                 </>
               )}
 
-              {macroTypeScope === 'services' && (
-                <>
-                  {[
-                    { id: 'all', label: t.inventory.allFilter, count: totalServices },
-                    { id: 'same_day', label: t.inventory.filterSameDay, count: sameDayServicesCount },
-                    { id: 'scheduled', label: t.inventory.filterScheduled, count: scheduledServicesCount },
-                    { id: 'in_person', label: t.inventory.filterInPerson, count: inPersonServicesCount },
-                    { id: 'remote', label: t.inventory.filterVirtual, count: remoteServicesCount },
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setSubFilter(f.id)}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                        subFilter === f.id
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                      }`}
-                    >
-                      <span>{f.label}</span>
-                      <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px]">
-                        {f.count}
-                      </span>
-                    </button>
-                  ))}
-                </>
-              )}
-
               {macroTypeScope === 'all' && (
                 <>
                   {[
                     { id: 'all', label: t.inventory.allFilter, count: listings.length },
                     { id: 'products', label: t.inventory.productsFilter, count: totalProducts },
                     { id: 'articles', label: t.inventory.articlesFilter, count: totalArticles },
-                    { id: 'services', label: t.inventory.servicesFilter, count: totalServices },
                     { id: 'low_stock', label: t.inventory.lowStockFilter, count: lowStockCount + lowArticleStockCount },
                     { id: 'out_of_stock', label: t.inventory.outOfStockFilter, count: outOfStockCount + outOfArticleStockCount },
                   ].map((f) => (
@@ -2472,11 +2354,10 @@ export default function InventoryManager({
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
                   Tipo de Artículo *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: 'product', label: '🛍️ Producto (Nuevo)', unit: 'unidad' },
                     { id: 'article', label: '📦 Artículo (Usado)', unit: 'unidad' },
-                    { id: 'service', label: '🛠️ Servicio', unit: 'servicio' },
                   ].map((tOption) => (
                     <button
                       key={tOption.id}

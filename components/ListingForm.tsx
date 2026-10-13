@@ -10,16 +10,39 @@ import { useTranslation } from '@/lib/i18n'
 interface ListingFormProps {
   categories: Category[]
   existingListing?: any
+  fixedType?: 'product' | 'service'
+  initialCondition?: string
+  initialInventoryId?: string
+  initialEditId?: string
 }
 
-export default function ListingForm({ categories }: ListingFormProps) {
+export default function ListingForm({
+  categories,
+  fixedType,
+  initialCondition,
+  initialInventoryId,
+  initialEditId,
+}: ListingFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialInventoryParam = searchParams ? searchParams.get('inventory_id') || '' : ''
+  const initialInventoryParam = initialInventoryId || (searchParams ? searchParams.get('inventory_id') || '' : '')
   const initialTypeParam = searchParams ? (searchParams.get('type') as ListingType) || '' : ''
-  const initialEditIdParam = searchParams ? searchParams.get('edit_id') || searchParams.get('edit') || '' : ''
+  const initialEditIdParam = initialEditId || (searchParams ? searchParams.get('edit_id') || searchParams.get('edit') || '' : '')
   const supabase = createClient()
   const { t, locale } = useTranslation()
+
+  // Determinar modo de la ventana: estrictamente independiente
+  const mode: 'product' | 'service' = fixedType || (initialTypeParam === 'service' ? 'service' : 'product')
+  const isServiceMode = mode === 'service'
+  const isProductMode = !isServiceMode
+
+  // Condición de producto (Nuevo o Usado) - Exclusivo de ventana de Productos
+  const [productCondition, setProductCondition] = useState<'new' | 'used'>(() => {
+    if (initialCondition?.includes('Usado') || initialCondition?.includes('Reacondicionado') || initialTypeParam === 'article') {
+      return 'used'
+    }
+    return 'new'
+  })
 
   // Auth & Seller state
   const [loadingAuth, setLoadingAuth] = useState(true)
@@ -27,7 +50,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [sellers, setSellers] = useState<Seller[]>([])
   const [selectedSellerId, setSelectedSellerId] = useState<string>('')
 
-  // Inventory Integration state (prioridad módulo de inventario)
+  // Inventory Integration state (SOLO para ventana de productos)
   const [inventoryListings, setInventoryListings] = useState<ListingWithRelations[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
   const [selectedInventoryId, setSelectedInventoryId] = useState<string>(initialInventoryParam || initialEditIdParam)
@@ -46,9 +69,8 @@ export default function ListingForm({ categories }: ListingFormProps) {
 
   // Listing Form fields
   const [type, setType] = useState<ListingType>(() => {
-    if (initialTypeParam === 'product' || initialTypeParam === 'article' || initialTypeParam === 'service') {
-      return initialTypeParam
-    }
+    if (isServiceMode) return 'service'
+    if (initialCondition?.includes('Usado') || initialTypeParam === 'article') return 'article'
     return 'product'
   })
   const [categoryId, setCategoryId] = useState('')
@@ -56,13 +78,18 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [description, setDescription] = useState('')
   const [priceType, setPriceType] = useState<'fixed' | 'quote'>('fixed')
   const [price, setPrice] = useState<string>('')
-  const [priceUnit, setPriceUnit] = useState(() => (initialTypeParam === 'service' ? 'servicio' : 'unidad'))
+  const [priceUnit, setPriceUnit] = useState(() => (isServiceMode ? 'servicio' : 'unidad'))
   const [city, setCity] = useState('')
   const [stock, setStock] = useState<string>('1')
 
   // Dynamic attributes (attrs jsonb)
-  const [condition, setCondition] = useState(() => (initialTypeParam === 'article' ? 'Usado - Buen estado' : 'Nuevo'))
+  const [condition, setCondition] = useState(() => {
+    if (initialCondition) return initialCondition
+    if (initialTypeParam === 'article') return 'Usado - Buen estado'
+    return 'Nuevo'
+  })
   const [modality, setModality] = useState('Presencial')
+  const [leadTime, setLeadTime] = useState('24 a 48 horas')
   const [deliveryMethod, setDeliveryMethod] = useState('Domicilio local')
   const [customAttrs, setCustomAttrs] = useState<{ key: string; value: string }[]>([])
   const [newAttrKey, setNewAttrKey] = useState('')
@@ -88,21 +115,26 @@ export default function ListingForm({ categories }: ListingFormProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successInfo, setSuccessInfo] = useState<{ id: string; status: string } | null>(null)
 
-  // Sincronizar tipo de publicación cuando cambia el parámetro de URL (ej. desde el menú lateral)
+  // Sincronizar tipo de publicación cuando cambia el modo de la ventana
   useEffect(() => {
-    if (!isLockedType && initialTypeParam && (initialTypeParam === 'product' || initialTypeParam === 'article' || initialTypeParam === 'service')) {
-      setType(initialTypeParam)
-      if (initialTypeParam === 'service') {
-        setPriceUnit('servicio')
-      } else if (initialTypeParam === 'article') {
-        setCondition('Usado - Buen estado')
-        setPriceUnit('unidad')
+    if (isServiceMode) {
+      setType('service')
+      setPriceUnit('servicio')
+      setSelectedInventoryId('')
+      setInventoryItemData(null)
+    } else {
+      if (productCondition === 'used') {
+        setType('article')
+        if (!condition.includes('Usado') && !condition.includes('Reacondicionado')) {
+          setCondition('Usado - Buen estado')
+        }
       } else {
+        setType('product')
         setCondition('Nuevo')
-        setPriceUnit('unidad')
       }
+      setPriceUnit('unidad')
     }
-  }, [initialTypeParam, isLockedType])
+  }, [isServiceMode, productCondition, condition])
 
   // Load user and sellers
   useEffect(() => {
@@ -134,10 +166,35 @@ export default function ListingForm({ categories }: ListingFormProps) {
     initUserAndSeller()
   }, [supabase])
 
-  // Cargar inventario del vendedor seleccionado para sincronización prioritaria
+  // Cargar inventario del vendedor seleccionado para sincronización prioritaria (solo en modo producto)
   useEffect(() => {
     async function loadSellerInventory() {
       if (!selectedSellerId) return
+
+      // En modo servicio no existe concepto de inventario físico ni existencias
+      if (isServiceMode) {
+        if (initialEditIdParam) {
+          try {
+            const { data } = await supabase
+              .from('listing')
+              .select(`
+                *,
+                category:category_id(*),
+                listing_media(*)
+              `)
+              .eq('id', initialEditIdParam)
+              .single()
+
+            if (data) {
+              applyInventoryItem(data as ListingWithRelations)
+            }
+          } catch (err: any) {
+            console.warn('Error cargando servicio para edición:', err)
+          }
+        }
+        return
+      }
+
       setLoadingInventory(true)
       try {
         const { data, error } = await supabase
@@ -148,6 +205,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
             listing_media(*)
           `)
           .eq('seller_id', selectedSellerId)
+          .neq('type', 'service')
           .order('created_at', { ascending: false })
 
         if (!error && data) {
@@ -170,7 +228,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
     }
 
     loadSellerInventory()
-  }, [selectedSellerId, supabase, initialInventoryParam, initialEditIdParam])
+  }, [selectedSellerId, supabase, initialInventoryParam, initialEditIdParam, isServiceMode])
 
   const applyInventoryItem = (item: ListingWithRelations) => {
     setSelectedInventoryId(item.id)
@@ -196,12 +254,15 @@ export default function ListingForm({ categories }: ListingFormProps) {
 
     // Atributos dinámicos
     if (item.type === 'product') {
+      setProductCondition('new')
       setCondition('Nuevo')
     } else if (item.type === 'article') {
+      setProductCondition('used')
       setCondition(item.attrs?.condition || 'Usado - Buen estado')
     }
     if (item.attrs) {
       if (item.attrs.modality || item.attrs.modalidad) setModality(item.attrs.modality || item.attrs.modalidad)
+      if (item.attrs.lead_time) setLeadTime(item.attrs.lead_time)
       if (item.attrs.delivery_method) setDeliveryMethod(item.attrs.delivery_method)
     }
   }
@@ -219,9 +280,9 @@ export default function ListingForm({ categories }: ListingFormProps) {
     }
   }
 
-  // Detección de artículo existente en inventario mientras el vendedor escribe el título
+  // Detección de artículo existente en inventario mientras el vendedor escribe el título (solo productos)
   useEffect(() => {
-    if (selectedInventoryId) {
+    if (isServiceMode || selectedInventoryId) {
       setMatchedInventorySuggestion(null)
       return
     }
@@ -234,7 +295,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
     } else {
       setMatchedInventorySuggestion(null)
     }
-  }, [title, selectedInventoryId, inventoryListings])
+  }, [title, selectedInventoryId, inventoryListings, isServiceMode])
 
   // Select initial category matching type
   useEffect(() => {
@@ -393,13 +454,15 @@ export default function ListingForm({ categories }: ListingFormProps) {
     try {
       // Build attrs jsonb
       const attrsObj: Record<string, any> = {}
-      if (type === 'product') {
-        attrsObj.condition = 'Nuevo'
-        attrsObj.delivery_method = deliveryMethod
-      } else if (type === 'service') {
+      if (isServiceMode) {
         attrsObj.modality = modality
-      } else if (type === 'article') {
-        attrsObj.condition = condition.includes('Usado') || condition.includes('Reacondicionado') ? condition : 'Usado - Buen estado'
+        attrsObj.lead_time = leadTime
+      } else {
+        if (productCondition === 'used' || type === 'article') {
+          attrsObj.condition = condition.includes('Usado') || condition.includes('Reacondicionado') ? condition : 'Usado - Buen estado'
+        } else {
+          attrsObj.condition = 'Nuevo'
+        }
         attrsObj.delivery_method = deliveryMethod
       }
 
@@ -408,17 +471,18 @@ export default function ListingForm({ categories }: ListingFormProps) {
       })
 
       const numericPrice = priceType === 'fixed' && price ? parseInt(price, 10) : null
-      const numericStock = type === 'service' ? null : stock ? parseInt(stock, 10) : null
+      const numericStock = isServiceMode ? null : stock ? parseInt(stock, 10) : null
+      const finalListingType: ListingType = isServiceMode ? 'service' : (productCondition === 'used' ? 'article' : 'product')
 
       let listingData: any = null
 
-      if (selectedInventoryId) {
+      if (selectedInventoryId && !isServiceMode) {
         // Actualizar artículo existente de inventario y confirmar publicación
         const { data: updatedData, error: updateError } = await supabase
           .from('listing')
           .update({
             category_id: categoryId,
-            type,
+            type: finalListingType,
             title: title.trim(),
             description: description.trim() || null,
             price: numericPrice,
@@ -447,14 +511,14 @@ export default function ListingForm({ categories }: ListingFormProps) {
           await supabase.from('listing_media').insert(mediaToInsert)
         }
       } else {
-        // 1. Insert into public.listing (se añade de inmediato al inventario maestro)
+        // 1. Insert into public.listing
         const { data: insertedData, error: listingError } = await supabase
           .from('listing')
           .insert({
             id: listingId,
             seller_id: selectedSellerId,
             category_id: categoryId,
-            type,
+            type: finalListingType,
             title: title.trim(),
             description: description.trim() || null,
             price: numericPrice,
@@ -666,12 +730,21 @@ export default function ListingForm({ categories }: ListingFormProps) {
           >
             Ver vista previa del anuncio
           </Link>
-          <Link
-            href="/mis-publicaciones"
-            className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
-          >
-            📦 Mis Publicaciones & Inventario
-          </Link>
+          {isServiceMode ? (
+            <Link
+              href="/mis-servicios"
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
+            >
+              🛠️ Mis Servicios
+            </Link>
+          ) : (
+            <Link
+              href="/mis-publicaciones"
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
+            >
+              📦 Inventario
+            </Link>
+          )}
           <button
             onClick={() => {
               setSuccessInfo(null)
@@ -702,13 +775,22 @@ export default function ListingForm({ categories }: ListingFormProps) {
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          {locale === 'en' ? 'Post a New Listing' : 'Publicar nuevo anuncio'}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {locale === 'en'
-            ? 'Complete your product, service, or item details for the marketplace catalog.'
-            : 'Completa la información de tu producto, servicio o artículo para el catálogo del marketplace.'}
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <span className="text-3xl">{isServiceMode ? '🛠️' : '🛍️'}</span>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            {isServiceMode
+              ? (locale === 'en' ? 'Post Professional Service' : 'Publicar Servicio Profesional')
+              : (locale === 'en' ? 'Post Product (New or Used)' : 'Publicar Producto (Nuevo o Usado)')}
+          </h1>
+        </div>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          {isServiceMode
+            ? (locale === 'en'
+                ? 'Offer your services, consulting, maintenance, or professional trades with hourly, project, or custom quote rates.'
+                : 'Ofrece tus servicios, consultoría, oficios o asesorías profesionales con tarifas por hora, proyecto o cotización personalizada.')
+            : (locale === 'en'
+                ? 'Manage stock inventory, physical condition (new or pre-owned), and shipping methods for your products.'
+                : 'Gestiona existencias de inventario, condición física (nuevo o segunda mano) y entregas para tus productos.')}
         </p>
       </div>
 
@@ -749,165 +831,147 @@ export default function ListingForm({ categories }: ListingFormProps) {
         )}
       </div>
 
-      {/* Sincronización con Inventario Maestro (Prioridad de Inventario) */}
-      <div className="mb-6 rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-white p-5 shadow-xs dark:from-emerald-950/40 dark:via-zinc-900 dark:to-zinc-900 dark:border-emerald-700/50">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-xs">
-              📦
-            </span>
-            <div>
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                <span>Vincular con Artículo de tu Inventario Maestro</span>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 uppercase tracking-wider">
-                  Prioridad Inventario
+      {/* Sincronización con Inventario Maestro (Prioridad de Inventario) - Exclusivo de Productos */}
+      {isProductMode && (
+        <div className="mb-6 rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-white p-5 shadow-xs dark:from-emerald-950/40 dark:via-zinc-900 dark:to-zinc-900 dark:border-emerald-700/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg shadow-xs">
+                📦
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                  <span>Vincular con Artículo de tu Inventario Maestro</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 uppercase tracking-wider">
+                    Prioridad Inventario
+                  </span>
+                </h2>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  El precio y existencias provienen de tu inventario. Selecciona un artículo existente para importar su información:
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/mis-publicaciones"
+              className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 self-start sm:self-auto"
+            >
+              <span>Publicaciones & Inventario</span>
+              <span>↗</span>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+            <div className="sm:col-span-2">
+              <select
+                value={selectedInventoryId}
+                onChange={(e) => handleSelectInventoryItem(e.target.value)}
+                className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-zinc-800 dark:text-zinc-100"
+              >
+                <option value="">➕ Crear nuevo artículo independiente (se integrará al inventario)</option>
+                {inventoryListings.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    📦 {inv.title} — ${Number(inv.price || 0).toLocaleString('es-CO')} COP / {inv.price_unit || 'unidad'} ({inv.stock ?? 0} disponibles)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-1">
+              {selectedInventoryId && inventoryItemData ? (
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-100/90 px-3 py-2 text-xs font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
+                  <span className="truncate">✓ Precio: ${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectInventoryItem('new')}
+                    className="text-emerald-900 dark:text-emerald-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] underline"
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-zinc-500 block">
+                  {loadingInventory ? 'Cargando inventario...' : `${inventoryListings.length} artículos en tu inventario`}
                 </span>
-              </h2>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                El precio y existencias provienen de tu inventario. Selecciona un artículo existente para importar su información:
-              </p>
+              )}
             </div>
           </div>
-
-          <Link
-            href="/mis-publicaciones"
-            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 self-start sm:self-auto"
-          >
-            <span>Publicaciones & Inventario</span>
-            <span>↗</span>
-          </Link>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-          <div className="sm:col-span-2">
-            <select
-              value={selectedInventoryId}
-              onChange={(e) => handleSelectInventoryItem(e.target.value)}
-              className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-emerald-800 dark:bg-zinc-800 dark:text-zinc-100"
-            >
-              <option value="">➕ Crear nuevo artículo independiente (se integrará al inventario)</option>
-              {inventoryListings.map((inv) => (
-                <option key={inv.id} value={inv.id}>
-                  📦 {inv.title} — ${Number(inv.price || 0).toLocaleString('es-CO')} COP / {inv.price_unit || (inv.type === 'service' ? 'servicio' : 'unidad')} ({inv.type === 'service' ? 'Servicio' : `${inv.stock ?? 0} disponibles`})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="sm:col-span-1">
-            {selectedInventoryId && inventoryItemData ? (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-100/90 px-3 py-2 text-xs font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
-                <span className="truncate">✓ Precio: ${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP</span>
-                <button
-                  type="button"
-                  onClick={() => handleSelectInventoryItem('new')}
-                  className="text-emerald-900 dark:text-emerald-300 hover:text-red-600 dark:hover:text-red-400 text-[11px] underline"
-                >
-                  Desvincular
-                </button>
-              </div>
-            ) : (
-              <span className="text-[11px] text-zinc-500 block">
-                {loadingInventory ? 'Cargando inventario...' : `${inventoryListings.length} artículos en tu inventario`}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        {/* 1. Tipo de Publicación */}
+        {/* 1. Tipo de Publicación / Condición */}
         <div>
           <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-            1. ¿Qué deseas publicar?
+            1. {isServiceMode ? 'Tipo de Publicación' : 'Condición del Producto'}
           </label>
           
-          {isLockedType ? (
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4.5 dark:border-zinc-800 dark:bg-zinc-900/60 shadow-xs">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                  {locale === 'en' ? 'Listing Classification' : 'Clasificación de la Publicación'}
+          {isServiceMode ? (
+            <div className="rounded-2xl border-2 border-purple-500/30 bg-purple-50/50 p-4.5 dark:border-purple-800/40 dark:bg-purple-950/20 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                  Ventana Exclusiva de Servicios
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[11px] font-bold dark:bg-emerald-950 dark:text-emerald-300">
-                  🔒 {locale === 'en' ? 'Type Defined & Locked' : 'Tipo Clasificado / Fijo'}
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 text-purple-800 px-2.5 py-0.5 text-[11px] font-bold dark:bg-purple-900/60 dark:text-purple-200">
+                  🛠️ Servicio Profesional
                 </span>
               </div>
-              <div className="flex items-center gap-3.5">
-                <span className="text-3xl">
-                  {type === 'service' ? '🛠️' : type === 'article' ? '📦' : '🛍️'}
-                </span>
-                <div>
-                  <h4 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
-                    {type === 'service'
-                      ? (locale === 'en' ? '🛠️ Professional Service' : '🛠️ Servicio Profesional')
-                      : type === 'article'
-                      ? (locale === 'en' ? '📦 Article (Used / Pre-owned)' : '📦 Artículo (Usado / Segunda mano)')
-                      : (locale === 'en' ? '🛍️ Product (New / Brand new)' : '🛍️ Producto (Nuevo / A estrenar)')}
-                  </h4>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    {type === 'service'
-                      ? (locale === 'en' ? 'Classified as service offering. Delivery time and capacity apply.' : 'Clasificado como servicio. Aplican tiempos de respuesta y cupos.')
-                      : type === 'article'
-                      ? (locale === 'en' ? 'Classified strictly as used item. State of conservation applies.' : 'Clasificado exclusivamente para cosas usadas. Requiere especificar estado de conservación.')
-                      : (locale === 'en' ? 'Classified strictly as new product. Brand new condition applies.' : 'Clasificado exclusivamente para cosas nuevas. La condición está fijada a Nuevo.')}
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Esta ventana está configurada exclusivamente para la oferta de servicios, mantenimiento, oficios o asesorías. No requiere control de inventario de existencias físicas ni despachos de mercancía.
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setType('product')
-                  setCondition('Nuevo')
-                  setPriceUnit('unidad')
-                }}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
-                  type === 'product'
-                    ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-300 ring-2 ring-blue-600'
-                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <span className="text-2xl">🛍️</span>
-                <span className="font-bold text-sm">Producto (Nuevo)</span>
-                <span className="text-xs text-zinc-500">Únicamente cosas nuevas a estrenar, alimentos o inventario de fábrica</span>
-              </button>
+            <div>
+              <p className="text-xs text-zinc-500 mb-2.5">
+                Selecciona la condición física de este producto para asociarlo a su respectiva vitrina y filtros:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductCondition('new')
+                    setType('product')
+                    setCondition('Nuevo')
+                    setPriceUnit('unidad')
+                  }}
+                  className={`flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    productCondition === 'new'
+                      ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-300 ring-2 ring-blue-600'
+                      : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🛍️</span>
+                    <span className="font-bold text-sm">Producto Nuevo</span>
+                    <span className="rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-bold dark:bg-blue-900 dark:text-blue-200">A estrenar</span>
+                  </div>
+                  <span className="text-xs text-zinc-500">Mercancía nueva de fábrica, precintada o elaboración propia con existencias de inventario.</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setType('article')
-                  setCondition('Usado - Buen estado')
-                  setPriceUnit('unidad')
-                }}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
-                  type === 'article'
-                    ? 'border-amber-600 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 ring-2 ring-amber-600'
-                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <span className="text-2xl">📦</span>
-                <span className="font-bold text-sm">Artículo (Usado)</span>
-                <span className="text-xs text-zinc-500">Únicamente cosas usadas, segunda mano, antigüedades o de ocasión</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setType('service')
-                  setPriceUnit('servicio')
-                }}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all cursor-pointer ${
-                  type === 'service'
-                    ? 'border-purple-600 bg-purple-50/50 dark:bg-purple-950/20 text-purple-900 dark:text-purple-300 ring-2 ring-purple-600'
-                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <span className="text-2xl">🛠️</span>
-                <span className="font-bold text-sm">Servicio</span>
-                <span className="text-xs text-zinc-500">Hogar, belleza, clases, oficios, mantenimiento y asesorías profesionales</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductCondition('used')
+                    setType('article')
+                    if (!condition.includes('Usado') && !condition.includes('Reacondicionado')) {
+                      setCondition('Usado - Buen estado')
+                    }
+                    setPriceUnit('unidad')
+                  }}
+                  className={`flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    productCondition === 'used'
+                      ? 'border-amber-600 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 ring-2 ring-amber-600'
+                      : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">📦</span>
+                    <span className="font-bold text-sm">Artículo Usado / Segunda Mano</span>
+                    <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold dark:bg-amber-900 dark:text-amber-200">Pre-owned</span>
+                  </div>
+                  <span className="text-xs text-zinc-500">Cosas de segunda mano, antigüedades, artículos reacondicionados u ocasiones con estado de conservación.</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -964,7 +1028,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
         </div>
 
         {/* 3. Ciudad y Ubicación */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className={isProductMode ? 'grid grid-cols-1 sm:grid-cols-2 gap-6' : 'grid grid-cols-1 gap-6'}>
           <div>
             <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
               Ciudad de cobertura / ubicación
@@ -978,10 +1042,10 @@ export default function ListingForm({ categories }: ListingFormProps) {
             />
           </div>
 
-          {type !== 'service' && (
+          {isProductMode && (
             <div>
               <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
-                Stock / Cantidad disponible
+                Stock / Cantidad disponible *
               </label>
               <input
                 type="number"
@@ -1001,7 +1065,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
             <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               4. Precio y Modalidad de Cobro
             </label>
-            {selectedInventoryId && inventoryItemData && (
+            {isProductMode && selectedInventoryId && inventoryItemData && (
               <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 flex items-center gap-1">
                 <span>🔒</span>
                 <span>Precio Maestro de Inventario</span>
@@ -1010,7 +1074,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
           </div>
 
           {/* Tarjeta de Confirmación de Información de Inventario */}
-          {selectedInventoryId && inventoryItemData && (
+          {isProductMode && selectedInventoryId && inventoryItemData && (
             <div className="mb-5 rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white p-4 sm:p-5 dark:border-emerald-700 dark:bg-zinc-900 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-xl border border-emerald-200 shadow-2xs dark:bg-zinc-900 dark:border-emerald-900">
                 <div>
@@ -1022,7 +1086,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
                       ${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP
                     </span>
                     <span className="text-xs font-bold text-zinc-400">
-                      / {inventoryItemData.price_unit || (type === 'service' ? 'servicio' : 'unidad')}
+                      / {inventoryItemData.price_unit || 'unidad'}
                     </span>
                   </div>
                 </div>
@@ -1058,7 +1122,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
                 onChange={() => setPriceType('fixed')}
                 className="h-4 w-4 text-emerald-600 focus:ring-emerald-500"
               />
-              Precio fijo / establecido
+              {isServiceMode ? 'Tarifa fija establecida' : 'Precio fijo / establecido'}
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -1077,7 +1141,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                  Monto en COP ($) {selectedInventoryId && <span className="text-emerald-600 font-bold">(Sincronizado)</span>}
+                  Monto en COP ($) {isProductMode && selectedInventoryId && <span className="text-emerald-600 font-bold">(Sincronizado)</span>}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500 text-sm">
@@ -1089,7 +1153,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
                     step="100"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="Ej. 35000"
+                    placeholder={isServiceMode ? 'Ej. 80000' : 'Ej. 35000'}
                     className="w-full rounded-lg border border-zinc-300 pl-8 pr-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   />
                 </div>
@@ -1103,14 +1167,14 @@ export default function ListingForm({ categories }: ListingFormProps) {
                   type="text"
                   value={priceUnit}
                   onChange={(e) => setPriceUnit(e.target.value)}
-                  placeholder="Ej. unidad, hora, servicio, kg, sesión, día"
+                  placeholder={isServiceMode ? 'Ej. servicio, hora, proyecto, sesión, mes, día' : 'Ej. unidad, paquete, caja, docena, kg'}
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:border-emerald-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 />
               </div>
             </div>
           )}
 
-          {selectedInventoryId && inventoryItemData && price !== String(inventoryItemData.price || '') && (
+          {isProductMode && selectedInventoryId && inventoryItemData && price !== String(inventoryItemData.price || '') && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900">
               ⚠️ <strong>Sincronización:</strong> Modificaste el precio respecto al valor de inventario (${Number(inventoryItemData.price || 0).toLocaleString('es-CO')} COP). Al publicar el anuncio, este nuevo valor actualizará también el Inventario Maestro.
             </p>
@@ -1126,7 +1190,11 @@ export default function ListingForm({ categories }: ListingFormProps) {
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe las características principales, ingredientes o materiales, tiempos de entrega, experiencia o lo que el cliente debe saber..."
+            placeholder={
+              isServiceMode
+                ? 'Describe los alcances del servicio, experiencia profesional, metodología, herramientas que usas y qué incluye la cotización...'
+                : 'Describe las características principales, ingredientes o materiales, tiempos de despacho, especificaciones o lo que el cliente debe saber...'
+            }
             className="w-full rounded-lg border border-zinc-300 p-3 text-sm text-zinc-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
@@ -1134,11 +1202,11 @@ export default function ListingForm({ categories }: ListingFormProps) {
         {/* 6. Atributos Específicos (attrs jsonb) */}
         <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
           <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
-            Atributos y características técnicas
+            6. {isServiceMode ? 'Modalidad y Tiempos del Servicio' : 'Atributos y Entrega del Producto'}
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            {type === 'product' && (
+            {isProductMode && productCondition === 'new' && (
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
                   Condición del Producto
@@ -1153,7 +1221,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
               </div>
             )}
 
-            {type === 'article' && (
+            {isProductMode && productCondition === 'used' && (
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
                   Estado de Conservación (Artículo Usado) *
@@ -1171,7 +1239,7 @@ export default function ListingForm({ categories }: ListingFormProps) {
               </div>
             )}
 
-            {(type === 'product' || type === 'article') && (
+            {isProductMode && (
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
                   Método de entrega
@@ -1189,22 +1257,40 @@ export default function ListingForm({ categories }: ListingFormProps) {
               </div>
             )}
 
-            {type === 'service' && (
-              <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                  Modalidad de atención
-                </label>
-                <select
-                  value={modality}
-                  onChange={(e) => setModality(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  <option value="Presencial">Presencial (en sede)</option>
-                  <option value="A domicilio">A domicilio</option>
-                  <option value="Virtual / Remoto">Virtual / Remoto</option>
-                  <option value="Mixta">Mixta</option>
-                </select>
-              </div>
+            {isServiceMode && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                    Modalidad de atención del servicio *
+                  </label>
+                  <select
+                    value={modality}
+                    onChange={(e) => setModality(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 font-medium"
+                  >
+                    <option value="Presencial">Presencial (en sede o local)</option>
+                    <option value="A domicilio">A domicilio (visita al cliente)</option>
+                    <option value="Virtual / Remoto">Virtual / Remoto (en línea)</option>
+                    <option value="Mixta">Mixta (Presencial y Virtual)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                    Tiempo estimado de respuesta / realización *
+                  </label>
+                  <select
+                    value={leadTime}
+                    onChange={(e) => setLeadTime(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 font-medium"
+                  >
+                    <option value="Inmediato / Mismo día">Inmediato / Mismo día</option>
+                    <option value="24 a 48 horas">24 a 48 horas</option>
+                    <option value="3 a 5 días hábiles">3 a 5 días hábiles</option>
+                    <option value="A convenir con el cliente">A convenir con el cliente</option>
+                  </select>
+                </div>
+              </>
             )}
           </div>
 
@@ -1363,7 +1449,13 @@ export default function ListingForm({ categories }: ListingFormProps) {
             >
               {submitting
                 ? t.common.loading
-                : (locale === 'en' ? 'Save as draft' : 'Guardar como borrador')}
+                : locale === 'en'
+                ? isServiceMode
+                  ? 'Save service draft'
+                  : 'Save product draft'
+                : isServiceMode
+                ? 'Guardar borrador de servicio'
+                : 'Guardar borrador de producto'}
             </button>
 
             <button
@@ -1381,7 +1473,15 @@ export default function ListingForm({ categories }: ListingFormProps) {
                   <span>{t.common.loading}</span>
                 </>
               ) : (
-                <span>{locale === 'en' ? 'Publish for review' : 'Publicar para revisión'}</span>
+                <span>
+                  {locale === 'en'
+                    ? isServiceMode
+                      ? 'Publish service for review'
+                      : 'Publish product for review'
+                    : isServiceMode
+                    ? 'Publicar servicio para revisión'
+                    : 'Publicar producto para revisión'}
+                </span>
               )}
             </button>
           </div>

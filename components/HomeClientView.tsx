@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import type { Category, ListingWithRelations } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
@@ -242,37 +242,29 @@ export default function HomeClientView({
     return Array.from(map.values())
   }, [showcaseItems])
 
-  // Listas con repetición para ciclo infinito continuo en carrusel
+  // Listas con repetición simétrica para ciclo infinito continuo en carrusel
   const loopedServiceItems = useMemo(() => {
     if (serviceItems.length === 0) return []
-    if (serviceItems.length < 5) {
-      return [...serviceItems, ...serviceItems, ...serviceItems]
-    }
-    return [...serviceItems, ...serviceItems]
+    const base = serviceItems.length < 4 ? [...serviceItems, ...serviceItems] : serviceItems
+    return [...base, ...base]
   }, [serviceItems])
 
   const loopedArticleItems = useMemo(() => {
     if (articleItems.length === 0) return []
-    if (articleItems.length < 5) {
-      return [...articleItems, ...articleItems, ...articleItems]
-    }
-    return [...articleItems, ...articleItems]
+    const base = articleItems.length < 4 ? [...articleItems, ...articleItems] : articleItems
+    return [...base, ...base]
   }, [articleItems])
 
   const loopedProductItems = useMemo(() => {
     if (productItems.length === 0) return []
-    if (productItems.length < 5) {
-      return [...productItems, ...productItems, ...productItems]
-    }
-    return [...productItems, ...productItems]
+    const base = productItems.length < 4 ? [...productItems, ...productItems] : productItems
+    return [...base, ...base]
   }, [productItems])
 
   const loopedMerchantShowcases = useMemo(() => {
     if (merchantShowcases.length === 0) return []
-    if (merchantShowcases.length < 5) {
-      return [...merchantShowcases, ...merchantShowcases, ...merchantShowcases]
-    }
-    return [...merchantShowcases, ...merchantShowcases]
+    const base = merchantShowcases.length < 4 ? [...merchantShowcases, ...merchantShowcases] : merchantShowcases
+    return [...base, ...base]
   }, [merchantShowcases])
 
   // Estado de la Gran Vitrina Principal (Hero Runway)
@@ -292,14 +284,14 @@ export default function HomeClientView({
     setSelectedPhotoIndex(0)
   }
 
-  // Rotación constante continua en loop de la Gran Vitrina Hero (cada 6.0s)
+  // Rotación automática de la Gran Vitrina Hero (fija cada 5.0s continuo en sentido inverso)
   useEffect(() => {
     if (heroItems.length <= 1) return
 
     const timer = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroItems.length)
+      setHeroIndex((prev) => (prev === 0 ? heroItems.length - 1 : prev - 1))
       setSelectedPhotoIndex(0)
-    }, 6000)
+    }, 5000)
 
     return () => clearInterval(timer)
   }, [heroItems.length])
@@ -310,13 +302,125 @@ export default function HomeClientView({
   const productsScrollRef = useRef<HTMLDivElement>(null)
   const merchantsScrollRef = useRef<HTMLDivElement>(null)
 
-  // Desplazamiento rotativo fluido en loop infinito para pasarelas
-  const scrollCarousel = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
+  // Hook para desplazamiento horizontal continuo fluido en bucle infinito con pausa al interactuar (en sentido inverso)
+  const useContinuousScroll = (
+    ref: React.RefObject<HTMLDivElement | null>,
+    itemCount: number,
+    speed: number = 0.65
+  ) => {
+    const [isPaused, setIsPaused] = useState(false)
+    const isPausedRef = useRef(false)
+    const resumeTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+    const pause = useCallback(() => {
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current)
+        resumeTimerRef.current = null
+      }
+      isPausedRef.current = true
+      setIsPaused(true)
+    }, [])
+
+    const resume = useCallback(() => {
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current)
+        resumeTimerRef.current = null
+      }
+      isPausedRef.current = false
+      setIsPaused(false)
+    }, [])
+
+    const pauseTemporarily = useCallback((ms: number = 2500) => {
+      pause()
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+      resumeTimerRef.current = setTimeout(() => {
+        resume()
+      }, ms)
+    }, [pause, resume])
+
+    useEffect(() => {
+      if (itemCount <= 1) return
+
+      // Inicializar el scroll en la segunda mitad para permitir desplazamiento continuo en sentido inverso de inmediato
+      if (ref.current && ref.current.scrollLeft === 0) {
+        const half = ref.current.scrollWidth / 2
+        if (half > 0) {
+          ref.current.scrollLeft = half
+        }
+      }
+
+      let animId: number
+      let lastTime: number | null = null
+
+      const step = (time: number) => {
+        if (!ref.current) {
+          animId = requestAnimationFrame(step)
+          return
+        }
+
+        if (lastTime === null) {
+          lastTime = time
+        }
+        const delta = Math.min(time - lastTime, 50)
+        lastTime = time
+
+        if (!isPausedRef.current) {
+          const el = ref.current
+          const halfScroll = el.scrollWidth / 2
+
+          if (halfScroll > 0) {
+            // Si llega o está en el extremo izquierdo (<= 0), reposicionar a la mitad para mantener bucle continuo
+            if (el.scrollLeft <= 0) {
+              el.scrollLeft += halfScroll
+            }
+
+            // Movimiento continuo suave en sentido contrario (disminuyendo scrollLeft)
+            const px = (speed * delta) / 16.67
+            el.scrollLeft -= px
+
+            // Bucle infinito continuo sin cortes perceptibles en sentido contrario
+            if (el.scrollLeft <= 0) {
+              el.scrollLeft += halfScroll
+            }
+          }
+        }
+
+        animId = requestAnimationFrame(step)
+      }
+
+      animId = requestAnimationFrame(step)
+
+      return () => {
+        cancelAnimationFrame(animId)
+        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
+      }
+    }, [ref, itemCount, speed])
+
+    return { isPaused, pause, resume, pauseTemporarily }
+  }
+
+  // Controladores de desplazamiento continuo para cada pasarela
+  const servicesControl = useContinuousScroll(servicesScrollRef, serviceItems.length, 0.65)
+  const articlesControl = useContinuousScroll(articlesScrollRef, articleItems.length, 0.65)
+  const productsControl = useContinuousScroll(productsScrollRef, productItems.length, 0.65)
+  const merchantsControl = useContinuousScroll(merchantsScrollRef, merchantShowcases.length, 0.65)
+
+  // Desplazamiento manual asistido (botones ◀ y ▶) con pausa temporal
+  const scrollCarousel = (
+    ref: React.RefObject<HTMLDivElement | null>,
+    direction: 'left' | 'right',
+    pauseFn?: (ms?: number) => void
+  ) => {
     if (!ref.current) return
     const el = ref.current
     const card = el.firstElementChild as HTMLElement | null
     const cardWidth = card ? card.offsetWidth + 20 : 340
     const halfScroll = el.scrollWidth / 2
+
+    // Pausar temporalmente para que el usuario pueda interactuar con el resultado manual
+    if (pauseFn) {
+      pauseFn(2500)
+    }
 
     if (direction === 'right') {
       if (halfScroll > 0 && el.scrollLeft >= halfScroll - 10) {
@@ -335,54 +439,14 @@ export default function HomeClientView({
     if (!ref.current) return
     const el = ref.current
     const halfScroll = el.scrollWidth / 2
-    if (halfScroll > 0 && el.scrollLeft >= halfScroll) {
-      el.scrollTo({ left: Math.max(0, el.scrollLeft - halfScroll), behavior: 'instant' as ScrollBehavior })
+    if (halfScroll > 0) {
+      if (el.scrollLeft >= halfScroll) {
+        el.scrollLeft -= halfScroll
+      } else if (el.scrollLeft <= 0) {
+        el.scrollLeft += halfScroll
+      }
     }
   }
-
-  // Rotación constante continua en loop de la pasarela de servicios (cada 4.0s)
-  useEffect(() => {
-    if (serviceItems.length <= 1) return
-
-    const timer = setInterval(() => {
-      scrollCarousel(servicesScrollRef, 'right')
-    }, 4000)
-
-    return () => clearInterval(timer)
-  }, [serviceItems.length])
-
-  // Rotación constante continua en loop de la pasarela de artículos usados (cada 3.6s)
-  useEffect(() => {
-    if (articleItems.length <= 1) return
-
-    const timer = setInterval(() => {
-      scrollCarousel(articlesScrollRef, 'right')
-    }, 3600)
-
-    return () => clearInterval(timer)
-  }, [articleItems.length])
-
-  // Rotación constante continua en loop de la pasarela de productos nuevos (cada 3.8s)
-  useEffect(() => {
-    if (productItems.length <= 1) return
-
-    const timer = setInterval(() => {
-      scrollCarousel(productsScrollRef, 'right')
-    }, 3800)
-
-    return () => clearInterval(timer)
-  }, [productItems.length])
-
-  // Rotación constante continua en loop de la pasarela de marcas/comercios (cada 4.5s)
-  useEffect(() => {
-    if (merchantShowcases.length <= 1) return
-
-    const timer = setInterval(() => {
-      scrollCarousel(merchantsScrollRef, 'right')
-    }, 4500)
-
-    return () => clearInterval(timer)
-  }, [merchantShowcases.length])
 
   // Generador de enlace WhatsApp con mensaje predeterminado
   const getWhatsappUrl = (phoneRaw: string | null, sellerName: string, title: string) => {
@@ -749,16 +813,20 @@ export default function HomeClientView({
             {/* Controles de Desplazamiento y Estado de Rotación */}
             <div className="flex items-center gap-2">
               <span
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-purple-700 bg-purple-50 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-900"
-                title="Rotación constante continua en loop activa"
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
+                  servicesControl.isPaused
+                    ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                    : 'text-purple-700 bg-purple-50 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-900'
+                }`}
+                title={servicesControl.isPaused ? 'Desplazamiento pausado por interacción' : 'Desplazamiento continuo fluido activo'}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />
-                <span className="hidden sm:inline">Rotación en loop</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${servicesControl.isPaused ? 'bg-amber-500' : 'bg-purple-500 animate-pulse'}`} />
+                <span className="hidden sm:inline">{servicesControl.isPaused ? 'Pausado' : 'Continuo'}</span>
               </span>
 
               <button
                 type="button"
-                onClick={() => scrollCarousel(servicesScrollRef, 'left')}
+                onClick={() => scrollCarousel(servicesScrollRef, 'left', servicesControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la izquierda"
                 title="Servicio anterior"
@@ -767,7 +835,7 @@ export default function HomeClientView({
               </button>
               <button
                 type="button"
-                onClick={() => scrollCarousel(servicesScrollRef, 'right')}
+                onClick={() => scrollCarousel(servicesScrollRef, 'right', servicesControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la derecha"
                 title="Siguiente servicio"
@@ -780,7 +848,11 @@ export default function HomeClientView({
           <div
             ref={servicesScrollRef}
             onScroll={() => handleLoopScroll(servicesScrollRef)}
-            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            onMouseEnter={servicesControl.pause}
+            onMouseLeave={servicesControl.resume}
+            onTouchStart={servicesControl.pause}
+            onTouchEnd={() => servicesControl.pauseTemporarily(2500)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {loopedServiceItems.map((item, idx) => {
@@ -789,7 +861,9 @@ export default function HomeClientView({
               return (
                 <div
                   key={`${item.id}-${idx}`}
-                  className="w-80 sm:w-96 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-purple-200/80 bg-white p-5 shadow-xs hover:shadow-lg transition-all dark:border-purple-900/40 dark:bg-zinc-900 overflow-hidden"
+                  onMouseEnter={servicesControl.pause}
+                  onMouseLeave={servicesControl.resume}
+                  className="w-80 sm:w-96 shrink-0 flex flex-col justify-between rounded-2xl border border-purple-200/80 bg-white p-5 shadow-xs hover:shadow-lg transition-all dark:border-purple-900/40 dark:bg-zinc-900 overflow-hidden"
                 >
                   <div className="space-y-3.5">
                     {/* 1. Fila Superior de Etiquetas (Badges & Categoría) */}
@@ -931,16 +1005,20 @@ export default function HomeClientView({
             {/* Controles de Desplazamiento y Estado de Rotación */}
             <div className="flex items-center gap-2">
               <span
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-900"
-                title="Rotación constante continua en loop activa"
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
+                  articlesControl.isPaused
+                    ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                    : 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                }`}
+                title={articlesControl.isPaused ? 'Desplazamiento pausado por interacción' : 'Desplazamiento continuo fluido activo'}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="hidden sm:inline">Rotación en loop</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${articlesControl.isPaused ? 'bg-amber-500' : 'bg-amber-500 animate-pulse'}`} />
+                <span className="hidden sm:inline">{articlesControl.isPaused ? 'Pausado' : 'Continuo'}</span>
               </span>
 
               <button
                 type="button"
-                onClick={() => scrollCarousel(articlesScrollRef, 'left')}
+                onClick={() => scrollCarousel(articlesScrollRef, 'left', articlesControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la izquierda"
                 title="Artículo anterior"
@@ -949,7 +1027,7 @@ export default function HomeClientView({
               </button>
               <button
                 type="button"
-                onClick={() => scrollCarousel(articlesScrollRef, 'right')}
+                onClick={() => scrollCarousel(articlesScrollRef, 'right', articlesControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la derecha"
                 title="Siguiente artículo"
@@ -963,7 +1041,11 @@ export default function HomeClientView({
           <div
             ref={articlesScrollRef}
             onScroll={() => handleLoopScroll(articlesScrollRef)}
-            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            onMouseEnter={articlesControl.pause}
+            onMouseLeave={articlesControl.resume}
+            onTouchStart={articlesControl.pause}
+            onTouchEnd={() => articlesControl.pauseTemporarily(2500)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {loopedArticleItems.map((item, idx) => {
@@ -973,7 +1055,9 @@ export default function HomeClientView({
               return (
                 <div
                   key={`${item.id}-${idx}`}
-                  className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-amber-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-amber-900/30 dark:bg-zinc-900 group"
+                  onMouseEnter={articlesControl.pause}
+                  onMouseLeave={articlesControl.resume}
+                  className="w-72 sm:w-80 shrink-0 flex flex-col justify-between rounded-2xl border border-amber-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-amber-900/30 dark:bg-zinc-900 group"
                 >
                   <div>
                     {/* Imagen y Badges */}
@@ -1111,16 +1195,20 @@ export default function HomeClientView({
             {/* Controles de Desplazamiento y Estado de Rotación */}
             <div className="flex items-center gap-2">
               <span
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-blue-700 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
-                title="Rotación constante continua en loop activa"
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
+                  productsControl.isPaused
+                    ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                    : 'text-blue-700 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900'
+                }`}
+                title={productsControl.isPaused ? 'Desplazamiento pausado por interacción' : 'Desplazamiento continuo fluido activo'}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <span className="hidden sm:inline">Rotación en loop</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${productsControl.isPaused ? 'bg-amber-500' : 'bg-blue-500 animate-pulse'}`} />
+                <span className="hidden sm:inline">{productsControl.isPaused ? 'Pausado' : 'Continuo'}</span>
               </span>
 
               <button
                 type="button"
-                onClick={() => scrollCarousel(productsScrollRef, 'left')}
+                onClick={() => scrollCarousel(productsScrollRef, 'left', productsControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la izquierda"
                 title="Producto anterior"
@@ -1129,7 +1217,7 @@ export default function HomeClientView({
               </button>
               <button
                 type="button"
-                onClick={() => scrollCarousel(productsScrollRef, 'right')}
+                onClick={() => scrollCarousel(productsScrollRef, 'right', productsControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la derecha"
                 title="Siguiente producto"
@@ -1143,7 +1231,11 @@ export default function HomeClientView({
           <div
             ref={productsScrollRef}
             onScroll={() => handleLoopScroll(productsScrollRef)}
-            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            onMouseEnter={productsControl.pause}
+            onMouseLeave={productsControl.resume}
+            onTouchStart={productsControl.pause}
+            onTouchEnd={() => productsControl.pauseTemporarily(2500)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {loopedProductItems.map((item, idx) => {
@@ -1152,7 +1244,9 @@ export default function HomeClientView({
               return (
                 <div
                   key={`${item.id}-${idx}`}
-                  className="w-72 sm:w-80 shrink-0 snap-start flex flex-col justify-between rounded-2xl border border-blue-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-blue-900/30 dark:bg-zinc-900 group"
+                  onMouseEnter={productsControl.pause}
+                  onMouseLeave={productsControl.resume}
+                  className="w-72 sm:w-80 shrink-0 flex flex-col justify-between rounded-2xl border border-blue-200/70 bg-white p-4 shadow-xs hover:shadow-lg transition-all dark:border-blue-900/30 dark:bg-zinc-900 group"
                 >
                   <div>
                     {/* Imagen y Badges */}
@@ -1290,16 +1384,20 @@ export default function HomeClientView({
             {/* Controles de Desplazamiento y Estado de Rotación */}
             <div className="flex items-center gap-2">
               <span
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none text-indigo-700 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900"
-                title="Rotación constante continua en loop activa"
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
+                  merchantsControl.isPaused
+                    ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                    : 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900'
+                }`}
+                title={merchantsControl.isPaused ? 'Desplazamiento pausado por interacción' : 'Desplazamiento continuo fluido activo'}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                <span className="hidden sm:inline">Rotación en loop</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${merchantsControl.isPaused ? 'bg-amber-500' : 'bg-indigo-500 animate-pulse'}`} />
+                <span className="hidden sm:inline">{merchantsControl.isPaused ? 'Pausado' : 'Continuo'}</span>
               </span>
 
               <button
                 type="button"
-                onClick={() => scrollCarousel(merchantsScrollRef, 'left')}
+                onClick={() => scrollCarousel(merchantsScrollRef, 'left', merchantsControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la izquierda"
                 title="Comercio anterior"
@@ -1308,7 +1406,7 @@ export default function HomeClientView({
               </button>
               <button
                 type="button"
-                onClick={() => scrollCarousel(merchantsScrollRef, 'right')}
+                onClick={() => scrollCarousel(merchantsScrollRef, 'right', merchantsControl.pauseTemporarily)}
                 className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
                 aria-label="Desplazar a la derecha"
                 title="Siguiente comercio"
@@ -1321,13 +1419,19 @@ export default function HomeClientView({
           <div
             ref={merchantsScrollRef}
             onScroll={() => handleLoopScroll(merchantsScrollRef)}
-            className="flex gap-5 overflow-x-auto pb-4 pt-1 scroll-smooth snap-x snap-mandatory no-scrollbar"
+            onMouseEnter={merchantsControl.pause}
+            onMouseLeave={merchantsControl.resume}
+            onTouchStart={merchantsControl.pause}
+            onTouchEnd={() => merchantsControl.pauseTemporarily(2500)}
+            className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {loopedMerchantShowcases.map((merchant, idx) => (
               <div
                 key={`${merchant.sellerId}-${idx}`}
-                className="w-72 shrink-0 snap-start rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
+                onMouseEnter={merchantsControl.pause}
+                onMouseLeave={merchantsControl.resume}
+                className="w-72 shrink-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center gap-3">
@@ -1394,31 +1498,112 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 6. ACCESO RÁPIDO A CATEGORÍAS                                             */}
+      {/* 6. ACCESO RÁPIDO POR CATÁLOGOS: SERVICIOS, USADOS Y NUEVOS               */}
       {/* ========================================================================= */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-4">
+        <div className="mb-5">
           <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
             <span>🏷️</span>
-            <span>{t.home.categoriesTitle}</span>
+            <span>
+              {locale === 'en'
+                ? 'Explore by Catalog: Services, Used & New'
+                : 'Explora por Catálogo: Servicios, Usados y Nuevos'}
+            </span>
           </h2>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            {locale === 'en'
+              ? 'Direct access to independent catalogs with specialized filters and modalities.'
+              : 'Acceso directo a las ventanas independientes de catálogo con sus propios filtros y modalidades especializadas.'}
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              href={`/catalogo?category=${category.slug}`}
-              className="group flex flex-col items-center justify-center rounded-2xl border border-zinc-200 bg-white p-3.5 text-center transition-all hover:-translate-y-0.5 hover:border-emerald-500 hover:shadow-xs dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <span className="text-2xl transition-transform group-hover:scale-110">
-                {categoryIcons[category.slug] || '🏷️'}
-              </span>
-              <span className="mt-1.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 line-clamp-1">
-                {category.name}
-              </span>
-            </Link>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1. SERVICIOS */}
+          <Link
+            href="/catalogo?type=service"
+            className="group flex flex-col justify-between rounded-2xl border border-purple-200 bg-white p-5 shadow-xs transition-all hover:-translate-y-1 hover:border-purple-500 hover:shadow-md dark:border-purple-900/50 dark:bg-zinc-900"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-2xl transition-transform group-hover:scale-110 dark:bg-purple-950/60">
+                  🛠️
+                </span>
+                <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
+                  {locale === 'en' ? 'Services' : 'Servicios'}
+                </span>
+              </div>
+              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
+                {locale === 'en' ? 'Professional Services' : 'Servicios Profesionales'}
+              </h3>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                {locale === 'en'
+                  ? 'Quotes on request, on-site or remote assistance, and expert response times.'
+                  : 'Cotizaciones a solicitud, asesorías, modalidades presenciales o virtuales y tiempos de respuesta.'}
+              </p>
+            </div>
+            <div className="mt-5 pt-3 border-t border-purple-100 dark:border-purple-900/30 flex items-center justify-between text-xs font-bold text-purple-700 dark:text-purple-300">
+              <span>{locale === 'en' ? 'Explore Services' : 'Ver Catálogo de Servicios'}</span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* 2. ARTÍCULOS USADOS */}
+          <Link
+            href="/catalogo?type=article"
+            className="group flex flex-col justify-between rounded-2xl border border-amber-200 bg-white p-5 shadow-xs transition-all hover:-translate-y-1 hover:border-amber-500 hover:shadow-md dark:border-amber-900/50 dark:bg-zinc-900"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-2xl transition-transform group-hover:scale-110 dark:bg-amber-950/60">
+                  📦
+                </span>
+                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+                  {locale === 'en' ? 'Used Articles' : 'Artículos Usados'}
+                </span>
+              </div>
+              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors">
+                {locale === 'en' ? 'Used Articles' : 'Artículos Usados'}
+              </h3>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                {locale === 'en'
+                  ? 'Second-hand deals, pre-owned opportunities and verified local merchant inventory.'
+                  : 'Oportunidades únicas de segunda mano, liquidaciones y artículos de comercios locales.'}
+              </p>
+            </div>
+            <div className="mt-5 pt-3 border-t border-amber-100 dark:border-amber-900/30 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
+              <span>{locale === 'en' ? 'Explore Used Articles' : 'Ver Catálogo de Usados'}</span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* 3. PRODUCTOS NUEVOS */}
+          <Link
+            href="/catalogo?type=product"
+            className="group flex flex-col justify-between rounded-2xl border border-blue-200 bg-white p-5 shadow-xs transition-all hover:-translate-y-1 hover:border-blue-500 hover:shadow-md dark:border-blue-900/50 dark:bg-zinc-900"
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-2xl transition-transform group-hover:scale-110 dark:bg-blue-950/60">
+                  ✨
+                </span>
+                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+                  {locale === 'en' ? 'New Products' : 'Productos Nuevos'}
+                </span>
+              </div>
+              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                {locale === 'en' ? 'New Products' : 'Productos Nuevos'}
+              </h3>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                {locale === 'en'
+                  ? 'Brand-new factory items with seller warranty and fast shipping or store pickup.'
+                  : 'Productos a estrenar de fábrica con garantía de vendedor y métodos de entrega inmediata.'}
+              </p>
+            </div>
+            <div className="mt-5 pt-3 border-t border-blue-100 dark:border-blue-900/30 flex items-center justify-between text-xs font-bold text-blue-700 dark:text-blue-300">
+              <span>{locale === 'en' ? 'Explore New Products' : 'Ver Catálogo de Nuevos'}</span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
         </div>
       </section>
 

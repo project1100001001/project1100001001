@@ -1,6 +1,7 @@
 // app/catalogo/page.tsx
 // Catálogo y Búsqueda de Productos y Servicios
 
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import CatalogClientView from '@/components/CatalogClientView'
 import type { Category, ListingWithRelations } from '@/lib/types'
@@ -16,13 +17,31 @@ interface PageProps {
 
 export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const rawType = typeof params.type === 'string' ? params.type.trim() : ''
+
+  // Si no se especifica tipo o viene el antiguo 'products', redirigir a su ventana correspondiente
+  if (!rawType || rawType === 'products') {
+    const nextParams = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (typeof v === 'string') nextParams.set(k, v)
+    })
+    nextParams.set('type', rawType === 'products' ? 'product' : 'service')
+    redirect(`/catalogo?${nextParams.toString()}`)
+  }
+
+  const typeFilter = rawType
+
   const q = typeof params.q === 'string' ? params.q.trim() : ''
   const categorySlug = typeof params.category === 'string' ? params.category.trim() : ''
-  const typeFilter = typeof params.type === 'string' ? params.type.trim() : ''
   const cityFilter = typeof params.city === 'string' ? params.city.trim() : ''
   const minPrice = typeof params.minPrice === 'string' ? params.minPrice.trim() : ''
   const maxPrice = typeof params.maxPrice === 'string' ? params.maxPrice.trim() : ''
   const sort = typeof params.sort === 'string' ? params.sort.trim() : 'newest'
+  const modalityFilter = typeof params.modality === 'string' ? params.modality.trim() : ''
+  const leadTimeFilter = typeof params.leadTime === 'string' ? params.leadTime.trim() : ''
+  const conditionFilter = typeof params.condition === 'string' ? params.condition.trim() : ''
+  const deliveryFilter = typeof params.delivery === 'string' ? params.delivery.trim() : ''
+  const subTypeFilter = typeof params.subType === 'string' ? params.subType.trim() : ''
 
   const supabase = await createClient()
 
@@ -59,8 +78,8 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     }
   }
 
-  // Filtro por tipo (product, service, article)
-  if (typeFilter && ['product', 'service', 'article'].includes(typeFilter)) {
+  // Filtro por tipo estricto (service | article | product)
+  if (['product', 'service', 'article'].includes(typeFilter)) {
     query = query.eq('type', typeFilter)
   }
 
@@ -99,7 +118,34 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     console.error('Error cargando listings:', error.message)
   }
 
-  const listings = (listingsData as ListingWithRelations[]) || []
+  let listings = (listingsData as ListingWithRelations[]) || []
+
+  // Filtros específicos para Servicios
+  if (typeFilter === 'service') {
+    if (modalityFilter) {
+      const mod = modalityFilter.toLowerCase()
+      listings = listings.filter((l) => {
+        const val = (l.attrs?.modalidad || l.attrs?.modality || '').toLowerCase()
+        return val.includes(mod)
+      })
+    }
+    if (leadTimeFilter) {
+      const lt = leadTimeFilter.toLowerCase()
+      listings = listings.filter((l) => {
+        const val = (l.attrs?.tiempo_entrega || l.attrs?.disponibilidad || '').toLowerCase()
+        return val.includes(lt)
+      })
+    }
+  }
+
+  // Filtros específicos para Productos Nuevos y Artículos Usados (Despacho / Entrega)
+  if (deliveryFilter && (typeFilter === 'product' || typeFilter === 'article')) {
+    const del = deliveryFilter.toLowerCase()
+    listings = listings.filter((l) => {
+      const val = (l.attrs?.delivery_method || '').toLowerCase()
+      return val.includes(del)
+    })
+  }
 
   // Obtener lista de ciudades disponibles a partir de los listings o default
   const defaultCities = ['Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Bucaramanga', 'Cartagena']
@@ -121,6 +167,11 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
         maxPrice,
         sort,
         seller: sellerFilter,
+        modality: modalityFilter,
+        leadTime: leadTimeFilter,
+        condition: conditionFilter,
+        delivery: deliveryFilter,
+        subType: subTypeFilter,
       }}
       listings={listings}
     />

@@ -44,6 +44,7 @@ export default function SellersDirectoryClientView({
     initialFilter === 'whatsapp' ? 'whatsapp' : 'all'
   )
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'rating' | 'listings_count'>('name_asc')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
 
   // Modal para ver ficha completa del comercio
   const [selectedSellerModal, setSelectedSellerModal] = useState<SellerWithListings | null>(null)
@@ -358,6 +359,45 @@ export default function SellersDirectoryClientView({
         </div>
       </div>
 
+      {/* Barra de Control de Resultados y Selector de Modo de Visualización (Lista vs Cuadrícula) */}
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+          {filteredSellers.length === 1
+            ? `1 ${locale === 'en' ? 'registered business' : 'comercio registrado'}`
+            : `${filteredSellers.length} ${t.directory.totalSellers}`}
+        </span>
+
+        {/* Selector de Modo de Visualización (Lista predeterminada) */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'list'
+                ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+            title="Modo de visualización en lista con imagen compacta"
+          >
+            <span>☰</span>
+            <span>Lista</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'grid'
+                ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+            title="Modo de visualización en cuadrícula"
+          >
+            <span>⊞</span>
+            <span className="hidden sm:inline">Cuadrícula</span>
+          </button>
+        </div>
+      </div>
+
       {/* 3. Listado / Cuadrícula de Vendedores */}
       {filteredSellers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
@@ -377,6 +417,237 @@ export default function SellersDirectoryClientView({
               {t.directory.clearFilters}
             </button>
           )}
+        </div>
+      ) : viewMode === 'list' ? (
+        /* MODO LISTA (PREDETERMINADO CON IMAGEN PEQUEÑA E INFORMACIÓN COMPLETA) */
+        <div className="flex flex-col gap-3.5 sm:gap-4">
+          {filteredSellers.map((seller) => {
+            const initial = seller.business_name ? seller.business_name[0].toUpperCase() : 'C'
+            const whatsappUrl = formatWhatsappUrl(seller.whatsapp, seller.business_name)
+            const thumbnail = seller.listings?.find((l) => l.listing_media && l.listing_media.length > 0)?.listing_media?.[0]?.url
+
+            return (
+              <div
+                key={seller.id}
+                className="group relative flex flex-col md:flex-row items-stretch rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-md hover:border-purple-500/50 transition-all dark:border-zinc-800 dark:bg-zinc-900 gap-4"
+              >
+                {/* Imagen Pequeña (Thumbnail Compacto o Avatar) */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedSellerModal(seller)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') setSelectedSellerModal(seller)
+                  }}
+                  className="relative w-full sm:w-28 md:w-32 aspect-video sm:aspect-square shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center self-start md:self-center border border-zinc-200/70 dark:border-zinc-800 cursor-pointer"
+                >
+                  {thumbnail ? (
+                    <img
+                      src={thumbnail}
+                      alt={seller.business_name}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-2 text-center select-none">
+                      <span className="text-3xl font-black">{initial}</span>
+                      <span className="mt-1 text-[10px] font-bold opacity-80">🏪 Comercio</span>
+                    </div>
+                  )}
+
+                  {/* Badge superpuesto en miniatura */}
+                  <div className="absolute top-1.5 left-1.5 flex flex-wrap gap-1">
+                    {seller.verified ? (
+                      <span className="rounded-md bg-emerald-500/90 text-white px-1.5 py-0.5 text-[9px] font-black shadow-xs backdrop-blur-xs">
+                        ✓ Verificado
+                      </span>
+                    ) : (
+                      <span className="rounded-md bg-zinc-900/70 text-white px-1.5 py-0.5 text-[9px] font-bold backdrop-blur-xs">
+                        🏪 {initial}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Zona Central: Información Completa del Comercio */}
+                <div className="flex flex-1 flex-col justify-between min-w-0">
+                  <div className="space-y-1.5">
+                    {/* Fila 1: Título, Badges y Ubicación */}
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSellerModal(seller)}
+                          className="text-left font-bold text-zinc-900 group-hover:text-purple-600 dark:text-zinc-50 dark:group-hover:text-purple-400 transition-colors text-base sm:text-lg truncate max-w-xs sm:max-w-md cursor-pointer"
+                        >
+                          {seller.business_name}
+                        </button>
+
+                        {seller.verified ? (
+                          <span
+                            title={t.directory.verifiedBadge}
+                            className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800"
+                          >
+                            ✓ Verificado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                            En validación
+                          </span>
+                        )}
+
+                        {seller.business_type && (
+                          <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                            🏷️ {seller.business_type}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Ciudad */}
+                      {seller.city && (
+                        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 shrink-0">
+                          📍 {seller.city}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Fila 2: Rating, Opiniones y Conteo de Publicaciones */}
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
+                      <span className="font-bold text-amber-500">★</span>
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                        {seller.rating_avg > 0 ? Number(seller.rating_avg).toFixed(1) : '5.0'}
+                      </span>
+                      <span className="text-[11px] text-zinc-400">
+                        ({seller.rating_count || 0} opiniones)
+                      </span>
+
+                      {seller.listingsCount !== undefined && (
+                        <>
+                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                          <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                            📦 {seller.listingsCount} {t.directory.activeOffers}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Fila 3: Descripción del Comercio */}
+                    {seller.description ? (
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                        {seller.description}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-zinc-400">
+                        Comercio registrado en la plataforma.
+                      </p>
+                    )}
+
+                    {/* Fila 4: Mini-preview de publicaciones destacadas */}
+                    {seller.listings && seller.listings.length > 0 && (
+                      <div className="pt-2 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">
+                          Ofertas:
+                        </span>
+                        {seller.listings.slice(0, 3).map((l) => (
+                          <Link
+                            key={l.id}
+                            href={`/catalogo/${l.id}`}
+                            className="rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors truncate max-w-[180px]"
+                          >
+                            {l.type === 'service' ? '🛠️' : l.type === 'article' ? '📦' : '🛍️'} {l.title}
+                          </Link>
+                        ))}
+                        {seller.listings.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSellerModal(seller)}
+                            className="rounded-lg bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 cursor-pointer"
+                          >
+                            +{seller.listings.length - 3} más
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fila Inferior Móvil: Enlaces rápidos */}
+                  <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3 flex-wrap md:hidden">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyContact(seller)}
+                      className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>📋</span>
+                      <span>{t.directory.copyContact}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSellerModal(seller)}
+                      className="font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{t.directory.viewDetailBtn}</span>
+                      <span>↗</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Columna Derecha: Canales de Contacto Directo y Acciones */}
+                <div className="flex md:flex-col justify-between md:justify-center items-stretch gap-2 md:w-48 shrink-0 md:border-l md:border-zinc-100 md:dark:border-zinc-800/80 md:pl-4 pt-3 md:pt-0 border-t border-zinc-100 md:border-t-0 dark:border-zinc-800/80">
+                  {/* Botón WhatsApp */}
+                  {seller.whatsapp ? (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                    >
+                      <span>💬</span>
+                      <span>WhatsApp</span>
+                    </a>
+                  ) : (
+                    <button
+                      disabled
+                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-400 cursor-not-allowed dark:bg-zinc-800"
+                    >
+                      <span>💬</span>
+                      <span>Sin WhatsApp</span>
+                    </button>
+                  )}
+
+                  {/* Botón Ver Catálogo del Vendedor */}
+                  <Link
+                    href={`/catalogo?seller=${seller.id}`}
+                    className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors text-center"
+                  >
+                    <span>🛍️</span>
+                    <span>{t.directory.viewCatalog}</span>
+                  </Link>
+
+                  {/* Acciones Secundarias en Desktop */}
+                  <div className="hidden md:flex items-center justify-between gap-1 pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyContact(seller)}
+                      className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                      title={t.directory.copyContact}
+                    >
+                      <span>📋</span>
+                      <span>Copiar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSellerModal(seller)}
+                      className="font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Ficha</span>
+                      <span>↗</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

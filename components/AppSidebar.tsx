@@ -55,7 +55,6 @@ function SidebarNavContent({
   const isHomeActive = pathname === '/'
 
   // Catalog
-  const isAllCatalogActive = pathname === '/catalogo' && !currentType
   const isCatalogServiceActive = pathname === '/catalogo' && currentType === 'service'
   const isCatalogArticleActive = pathname === '/catalogo' && currentType === 'article'
   const isCatalogProductActive = pathname === '/catalogo' && currentType === 'product'
@@ -63,11 +62,11 @@ function SidebarNavContent({
   // Directory
   const isDirectoryActive = pathname === '/directorio'
 
-  // Listings / Inventory
+  // Listings / Inventory / Services
   const isInventoryActive = (pathname === '/mis-publicaciones' || pathname === '/inventario') && !currentType
+  const isServicesActive = pathname === '/mis-servicios'
+  const isPublishProductActive = pathname === '/publicar' && currentType !== 'service'
   const isPublishServiceActive = pathname === '/publicar' && currentType === 'service'
-  const isPublishArticleActive = pathname === '/publicar' && currentType === 'article'
-  const isPublishProductActive = pathname === '/publicar' && (currentType === 'product' || (!currentType && pathname === '/publicar'))
 
   // Campaigns
   const isCampaignHistoryActive = pathname === '/mis-campanas'
@@ -120,26 +119,7 @@ function SidebarNavContent({
 
         {catalogOpen && (
           <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-            {/* Todas las publicaciones */}
-            <Link
-              href="/catalogo"
-              onClick={close}
-              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all ${
-                isAllCatalogActive
-                  ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
-                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span>✨</span>
-                <span>{t.nav.allListings}</span>
-              </div>
-              {isAllCatalogActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
-              )}
-            </Link>
-
-            {/* Servicios */}
+            {/* 1. SERVICIOS (Prioridad destacada y aislada) */}
             <Link
               href="/catalogo?type=service"
               onClick={close}
@@ -158,7 +138,7 @@ function SidebarNavContent({
               )}
             </Link>
 
-            {/* Artículos (Usados) */}
+            {/* 2. ARTÍCULOS USADOS (Ventana independiente) */}
             <Link
               href="/catalogo?type=article"
               onClick={close}
@@ -170,14 +150,14 @@ function SidebarNavContent({
             >
               <div className="flex items-center gap-2">
                 <span>📦</span>
-                <span>{locale === 'en' ? 'Articles (Used)' : 'Artículos (Usados)'}</span>
+                <span>{locale === 'en' ? 'Used Articles' : 'Artículos Usados'}</span>
               </div>
               {isCatalogArticleActive && (
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400 shrink-0" />
               )}
             </Link>
 
-            {/* Productos (Nuevos) */}
+            {/* 3. PRODUCTOS NUEVOS (Ventana independiente) */}
             <Link
               href="/catalogo?type=product"
               onClick={close}
@@ -188,8 +168,8 @@ function SidebarNavContent({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span>🛍️</span>
-                <span>{locale === 'en' ? 'Products (New)' : 'Productos (Nuevos)'}</span>
+                <span>✨</span>
+                <span>{locale === 'en' ? 'New Products' : 'Productos Nuevos'}</span>
               </div>
               {isCatalogProductActive && (
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
@@ -238,28 +218,7 @@ function SidebarNavContent({
 
           {listingsOpen && (
             <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
-              <Link
-                href="/mis-publicaciones"
-                onClick={close}
-                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
-                  isInventoryActive
-                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
-                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📦</span>
-                  <span className="font-semibold">{locale === 'en' ? 'Listings & Inventory' : 'Publicaciones & Inventario'}</span>
-                </div>
-                {isInventoryActive && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
-                )}
-              </Link>
-
-              <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                {locale === 'en' ? 'Create Listing' : 'Crear Anuncio'}
-              </div>
-
+              {/* 1. PUBLICAR SERVICIO */}
               <Link
                 href="/publicar?type=service"
                 onClick={close}
@@ -278,24 +237,7 @@ function SidebarNavContent({
                 )}
               </Link>
 
-              <Link
-                href="/publicar?type=article"
-                onClick={close}
-                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                  isPublishArticleActive
-                    ? 'bg-amber-50 text-amber-800 font-bold dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-500/30 shadow-2xs'
-                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 font-medium'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📦</span>
-                  <span>{locale === 'en' ? 'Post Article (Used)' : 'Publicar Artículo (Usado)'}</span>
-                </div>
-                {isPublishArticleActive && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-600 dark:bg-amber-400 shrink-0" />
-                )}
-              </Link>
-
+              {/* 2. PUBLICAR PRODUCTO */}
               <Link
                 href="/publicar?type=product"
                 onClick={close}
@@ -307,10 +249,48 @@ function SidebarNavContent({
               >
                 <div className="flex items-center gap-2">
                   <span>🛍️</span>
-                  <span>{locale === 'en' ? 'Post Product (New)' : 'Publicar Producto (Nuevo)'}</span>
+                  <span>{locale === 'en' ? 'Post Product' : 'Publicar Producto'}</span>
                 </div>
                 {isPublishProductActive && (
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
+                )}
+              </Link>
+
+              {/* 3. INVENTARIO */}
+              <Link
+                href="/mis-publicaciones"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isInventoryActive
+                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📦</span>
+                  <span className="font-semibold">{locale === 'en' ? 'Inventory' : 'Inventario'}</span>
+                </div>
+                {isInventoryActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+                )}
+              </Link>
+
+              {/* 4. SERVICIOS */}
+              <Link
+                href="/mis-servicios"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isServicesActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 font-medium'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🛠️</span>
+                  <span className="font-semibold">{locale === 'en' ? 'Services' : 'Servicios'}</span>
+                </div>
+                {isServicesActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
                 )}
               </Link>
             </div>
