@@ -421,179 +421,144 @@ export default function ServicesManager({
             return (
               <div
                 key={service.id}
-                className="rounded-2xl border border-purple-200/70 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-purple-300 dark:border-purple-950/70 dark:bg-zinc-900 dark:hover:border-purple-800"
+                className="rounded-2xl border border-purple-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-purple-400 dark:border-purple-900/60 dark:bg-zinc-900 dark:hover:border-purple-700"
               >
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  {/* Columna Izquierda: Imagen y Datos del Servicio */}
-                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                    <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 group">
-                      <Link
-                        href={`/catalogo/${service.id}`}
-                        className="block h-full w-full relative"
-                        title="Ver servicio en catálogo público"
-                      >
-                        {coverImage ? (
-                          <Image
-                            src={coverImage}
-                            alt={service.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-3xl group-hover:scale-110 transition-transform">
-                            🛠️
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold">
-                          👁️
-                        </div>
-                      </Link>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase tracking-wider">
-                          🛠️ Servicio Profesional
-                        </span>
-                        {service.category && (
-                          <span className="text-[11px] text-zinc-400">
-                            • {service.category.name}
-                          </span>
-                        )}
-                        {service.city && (
-                          <span className="text-[11px] text-zinc-400">
-                            • {service.city}
-                          </span>
-                        )}
-                        <span
-                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                            statusBadges[service.status]?.color || 'bg-zinc-100 text-zinc-600'
-                          }`}
-                        >
-                          {statusBadges[service.status]?.label || service.status}
-                        </span>
-                      </div>
-
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <Link
-                          href={`/catalogo/${service.id}`}
-                          className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors truncate"
-                          title="Clic para ver anuncio público"
-                        >
-                          {service.title}
-                        </Link>
-                        <span className="text-[10px] text-zinc-400 font-semibold shrink-0">↗</span>
-                      </div>
-
-                      {/* 🌟 CRITERIOS EXCLUSIVOS DE SERVICIO */}
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
-                          <span>📍</span>
-                          <span>Modalidad: <strong>{serviceMod}</strong></span>
-                        </span>
-
-                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80">
-                          <span>⚡</span>
-                          <span>Respuesta: <strong>{serviceLead}</strong></span>
-                        </span>
-
-                        <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                          <span>⏱️</span>
-                          <span>Duración: {serviceTime}</span>
-                        </span>
-
-                        <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                          <span>👥</span>
-                          <span>Capacidad: {serviceCap} cupos/día</span>
-                        </span>
-                      </div>
-
-                      {serviceNotes && (
-                        <p className="mt-1 text-[11px] text-zinc-500 italic">
-                          📝 {serviceNotes}
-                        </p>
-                      )}
-                    </div>
+                {/* 1. FILA SUPERIOR: Metadata (Servicio Profesional, Categoría, Ciudad) y Tarifa destacada */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase tracking-wider">
+                      <span>🛠️</span>
+                      <span>Servicio Profesional</span>
+                    </span>
+                    {service.category && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                        <span>•</span>
+                        <span>📁 {service.category.name}</span>
+                      </span>
+                    )}
+                    {service.city && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                        <span>•</span>
+                        <span>📍 {service.city}</span>
+                      </span>
+                    )}
                   </div>
 
-                  {/* Columna Derecha: Tarifa y Acciones */}
-                  <div className="shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
-                    {/* Tarifa Configurada */}
-                    <div className="text-left md:text-right">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-                        Tarifa del Servicio
-                      </span>
-                      {service.price !== null && service.price !== undefined ? (
-                        <div className="flex items-baseline md:justify-end gap-1">
-                          <span className="text-base sm:text-lg font-black text-purple-700 dark:text-purple-300">
-                            ${Number(service.price).toLocaleString('es-CO')}
-                          </span>
-                          <span className="text-[11px] font-bold text-zinc-500">
-                            / {service.price_unit || 'servicio'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="inline-block rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                          Cotización a convenir
+                  {/* Tarifa destacada en la cabecera */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                      Tarifa:
+                    </span>
+                    {service.price !== null && service.price !== undefined ? (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-base sm:text-lg font-black text-purple-700 dark:text-purple-300">
+                          ${Number(service.price).toLocaleString('es-CO')} COP
                         </span>
+                        <span className="text-[11px] font-bold text-zinc-500">
+                          / {service.price_unit || 'servicio'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
+                        <span>💬</span>
+                        <span>Cotización a convenir</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. CUERPO PRINCIPAL: Portada + Título + Criterios de Prestación */}
+                <div className="flex items-start gap-3.5 sm:gap-4 pt-3.5 min-w-0">
+                  {/* Imagen / Portada con zoom y acceso al anuncio */}
+                  <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/80 group shadow-2xs">
+                    <Link
+                      href={`/catalogo/${service.id}`}
+                      className="block h-full w-full relative"
+                      title="Ver anuncio en catálogo público"
+                    >
+                      {coverImage ? (
+                        <Image
+                          src={coverImage}
+                          alt={service.title}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                          🛠️
+                        </div>
                       )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold">
+                        👁️ Ver
+                      </div>
+                    </Link>
+                  </div>
+
+                  {/* Información Central del Servicio */}
+                  <div className="min-w-0 flex-1">
+                    {/* Título del Servicio */}
+                    <div className="flex items-baseline gap-2">
+                      <Link
+                        href={`/catalogo/${service.id}`}
+                        className="font-black text-base sm:text-lg text-zinc-900 dark:text-zinc-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors line-clamp-1"
+                        title="Clic para ver anuncio en catálogo público"
+                      >
+                        {service.title}
+                      </Link>
+                      <span className="text-xs text-zinc-400 font-bold shrink-0">↗</span>
                     </div>
 
-                    {/* Botones de Acción */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Vista Rápida Modal */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewItem(service)
-                          setPreviewMediaIndex(0)
-                        }}
-                        className="rounded-lg border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1 shadow-2xs"
-                        title="Vista previa del servicio"
-                      >
-                        <span>🔍</span>
-                        <span>Ver</span>
-                      </button>
+                    {/* Criterios Clave del Servicio */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+                      {/* Modalidad */}
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <span>📍</span>
+                        <span>Modalidad: <strong className="font-extrabold">{serviceMod}</strong></span>
+                      </span>
 
-                      {/* Editar Servicio Completo */}
-                      <Link
-                        href={`/publicar?type=service&edit_id=${service.id}`}
-                        className="rounded-lg border border-purple-300 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1 shadow-2xs"
-                        title="Editar servicio en formulario completo"
-                      >
-                        <span>🛠️</span>
-                        <span>Editar</span>
-                      </Link>
+                      {/* Tiempo de respuesta */}
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <span>⚡</span>
+                        <span>Respuesta: <strong className="font-extrabold">{serviceLead}</strong></span>
+                      </span>
 
-                      {/* Ajustar Modalidad y Tiempos */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenServiceModal(service)}
-                        className="rounded-lg bg-purple-100 text-purple-800 px-2.5 py-1 text-[11px] font-bold hover:bg-purple-200 dark:bg-purple-950/80 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1 shadow-2xs"
-                        title="Configurar modalidades de atención, tiempos de respuesta y cupos"
-                      >
-                        <span>⚙️</span>
-                        <span>Condiciones</span>
-                      </button>
+                      {/* Duración */}
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        <span>⏱️</span>
+                        <span>Duración: <strong className="font-bold">{serviceTime}</strong></span>
+                      </span>
 
-                      {/* Promocionar si está publicado */}
-                      {service.status === 'published' && (
-                        <Link
-                          href={`/promocionar?listing_id=${service.id}`}
-                          className="rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 py-1 text-[11px] font-bold text-white transition-colors flex items-center gap-1 shadow-2xs"
-                          title="Destacar este servicio en campañas publicitarias"
-                        >
-                          <span>🚀</span>
-                          <span>Promocionar</span>
-                        </Link>
-                      )}
+                      {/* Capacidad */}
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        <span>👥</span>
+                        <span>Capacidad: <strong className="font-bold">{serviceCap} cupos/día</strong></span>
+                      </span>
+                    </div>
 
-                      {/* Selector Rápido de Estado */}
+                    {/* Instrucciones / Notas si existen */}
+                    {serviceNotes && (
+                      <div className="mt-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 px-2.5 py-1 text-[11px] text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50 flex items-start gap-1.5">
+                        <span className="shrink-0">📝</span>
+                        <span className="italic line-clamp-1">{serviceNotes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. BARRA INFERIOR DE BOTONES Y ACCIONES: Claramente organizada */}
+                <div className="mt-3.5 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2.5">
+                  {/* Grupo Izquierdo: Selector de Estado + Ver Anuncio + Vista Rápida */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Selector Rápido de Estado */}
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">
+                        Estado:
+                      </label>
                       <select
                         value={service.status}
                         disabled={updatingStatusId === service.id}
                         onChange={(e) => handleQuickStatusChange(service, e.target.value as ListingStatus)}
-                        className={`rounded-lg border px-2 py-1 text-[10px] font-bold transition-colors cursor-pointer ${
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition-all cursor-pointer shadow-2xs ${
                           service.status === 'published'
                             ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : service.status === 'draft'
@@ -604,13 +569,76 @@ export default function ServicesManager({
                         }`}
                         title="Cambiar estado del servicio"
                       >
-                        <option value="published">✓ En Catálogo</option>
-                        <option value="draft">📦 Borrador</option>
-                        <option value="paused">⏸️ Pausado</option>
-                        <option value="submitted">⏳ En Revisión</option>
+                        <option value="published">🟢 En Catálogo</option>
+                        <option value="draft">⚪ Borrador</option>
+                        <option value="paused">🟠 Pausado</option>
+                        <option value="submitted">🟡 En Revisión</option>
                         <option value="archived">📁 Archivado</option>
                       </select>
                     </div>
+
+                    <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+
+                    {/* Ver Anuncio en Catálogo */}
+                    <Link
+                      href={`/catalogo/${service.id}`}
+                      className="rounded-lg border border-purple-200 bg-purple-50/60 px-2.5 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Abrir anuncio en catálogo público"
+                    >
+                      <span>👁️</span>
+                      <span>Ver Anuncio</span>
+                      <span className="text-[10px]">↗</span>
+                    </Link>
+
+                    {/* Vista Rápida Modal */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewItem(service)
+                        setPreviewMediaIndex(0)
+                      }}
+                      className="rounded-lg border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1 shadow-2xs"
+                      title="Vista previa rápida sin salir de esta ventana"
+                    >
+                      <span>🔍</span>
+                      <span>Vista Rápida</span>
+                    </button>
+                  </div>
+
+                  {/* Grupo Derecho: Condiciones + Editar + Promocionar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Ajustar Modalidad y Tiempos */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenServiceModal(service)}
+                      className="rounded-lg border border-purple-300 bg-purple-100/70 text-purple-900 px-3 py-1 text-xs font-bold hover:bg-purple-200 dark:border-purple-700 dark:bg-purple-950/80 dark:text-purple-200 dark:hover:bg-purple-900 transition-colors flex items-center gap-1.5 shadow-2xs"
+                      title="Configurar modalidades de atención, plazos de respuesta, duración y cupos"
+                    >
+                      <span>⚙️</span>
+                      <span>Condiciones y Tiempos</span>
+                    </button>
+
+                    {/* Editar Formulario Completo */}
+                    <Link
+                      href={`/publicar?type=service&edit_id=${service.id}`}
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1.5 shadow-2xs"
+                      title="Editar servicio en formulario completo (fotos, descripción, tarifa)"
+                    >
+                      <span>✏️</span>
+                      <span>Editar Servicio</span>
+                    </Link>
+
+                    {/* Promocionar si está publicado */}
+                    {service.status === 'published' && (
+                      <Link
+                        href={`/promocionar?listing_id=${service.id}`}
+                        className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-3 py-1 text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs hover:shadow-sm"
+                        title="Crear campaña publicitaria para destacar este servicio"
+                      >
+                        <span>🚀</span>
+                        <span>Promocionar</span>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

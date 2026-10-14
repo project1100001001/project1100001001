@@ -218,6 +218,12 @@ function SidebarNavContent({
 
           {listingsOpen && (
             <div className="mt-1 ml-3 space-y-1 border-l-2 border-zinc-200 pl-2 dark:border-zinc-800">
+              {/* SUBTÍTULO: CREAR PUBLICACIONES */}
+              <div className="pt-1 pb-0.5 px-2 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                <span>✨</span>
+                <span>{locale === 'en' ? 'Create Listings' : 'Crear Publicaciones'}</span>
+              </div>
+
               {/* 1. PUBLICAR SERVICIO */}
               <Link
                 href="/publicar?type=service"
@@ -256,26 +262,13 @@ function SidebarNavContent({
                 )}
               </Link>
 
-              {/* 3. INVENTARIO */}
-              <Link
-                href="/mis-publicaciones"
-                onClick={close}
-                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
-                  isInventoryActive
-                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
-                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📦</span>
-                  <span className="font-semibold">{locale === 'en' ? 'Inventory' : 'Inventario'}</span>
-                </div>
-                {isInventoryActive && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
-                )}
-              </Link>
+              {/* SUBTÍTULO: CONTROL DE INVENTARIO Y SERVICIOS */}
+              <div className="pt-2.5 pb-0.5 px-2 text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5 border-t border-zinc-100 dark:border-zinc-800/80 mt-1.5">
+                <span>📊</span>
+                <span>{locale === 'en' ? 'Inventory & Services Control' : 'Control de Inventario y Servicios'}</span>
+              </div>
 
-              {/* 4. SERVICIOS */}
+              {/* 3. SERVICIOS */}
               <Link
                 href="/mis-servicios"
                 onClick={close}
@@ -291,6 +284,25 @@ function SidebarNavContent({
                 </div>
                 {isServicesActive && (
                   <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              {/* 4. INVENTARIO */}
+              <Link
+                href="/mis-publicaciones"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isInventoryActive
+                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📦</span>
+                  <span className="font-semibold">{locale === 'en' ? 'Inventory' : 'Inventario'}</span>
+                </div>
+                {isInventoryActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
                 )}
               </Link>
             </div>

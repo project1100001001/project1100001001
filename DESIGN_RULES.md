@@ -67,3 +67,8 @@ Este documento registra los fundamentos y decisiones de diseño aprobadas por el
   3. *Pasarela de Servicios y Soluciones*: Destaca tiempos de respuesta, duración estimada y modalidad operativa.
   4. *Pasarela de Marcas y Catálogos Comerciales*: Exhibe las marcas con campañas activas y sus mini-catálogos.
 - **Rendimiento y Ligereza**: Las transiciones se ejecutan mediante CSS y estado reactivo limpio para evitar retrasos, caídas o fallas de rendimiento.
+- **Directriz de Tamaño Estático de la Gran Vitrina (Invariable y Estable)**:
+  - El recuadro de la **Gran Vitrina Principal (Hero Runway)** DEBE tener un **tamaño estático y fijo** (altura y dimensiones estáticas constantes).
+  - **PROHIBIDO que el recuadro cambie de tamaño, brinque o se deforme con los efectos de movimiento, transiciones o rotación automática del contenido interior**.
+  - No debe ocurrir ningún salto de diseño (*Layout Shift / CLS*) que desplace la ventana o las secciones inferiores de la página al rotar entre publicaciones con diferentes longitudes de texto, atributos o fotos.
+  - La tipografía, espaciados y elementos interiores (titular recortado a máximo 2 líneas con `line-clamp-2`, descripción con `line-clamp-2`, botones y fotos con alturas acotadas) deben adaptarse consecuente y proporcionalmente para que cualquier publicación encaje de manera armónica dentro de las dimensiones fijas del recuadro estático.

@@ -242,59 +242,140 @@ export default function HomeClientView({
     return Array.from(map.values())
   }, [showcaseItems])
 
-  // Listas con repetición simétrica para ciclo infinito continuo en carrusel
-  const loopedServiceItems = useMemo(() => {
-    if (serviceItems.length === 0) return []
-    const base = serviceItems.length < 4 ? [...serviceItems, ...serviceItems] : serviceItems
-    return [...base, ...base]
-  }, [serviceItems])
-
-  const loopedArticleItems = useMemo(() => {
-    if (articleItems.length === 0) return []
-    const base = articleItems.length < 4 ? [...articleItems, ...articleItems] : articleItems
-    return [...base, ...base]
-  }, [articleItems])
-
-  const loopedProductItems = useMemo(() => {
-    if (productItems.length === 0) return []
-    const base = productItems.length < 4 ? [...productItems, ...productItems] : productItems
-    return [...base, ...base]
-  }, [productItems])
-
-  const loopedMerchantShowcases = useMemo(() => {
-    if (merchantShowcases.length === 0) return []
-    const base = merchantShowcases.length < 4 ? [...merchantShowcases, ...merchantShowcases] : merchantShowcases
-    return [...base, ...base]
-  }, [merchantShowcases])
-
-  // Estado de la Gran Vitrina Principal (Hero Runway)
-  const [heroIndex, setHeroIndex] = useState(0)
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
-
-  // Navegación manual de la Gran Vitrina Principal
-  const handlePrevHero = () => {
-    if (heroItems.length <= 1) return
-    setHeroIndex((prev) => (prev === 0 ? heroItems.length - 1 : prev - 1))
-    setSelectedPhotoIndex(0)
+  // Listas con repetición simétrica (4 bloques completos) para bucle horizontal verdaderamente infinito sin fin
+  const createLoopedItems = <T,>(items: T[]): T[] => {
+    if (items.length === 0) return []
+    let base = items
+    while (base.length < 4) {
+      base = [...base, ...items]
+    }
+    return [...base, ...base, ...base, ...base]
   }
 
-  const handleNextHero = () => {
-    if (heroItems.length <= 1) return
-    setHeroIndex((prev) => (prev + 1) % heroItems.length)
-    setSelectedPhotoIndex(0)
+  const loopedServiceItems = useMemo(() => createLoopedItems(serviceItems), [serviceItems])
+  const loopedArticleItems = useMemo(() => createLoopedItems(articleItems), [articleItems])
+  const loopedProductItems = useMemo(() => createLoopedItems(productItems), [productItems])
+  const loopedMerchantShowcases = useMemo(() => createLoopedItems(merchantShowcases), [merchantShowcases])
+
+  // Estado de la Gran Vitrina Principal (Hero Runway) - Desplazamiento horizontal continuo al costado
+  const [trackIndex, setTrackIndex] = useState(1)
+  const [isTransitioning, setIsTransitioning] = useState(true)
+  const isTransitioningRef = useRef(false)
+  const trackIndexRef = useRef(1)
+  trackIndexRef.current = trackIndex
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [selectedPhotos, setSelectedPhotos] = useState<Record<string, number>>({})
+
+  // Items extendidos con clones en los extremos para bucle horizontal infinito sin saltos
+  const extendedHeroItems = useMemo(() => {
+    if (heroItems.length <= 1) return heroItems
+    return [
+      heroItems[heroItems.length - 1], // Slot 0: Clon del último
+      ...heroItems,                     // Slots 1 .. N: Items reales
+      heroItems[0],                     // Slot N+1: Clon del primero
+    ]
+  }, [heroItems])
+
+  // Índice real activo (0 .. N-1)
+  const activeHeroIndex = useMemo(() => {
+    if (heroItems.length <= 1) return 0
+    return ((trackIndex - 1) % heroItems.length + heroItems.length) % heroItems.length
+  }, [trackIndex, heroItems.length])
+
+  // Finalizar transición y gestionar teletransporte invisible sin saltos
+  const finishTransition = useCallback(() => {
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current)
+      transitionTimeoutRef.current = null
+    }
+
+    const N = heroItems.length
+    if (N <= 1) {
+      isTransitioningRef.current = false
+      return
+    }
+
+    const currentIdx = trackIndexRef.current
+    if (currentIdx >= N + 1) {
+      // Teletransporte instantáneo al slot 1 (primer item real) desactivando la animación
+      setIsTransitioning(false)
+      setTrackIndex(1)
+      trackIndexRef.current = 1
+      // Reactivar la animación para el siguiente desplazamiento
+      setTimeout(() => {
+        setIsTransitioning(true)
+        isTransitioningRef.current = false
+      }, 50)
+    } else if (currentIdx <= 0) {
+      // Teletransporte instantáneo al slot N (último item real) desactivando la animación
+      setIsTransitioning(false)
+      setTrackIndex(N)
+      trackIndexRef.current = N
+      // Reactivar la animación para el siguiente desplazamiento
+      setTimeout(() => {
+        setIsTransitioning(true)
+        isTransitioningRef.current = false
+      }, 50)
+    } else {
+      isTransitioningRef.current = false
+    }
+  }, [heroItems.length])
+
+  // Desplazamiento hacia una diapositiva objetivo con protección y temporizador de seguridad
+  const goToTrackSlide = useCallback((targetTrackIndex: number) => {
+    if (isTransitioningRef.current) return
+    isTransitioningRef.current = true
+    setIsTransitioning(true)
+    setTrackIndex(targetTrackIndex)
+    trackIndexRef.current = targetTrackIndex
+
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current)
+    }
+    // Timeout de seguridad (la transición CSS dura 700ms; si transitionend no dispara en 800ms se desbloquea)
+    transitionTimeoutRef.current = setTimeout(() => {
+      finishTransition()
+    }, 800)
+  }, [finishTransition])
+
+  const handleNextHero = useCallback(() => {
+    if (heroItems.length <= 1 || isTransitioningRef.current) return
+    goToTrackSlide(trackIndexRef.current + 1)
+  }, [heroItems.length, goToTrackSlide])
+
+  const handlePrevHero = useCallback(() => {
+    if (heroItems.length <= 1 || isTransitioningRef.current) return
+    goToTrackSlide(trackIndexRef.current - 1)
+  }, [heroItems.length, goToTrackSlide])
+
+  const handleDotClick = useCallback((realIdx: number) => {
+    if (heroItems.length <= 1 || isTransitioningRef.current) return
+    goToTrackSlide(realIdx + 1)
+  }, [heroItems.length, goToTrackSlide])
+
+  // Evento nativo cuando concluye la animación CSS del riel
+  const handleTrackTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
+    // Filtrar eventos procedentes de elementos hijos con transiciones CSS
+    if (e.target !== e.currentTarget || e.propertyName !== 'transform') return
+    finishTransition()
   }
 
-  // Rotación automática de la Gran Vitrina Hero (fija cada 5.0s continuo en sentido inverso)
+  // Rotación automática de la Gran Vitrina cada 5 segundos continuos en dirección invertida (desplazamiento lateral inverso)
   useEffect(() => {
     if (heroItems.length <= 1) return
 
     const timer = setInterval(() => {
-      setHeroIndex((prev) => (prev === 0 ? heroItems.length - 1 : prev - 1))
-      setSelectedPhotoIndex(0)
+      goToTrackSlide(trackIndexRef.current - 1)
     }, 5000)
 
-    return () => clearInterval(timer)
-  }, [heroItems.length])
+    return () => {
+      clearInterval(timer)
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current)
+        transitionTimeoutRef.current = null
+      }
+    }
+  }, [heroItems.length, goToTrackSlide, trackIndex])
 
   // Referencias para desplazamiento horizontal de pasarelas
   const servicesScrollRef = useRef<HTMLDivElement>(null)
@@ -302,7 +383,7 @@ export default function HomeClientView({
   const productsScrollRef = useRef<HTMLDivElement>(null)
   const merchantsScrollRef = useRef<HTMLDivElement>(null)
 
-  // Hook para desplazamiento horizontal continuo fluido en bucle infinito con pausa al interactuar (en sentido inverso)
+  // Hook para desplazamiento horizontal continuo fluido en bucle infinito con pausa breve al interactuar (en sentido inverso)
   const useContinuousScroll = (
     ref: React.RefObject<HTMLDivElement | null>,
     itemCount: number,
@@ -330,7 +411,7 @@ export default function HomeClientView({
       setIsPaused(false)
     }, [])
 
-    const pauseTemporarily = useCallback((ms: number = 2500) => {
+    const pauseTemporarily = useCallback((ms: number = 700) => {
       pause()
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current)
       resumeTimerRef.current = setTimeout(() => {
@@ -341,11 +422,11 @@ export default function HomeClientView({
     useEffect(() => {
       if (itemCount <= 1) return
 
-      // Inicializar el scroll en la segunda mitad para permitir desplazamiento continuo en sentido inverso de inmediato
+      // Inicializar el scroll en el bloque intermedio (1.5 * oneBlock) para permitir desplazamiento continuo sin fin
       if (ref.current && ref.current.scrollLeft === 0) {
-        const half = ref.current.scrollWidth / 2
-        if (half > 0) {
-          ref.current.scrollLeft = half
+        const oneBlock = ref.current.scrollWidth / 4
+        if (oneBlock > 0) {
+          ref.current.scrollLeft = 1.5 * oneBlock
         }
       }
 
@@ -366,21 +447,21 @@ export default function HomeClientView({
 
         if (!isPausedRef.current) {
           const el = ref.current
-          const halfScroll = el.scrollWidth / 2
+          const oneBlock = el.scrollWidth / 4
 
-          if (halfScroll > 0) {
-            // Si llega o está en el extremo izquierdo (<= 0), reposicionar a la mitad para mantener bucle continuo
-            if (el.scrollLeft <= 0) {
-              el.scrollLeft += halfScroll
+          if (oneBlock > 0) {
+            // Reposicionar al centro si nos acercamos al extremo izquierdo (< oneBlock)
+            if (el.scrollLeft < oneBlock) {
+              el.scrollLeft += oneBlock
             }
 
             // Movimiento continuo suave en sentido contrario (disminuyendo scrollLeft)
             const px = (speed * delta) / 16.67
             el.scrollLeft -= px
 
-            // Bucle infinito continuo sin cortes perceptibles en sentido contrario
-            if (el.scrollLeft <= 0) {
-              el.scrollLeft += halfScroll
+            // Bucle infinito continuo
+            if (el.scrollLeft < oneBlock) {
+              el.scrollLeft += oneBlock
             }
           }
         }
@@ -405,7 +486,7 @@ export default function HomeClientView({
   const productsControl = useContinuousScroll(productsScrollRef, productItems.length, 0.65)
   const merchantsControl = useContinuousScroll(merchantsScrollRef, merchantShowcases.length, 0.65)
 
-  // Desplazamiento manual asistido (botones ◀ y ▶) con pausa temporal
+  // Desplazamiento manual asistido (botones ◀ y ▶) con normalización instantánea para ciclo infinito sin fin
   const scrollCarousel = (
     ref: React.RefObject<HTMLDivElement | null>,
     direction: 'left' | 'right',
@@ -415,35 +496,38 @@ export default function HomeClientView({
     const el = ref.current
     const card = el.firstElementChild as HTMLElement | null
     const cardWidth = card ? card.offsetWidth + 20 : 340
-    const halfScroll = el.scrollWidth / 2
+    const oneBlock = el.scrollWidth / 4
 
-    // Pausar temporalmente para que el usuario pueda interactuar con el resultado manual
+    // Pausa breve de 700ms solo para permitir apreciar la tarjeta sin congelar la rotación continua
     if (pauseFn) {
-      pauseFn(2500)
+      pauseFn(700)
     }
 
-    if (direction === 'right') {
-      if (halfScroll > 0 && el.scrollLeft >= halfScroll - 10) {
-        el.scrollTo({ left: Math.max(0, el.scrollLeft - halfScroll), behavior: 'instant' as ScrollBehavior })
+    if (oneBlock > 0) {
+      // Normalización previa instantánea: si nos acercamos a los límites, trasladar por un bloque idéntico
+      if (direction === 'right' && el.scrollLeft >= 2 * oneBlock) {
+        el.scrollLeft -= oneBlock
+      } else if (direction === 'left' && el.scrollLeft <= oneBlock) {
+        el.scrollLeft += oneBlock
       }
-      el.scrollBy({ left: cardWidth, behavior: 'smooth' })
-    } else {
-      if (halfScroll > 0 && el.scrollLeft <= 10) {
-        el.scrollTo({ left: el.scrollLeft + halfScroll, behavior: 'instant' as ScrollBehavior })
-      }
-      el.scrollBy({ left: -cardWidth, behavior: 'smooth' })
     }
+
+    el.scrollBy({
+      left: direction === 'right' ? cardWidth : -cardWidth,
+      behavior: 'smooth',
+    })
   }
 
   const handleLoopScroll = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (!ref.current) return
     const el = ref.current
-    const halfScroll = el.scrollWidth / 2
-    if (halfScroll > 0) {
-      if (el.scrollLeft >= halfScroll) {
-        el.scrollLeft -= halfScroll
-      } else if (el.scrollLeft <= 0) {
-        el.scrollLeft += halfScroll
+    const oneBlock = el.scrollWidth / 4
+    if (oneBlock > 0) {
+      // Mantener scrollLeft en la zona central segura sin interferir con el desplazamiento suave
+      if (el.scrollLeft >= 2.5 * oneBlock) {
+        el.scrollLeft -= oneBlock
+      } else if (el.scrollLeft <= 0.5 * oneBlock) {
+        el.scrollLeft += oneBlock
       }
     }
   }
@@ -462,9 +546,9 @@ export default function HomeClientView({
     return `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
   }
 
-  const currentHero = heroItems[heroIndex] || heroItems[0]
+  const currentHero = heroItems[activeHeroIndex] || heroItems[0]
   const currentHeroPhoto =
-    currentHero?.allImages?.[selectedPhotoIndex] || currentHero?.imageUrl || null
+    currentHero?.allImages?.[selectedPhotos[currentHero?.id] ?? 0] || currentHero?.imageUrl || null
 
   // Registro analítico de eventos de campaña en tiempo real
   const trackAdEvent = (item: ShowcaseItem, eventType: 'impression' | 'click' | 'whatsapp') => {
@@ -547,237 +631,265 @@ export default function HomeClientView({
               )}
             </div>
 
-            {/* Tarjeta de Exhibición Dinámica Split (Doble Columna) */}
-            <div className="relative rounded-3xl border border-zinc-200/80 bg-white/90 p-6 sm:p-10 shadow-xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90 transition-all duration-500">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                {/* Columna Izquierda: Datos Comerciales de la Publicación y Campaña */}
-                <div className="lg:col-span-7 space-y-4">
-                  {/* Badges de Estado y Tipo de Publicación */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {currentHero.isPaidCampaign ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-600 px-3 py-1 text-xs font-black text-white shadow-xs">
-                        <span>📢</span>
-                        <span>{t.home.sponsoredBadge}</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white shadow-xs">
-                        <span>✨</span>
-                        <span>{t.home.campaignActiveBadge}</span>
-                      </span>
-                    )}
+            {/* Tarjeta de Exhibición Dinámica Split (Doble Columna con TAMAÑO ESTÁTICO FIJO y DESPLAZAMIENTO AL COSTADO) */}
+            <div className="relative rounded-3xl border border-zinc-200/80 bg-white/90 shadow-xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/90 overflow-hidden h-[680px] sm:h-[620px] lg:h-[490px] flex flex-col justify-between">
+              {/* Viewport de deslizamiento horizontal continuo */}
+              <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+                <div
+                  className={`flex h-full w-full ${
+                    isTransitioning ? 'transition-transform duration-700 ease-in-out' : ''
+                  }`}
+                  style={{
+                    transform: heroItems.length <= 1 ? 'translateX(0%)' : `translateX(-${trackIndex * 100}%)`,
+                  }}
+                  onTransitionEnd={handleTrackTransitionEnd}
+                >
+                  {extendedHeroItems.map((item, slotIdx) => {
+                    const itemPhoto =
+                      item.allImages?.[selectedPhotos[item.id] ?? 0] || item.imageUrl || null
 
-                    <span className="rounded-md bg-zinc-100 px-2.5 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                      {currentHero.type === 'service' ? '🔧 Servicio' : '📦 Producto'}
-                    </span>
-
-                    {currentHero.city && (
-                      <span className="text-xs font-medium text-zinc-500">
-                        📍 {currentHero.city}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Titular Principal y Descripción de la Campaña */}
-                  <div>
-                    <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
-                      {currentHero.headline}
-                    </h1>
-
-                    <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed">
-                      {currentHero.description}
-                    </p>
-                  </div>
-
-                  {/* Precio Formateado y Datos de Negocio */}
-                  <div className="flex flex-wrap items-baseline gap-3 pt-1">
-                    <div className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400">
-                      {currentHero.price !== null
-                        ? `$ ${currentHero.price.toLocaleString('es-CO')} COP`
-                        : 'Cotización Personalizada'}
-                    </div>
-                    {currentHero.priceUnit && (
-                      <span className="text-sm font-bold text-zinc-500">
-                        / {currentHero.priceUnit}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Información del Comercio Vendedor */}
-                  <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3.5 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-base font-bold text-white shadow-xs">
-                      {currentHero.sellerName[0]?.toUpperCase() || 'C'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
-                          {currentHero.sellerName}
-                        </span>
-                        {currentHero.sellerVerified && (
-                          <span
-                            title="Comercio Verificado Oficialmente"
-                            className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          >
-                            ✓ Verificado
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                        <span className="text-amber-500 font-bold">★ {currentHero.sellerRating.toFixed(1)}</span>
-                        <span>•</span>
-                        <span>Rubro: {currentHero.categoryName}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Atributos Clave Configurados de la Publicación */}
-                  {currentHero.attrs && Object.keys(currentHero.attrs).length > 0 && (
-                    <div className="flex flex-wrap gap-2 text-[11px]">
-                      {currentHero.attrs.tiempo_entrega && (
-                        <span className="rounded-lg bg-blue-50 px-2.5 py-1 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
-                          ⏱️ Entrega: {currentHero.attrs.tiempo_entrega}
-                        </span>
-                      )}
-                      {currentHero.attrs.disponibilidad && (
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          ✅ {currentHero.attrs.disponibilidad}
-                        </span>
-                      )}
-                      {currentHero.attrs.modalidad && (
-                        <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                          📍 Modalidad: {currentHero.attrs.modalidad}
-                        </span>
-                      )}
-                      {currentHero.attrs.garantia && (
-                        <span className="rounded-lg bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                          🛡️ Garantía: {currentHero.attrs.garantia}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Botones de Acción Inmediata (WhatsApp y Detalle) */}
-                  <div className="flex flex-wrap items-center gap-3 pt-3">
-                    {currentHero.sellerWhatsapp ? (
-                      <a
-                        href={getWhatsappUrl(
-                          currentHero.sellerWhatsapp,
-                          currentHero.sellerName,
-                          currentHero.title
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => trackAdEvent(currentHero, 'whatsapp')}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    return (
+                      <div
+                        key={`${item.id}-${slotIdx}`}
+                        className="w-full h-full shrink-0 p-5 sm:p-7 lg:p-8 flex flex-col justify-between select-none"
                       >
-                        <span className="text-base">💬</span>
-                        <span>{t.home.contactWhatsappDirect}</span>
-                      </a>
-                    ) : (
-                      <Link
-                        href={`/catalogo/${currentHero.listingId}`}
-                        onClick={() => trackAdEvent(currentHero, 'click')}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-colors"
-                      >
-                        <span>🛍️</span>
-                        <span>{t.home.viewProductDetails}</span>
-                      </Link>
-                    )}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center flex-1 min-h-0">
+                          {/* Columna Izquierda: Datos Comerciales de la Publicación y Campaña */}
+                          <div className="lg:col-span-7 flex flex-col justify-between h-full space-y-2.5 sm:space-y-3 min-w-0 py-1">
+                            {/* Badges de Estado y Tipo de Publicación */}
+                            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                              {item.isPaidCampaign ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-600 px-3 py-1 text-xs font-black text-white shadow-xs">
+                                  <span>📢</span>
+                                  <span>{t.home.sponsoredBadge}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white shadow-xs">
+                                  <span>✨</span>
+                                  <span>{t.home.campaignActiveBadge}</span>
+                                </span>
+                              )}
 
-                    <Link
-                      href={`/catalogo/${currentHero.listingId}`}
-                      onClick={() => trackAdEvent(currentHero, 'click')}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                    >
-                      <span>{t.home.viewProductDetails}</span>
-                      <span>↗</span>
-                    </Link>
+                              <span className="rounded-md bg-zinc-100 px-2.5 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                {item.type === 'service' ? '🔧 Servicio' : '📦 Producto'}
+                              </span>
 
-                    <Link
-                      href={`/catalogo?seller=${currentHero.sellerId}`}
-                      className="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:underline"
-                    >
-                      Ver más ofertas del vendedor →
-                    </Link>
-                  </div>
-                </div>
+                              {item.city && (
+                                <span className="text-xs font-medium text-zinc-500">
+                                  📍 {item.city}
+                                </span>
+                              )}
+                            </div>
 
-                {/* Columna Derecha: Imagen Principal con Miniaturas */}
-                <div className="lg:col-span-5 flex flex-col items-center">
-                  <div className="relative w-full aspect-4/3 max-w-md overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-xl border border-zinc-200/80 dark:border-zinc-700/80 group flex items-center justify-center">
-                    {currentHeroPhoto ? (
-                      <img
-                        src={currentHeroPhoto}
-                        alt={currentHero.title}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center p-8 text-center select-none text-zinc-400">
-                        <span className="text-7xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110">
-                          {currentHero.type === 'service' ? '🛠️' : currentHero.type === 'article' ? '📦' : '🛍️'}
-                        </span>
-                        {currentHero.categoryName && (
-                          <span className="mt-3 text-xs font-bold text-zinc-500 dark:text-zinc-400">
-                            {currentHero.categoryName}
-                          </span>
-                        )}
+                            {/* Titular Principal y Descripción de la Campaña */}
+                            <div className="min-w-0">
+                              <h1
+                                className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 break-words [overflow-wrap:anywhere]"
+                                title={item.headline}
+                              >
+                                {item.headline}
+                              </h1>
+
+                              <p className="mt-1.5 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">
+                                {item.description}
+                              </p>
+                            </div>
+
+                            {/* Precio Formateado y Datos de Negocio */}
+                            <div className="flex flex-wrap items-baseline gap-2 shrink-0">
+                              <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                                {item.price !== null
+                                  ? `$ ${item.price.toLocaleString('es-CO')} COP`
+                                  : 'Cotización Personalizada'}
+                              </div>
+                              {item.priceUnit && (
+                                <span className="text-xs font-bold text-zinc-500">
+                                  / {item.priceUnit}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Información del Comercio Vendedor */}
+                            <div className="flex items-center gap-2.5 rounded-xl bg-zinc-50 p-2.5 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 shrink-0">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-600 text-sm font-bold text-white shadow-xs">
+                                {item.sellerName[0]?.toUpperCase() || 'C'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                                    {item.sellerName}
+                                  </span>
+                                  {item.sellerVerified && (
+                                    <span
+                                      title="Comercio Verificado Oficialmente"
+                                      className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    >
+                                      ✓ Verificado
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                                  <span className="text-amber-500 font-bold">★ {item.sellerRating.toFixed(1)}</span>
+                                  <span>•</span>
+                                  <span>Rubro: {item.categoryName}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Atributos Clave Configurados de la Publicación */}
+                            <div className="h-7 flex flex-wrap items-center gap-1.5 text-[10px] overflow-hidden shrink-0">
+                              {item.attrs?.tiempo_entrega && (
+                                <span className="rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                  ⏱️ {item.attrs.tiempo_entrega}
+                                </span>
+                              )}
+                              {item.attrs?.disponibilidad && (
+                                <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                  ✅ {item.attrs.disponibilidad}
+                                </span>
+                              )}
+                              {item.attrs?.modalidad && (
+                                <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                  📍 {item.attrs.modalidad}
+                                </span>
+                              )}
+                              {item.attrs?.garantia && (
+                                <span className="rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                                  🛡️ {item.attrs.garantia}
+                                </span>
+                              )}
+                              {(!item.attrs || Object.keys(item.attrs).length === 0) && (
+                                <span className="rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                                  ⭐ Garantía y soporte directo del comercio
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Botones de Acción Inmediata (WhatsApp y Detalle) */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1 shrink-0">
+                              {item.sellerWhatsapp ? (
+                                <a
+                                  href={getWhatsappUrl(
+                                    item.sellerWhatsapp,
+                                    item.sellerName,
+                                    item.title
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => trackAdEvent(item, 'whatsapp')}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                  <span className="text-sm">💬</span>
+                                  <span>{t.home.contactWhatsappDirect}</span>
+                                </a>
+                              ) : (
+                                <Link
+                                  href={`/catalogo/${item.listingId}`}
+                                  onClick={() => trackAdEvent(item, 'click')}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-colors"
+                                >
+                                  <span>🛍️</span>
+                                  <span>{t.home.viewProductDetails}</span>
+                                </Link>
+                              )}
+
+                              <Link
+                                href={`/catalogo/${item.listingId}`}
+                                onClick={() => trackAdEvent(item, 'click')}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                              >
+                                <span>{t.home.viewProductDetails}</span>
+                                <span>↗</span>
+                              </Link>
+
+                              <Link
+                                href={`/catalogo?seller=${item.sellerId}`}
+                                className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:underline"
+                              >
+                                Más ofertas →
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Columna Derecha: Imagen Principal con Miniaturas */}
+                          <div className="lg:col-span-5 flex flex-col items-center justify-center h-full min-w-0">
+                            <div className="relative w-full aspect-4/3 max-w-sm max-h-[250px] sm:max-h-[270px] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-lg border border-zinc-200/80 dark:border-zinc-700/80 group flex items-center justify-center">
+                              {itemPhoto ? (
+                                <img
+                                  src={itemPhoto}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center p-6 text-center select-none text-zinc-400">
+                                  <span className="text-6xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110">
+                                    {item.type === 'service' ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
+                                  </span>
+                                  {item.categoryName && (
+                                    <span className="mt-2 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                                      {item.categoryName}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Top Badges coincidentes con el explorador de catálogo */}
+                              <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                                <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
+                                  {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
+                                </span>
+                                {item.isPaidCampaign && (
+                                  <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                                    📢 Patrocinado
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Badge Flotante de Precio */}
+                              <div className="absolute bottom-2.5 left-2.5 rounded-lg bg-black/75 px-2.5 py-1 text-xs font-black text-white backdrop-blur-md">
+                                {item.price !== null
+                                  ? `$ ${item.price.toLocaleString('es-CO')}`
+                                  : 'Cotización'}
+                              </div>
+                            </div>
+
+                            {/* Fila de Miniaturas si la publicación tiene múltiples fotos */}
+                            <div className="h-12 flex items-center justify-center gap-1.5 max-w-sm overflow-x-auto mt-2">
+                              {item.allImages && item.allImages.length > 1 && (
+                                item.allImages.slice(0, 5).map((img, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setSelectedPhotos((prev) => ({ ...prev, [item.id]: idx }))}
+                                    className={`h-10 w-10 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
+                                      (selectedPhotos[item.id] ?? 0) === idx
+                                        ? 'border-purple-600 scale-105 shadow-md'
+                                        : 'border-zinc-200 opacity-70 hover:opacity-100 dark:border-zinc-700'
+                                    }`}
+                                  >
+                                    <img src={img} alt="Miniatura" className="h-full w-full object-cover" />
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-
-                    {/* Top Badges coincidentes con el explorador de catálogo */}
-                    <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                      <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[11px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
-                        {currentHero.type === 'service' ? '🛠️ Servicio' : currentHero.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
-                      </span>
-                      {currentHero.isPaidCampaign && (
-                        <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
-                          📢 Patrocinado
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Badge Flotante de Precio */}
-                    <div className="absolute bottom-3 left-3 rounded-xl bg-black/75 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">
-                      {currentHero.price !== null
-                        ? `$ ${currentHero.price.toLocaleString('es-CO')}`
-                        : 'Cotización'}
-                    </div>
-                  </div>
-
-                  {/* Fila de Miniaturas si la publicación tiene múltiples fotos */}
-                  {currentHero.allImages && currentHero.allImages.length > 1 && (
-                    <div className="mt-3 flex items-center justify-center gap-2 max-w-md overflow-x-auto p-1">
-                      {currentHero.allImages.slice(0, 5).map((img, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedPhotoIndex(idx)}
-                          className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
-                            selectedPhotoIndex === idx
-                              ? 'border-purple-600 scale-105 shadow-md'
-                              : 'border-zinc-200 opacity-70 hover:opacity-100 dark:border-zinc-700'
-                          }`}
-                        >
-                          <img src={img} alt="Miniatura" className="h-full w-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    )
+                  })}
                 </div>
               </div>
 
               {/* Indicadores Circulares de Diapositiva (Dots) */}
               {heroItems.length > 1 && (
-                <div className="mt-6 flex items-center justify-center gap-2">
+                <div className="pb-3 pt-1 flex items-center justify-center gap-2 shrink-0 bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xs">
                   {heroItems.map((_, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => {
-                        setHeroIndex(idx)
-                        setSelectedPhotoIndex(0)
-                      }}
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        heroIndex === idx
+                      onClick={() => handleDotClick(idx)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        activeHeroIndex === idx
                           ? 'w-8 bg-purple-600 dark:bg-purple-500'
                           : 'w-2 bg-zinc-300 hover:bg-zinc-400 dark:bg-zinc-700'
                       }`}
@@ -851,7 +963,7 @@ export default function HomeClientView({
             onMouseEnter={servicesControl.pause}
             onMouseLeave={servicesControl.resume}
             onTouchStart={servicesControl.pause}
-            onTouchEnd={() => servicesControl.pauseTemporarily(2500)}
+            onTouchEnd={() => servicesControl.pauseTemporarily(700)}
             className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
@@ -1044,7 +1156,7 @@ export default function HomeClientView({
             onMouseEnter={articlesControl.pause}
             onMouseLeave={articlesControl.resume}
             onTouchStart={articlesControl.pause}
-            onTouchEnd={() => articlesControl.pauseTemporarily(2500)}
+            onTouchEnd={() => articlesControl.pauseTemporarily(700)}
             className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
@@ -1234,7 +1346,7 @@ export default function HomeClientView({
             onMouseEnter={productsControl.pause}
             onMouseLeave={productsControl.resume}
             onTouchStart={productsControl.pause}
-            onTouchEnd={() => productsControl.pauseTemporarily(2500)}
+            onTouchEnd={() => productsControl.pauseTemporarily(700)}
             className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
@@ -1422,7 +1534,7 @@ export default function HomeClientView({
             onMouseEnter={merchantsControl.pause}
             onMouseLeave={merchantsControl.resume}
             onTouchStart={merchantsControl.pause}
-            onTouchEnd={() => merchantsControl.pauseTemporarily(2500)}
+            onTouchEnd={() => merchantsControl.pauseTemporarily(700)}
             className="flex gap-5 overflow-x-auto pb-4 pt-1 no-scrollbar select-none"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >

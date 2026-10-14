@@ -24,5 +24,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 2. **Zona Central Limpia (Prohibido enlaces de navegación en el centro)**:
    - **NO DEJAR NINGÚN ENLACE NI BARRA DE NAVEGACIÓN EN LA PARTE CENTRAL DE LA PUBLICACIÓN O DE LA PÁGINA**.
    - El centro de la pantalla está reservado exclusivamente para el contenido (feed, tarjetas de productos, ficha técnica del anuncio, botón de WhatsApp, formularios).
-3. **Consulta de referencia**:
+3. **Tamaño Estático Invariable de la Gran Vitrina Principal (Hero Runway)**:
+   - El recuadro de la Gran Vitrina en el Inicio (`/`) DEBE mantener dimensiones y altura **estáticas y fijas**.
+   - Bajo ninguna circunstancia debe cambiar de tamaño, brincar o deformarse con el movimiento o rotación del contenido interior, evitando cualquier desplazamiento en la ventana.
+   - Los textos interiores (títulos con límite estricto de 2 líneas, descripciones acotadas y botones) deben ajustarse con coherencia para habitar el recuadro fijo sin alterar su altura.
+4. **Consulta de referencia**:
    - Ver detalles adicionales en `DESIGN_RULES.md`.

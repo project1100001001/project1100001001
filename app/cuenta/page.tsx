@@ -62,6 +62,8 @@ export default async function CuentaPage() {
         adAccount = accData[0] as AdAccount
       }
     }
+  }
+
   // 5. Obtener compras realizadas por el usuario comprador (public.sale)
   let purchases: Sale[] = []
   try {
