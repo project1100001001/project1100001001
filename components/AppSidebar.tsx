@@ -10,6 +10,7 @@ import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import { useSidebar } from './SidebarContext'
 import { hasPermission } from '@/lib/permissions'
+import TestProfilesModal from './TestProfilesModal'
 
 interface SidebarNavContentProps {
   pathname: string
@@ -607,6 +608,7 @@ export default function AppSidebar() {
   const [role, setRole] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
+  const [showProfilesModal, setShowProfilesModal] = useState(false)
 
   const supabase = createClient()
 
@@ -788,6 +790,15 @@ export default function AppSidebar() {
 
               <button
                 type="button"
+                onClick={() => setShowProfilesModal(true)}
+                className="rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-purple-950/50 dark:hover:text-purple-300 transition-colors cursor-pointer"
+                title="Cambiar perfil de prueba (40 perfiles)"
+              >
+                👥
+              </button>
+
+              <button
+                type="button"
                 onClick={handleSignOut}
                 className="rounded-lg bg-zinc-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-red-50 hover:text-red-700 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-red-950/50 dark:hover:text-red-300 transition-colors cursor-pointer"
                 title={t.nav.signOut}
@@ -797,14 +808,41 @@ export default function AppSidebar() {
             </div>
           </div>
         ) : (
-          <Link
-            href="/login"
-            onClick={close}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
-          >
-            <span>🔐</span>
-            <span>{t.nav.signIn}</span>
-          </Link>
+          <div className="space-y-1.5">
+            <Link
+              href="/login"
+              onClick={close}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+            >
+              <span>🔐</span>
+              <span>{t.nav.signIn}</span>
+            </Link>
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signInWithPassword({
+                  email: 'admin@marketplace.com',
+                  password: 'Password123!',
+                })
+                close()
+                window.location.reload()
+              }}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 transition-colors cursor-pointer"
+              title="Acceso directo rápido como Administrador Maestro"
+            >
+              <span>🛡️</span>
+              <span>Acceso Rápido Admin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowProfilesModal(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              title="Escoger entre los 40 perfiles de prueba"
+            >
+              <span>👥</span>
+              <span>Perfiles de Prueba (40)</span>
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -852,6 +890,8 @@ export default function AppSidebar() {
       >
         {sidebarContent}
       </aside>
+
+      <TestProfilesModal isOpen={showProfilesModal} onClose={() => setShowProfilesModal(false)} />
     </>
   )
 }

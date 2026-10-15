@@ -6,6 +6,15 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
 
+import {
+  ADMIN_PROFILE,
+  BUYER_PROFILES,
+  SERVICE_SELLER_PROFILES,
+  USED_SELLER_PROFILES,
+  NEW_SELLER_PROFILES,
+  TestProfile,
+} from '@/lib/testProfiles'
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -19,61 +28,9 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [testTab, setTestTab] = useState<'buyer' | 'service' | 'used' | 'new'>('buyer')
 
   const supabase = createClient()
-
-  const testUsers = [
-    {
-      role: 'buyer',
-      title: t.auth.buyerRole,
-      badge: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-      icon: '🛒',
-      email: 'comprador@marketplace.com',
-      password: 'Password123!',
-      subtitle: 'Carlos Comprador',
-      desc: locale === 'en' ? 'Buyer role: browse catalog and contact sellers' : 'Rol comprador: explora catálogo y contacta vendedores',
-    },
-    {
-      role: 'seller',
-      title: `${t.auth.sellerRole} 1`,
-      badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-      icon: '🥖',
-      email: 'vendedor@marketplace.com',
-      password: 'Password123!',
-      subtitle: 'Panadería & Café El Alba',
-      desc: locale === 'en' ? 'Seller: Panadería & Café El Alba (Medellín)' : 'Vendedor: Panadería & Café El Alba (Medellín)',
-    },
-    {
-      role: 'seller2',
-      title: `${t.auth.sellerRole} 2`,
-      badge: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-      icon: '🔧',
-      email: 'vendedor2@marketplace.com',
-      password: 'Password123!',
-      subtitle: 'Taller Moto & Auto Express',
-      desc: locale === 'en' ? 'Seller: Taller Moto & Auto Express (Bogotá)' : 'Vendedor: Taller Moto & Auto Express (Bogotá)',
-    },
-    {
-      role: 'seller3',
-      title: `${t.auth.sellerRole} 3`,
-      badge: 'bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-300',
-      icon: '👗',
-      email: 'vendedor3@marketplace.com',
-      password: 'Password123!',
-      subtitle: 'Boutique & Modas Elegancia',
-      desc: locale === 'en' ? 'Seller: Boutique & Modas Elegancia (Cali)' : 'Vendedor: Boutique & Modas Elegancia (Cali)',
-    },
-    {
-      role: 'admin',
-      title: t.auth.adminRole,
-      badge: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
-      icon: '🛡️',
-      email: 'admin@marketplace.com',
-      password: 'Password123!',
-      subtitle: 'Admin Marketplace',
-      desc: locale === 'en' ? 'Admin role: full permissions and moderation' : 'Rol admin: moderación y control total',
-    },
-  ]
 
   const executeLogin = async (targetEmail: string, targetPass: string) => {
     setLoading(true)
@@ -179,38 +136,120 @@ function LoginForm() {
       </div>
 
       {/* Panel de usuarios de prueba (1-clic) */}
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+      <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/40 dark:bg-purple-950/20 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
             <span>⚡</span>
-            <span>{locale === 'en' ? 'Quick test logins (1-click)' : 'Accesos rápidos de prueba (1-clic)'}</span>
+            <span>{locale === 'en' ? 'Quick Test Logins (1-Click)' : 'Accesos Rápidos de Prueba (1-Clic)'}</span>
           </span>
           <span className="text-[11px] text-zinc-500 font-mono">Password123!</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {testUsers.map((user) => (
+        {/* Botón de acceso directo para Administrador */}
+        <div className="flex items-center justify-between p-2.5 rounded-xl border border-purple-300 bg-white dark:border-purple-800 dark:bg-zinc-800 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-base">🛡️</span>
+            <div>
+              <div className="text-xs font-black text-purple-900 dark:text-purple-200">
+                {ADMIN_PROFILE.name}
+              </div>
+              <div className="text-[10px] text-zinc-500 font-mono">
+                {ADMIN_PROFILE.email}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleQuickLogin(ADMIN_PROFILE.email, ADMIN_PROFILE.password)}
+            className="rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-purple-500 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {locale === 'en' ? 'Log in as Admin' : 'Ingresar como Admin'}
+          </button>
+        </div>
+
+        {/* Pestañas para los demás perfiles */}
+        <div className="flex border-b border-purple-200 dark:border-purple-900/50 gap-1 overflow-x-auto no-scrollbar pt-1">
+          <button
+            type="button"
+            onClick={() => setTestTab('buyer')}
+            className={`px-3 py-1.5 rounded-t-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+              testTab === 'buyer'
+                ? 'bg-white text-blue-700 dark:bg-zinc-800 dark:text-blue-300 border-t border-x border-purple-200 dark:border-purple-800'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+            }`}
+          >
+            <span>🛒</span>
+            <span>Compradores (10)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTestTab('service')}
+            className={`px-3 py-1.5 rounded-t-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+              testTab === 'service'
+                ? 'bg-white text-emerald-700 dark:bg-zinc-800 dark:text-emerald-300 border-t border-x border-purple-200 dark:border-purple-800'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+            }`}
+          >
+            <span>🛠️</span>
+            <span>Servicios (10)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTestTab('used')}
+            className={`px-3 py-1.5 rounded-t-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+              testTab === 'used'
+                ? 'bg-white text-amber-700 dark:bg-zinc-800 dark:text-amber-300 border-t border-x border-purple-200 dark:border-purple-800'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+            }`}
+          >
+            <span>📦</span>
+            <span>Usados (10)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTestTab('new')}
+            className={`px-3 py-1.5 rounded-t-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+              testTab === 'new'
+                ? 'bg-white text-purple-700 dark:bg-zinc-800 dark:text-purple-300 border-t border-x border-purple-200 dark:border-purple-800'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+            }`}
+          >
+            <span>🛍️</span>
+            <span>Nuevos (10)</span>
+          </button>
+        </div>
+
+        {/* Lista de perfiles de la pestaña activa */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
+          {(testTab === 'buyer'
+            ? BUYER_PROFILES
+            : testTab === 'service'
+            ? SERVICE_SELLER_PROFILES
+            : testTab === 'used'
+            ? USED_SELLER_PROFILES
+            : NEW_SELLER_PROFILES
+          ).map((u) => (
             <button
-              key={user.email}
+              key={u.email}
               type="button"
               disabled={loading}
-              onClick={() => handleQuickLogin(user.email, user.password)}
-              className="flex flex-col items-start p-2.5 rounded-lg border border-zinc-200 bg-white hover:border-emerald-500 hover:shadow-xs transition-all text-left dark:border-zinc-700 dark:bg-zinc-800 disabled:opacity-50"
+              onClick={() => handleQuickLogin(u.email, u.password)}
+              className="flex items-center justify-between p-2 rounded-xl border border-zinc-200 bg-white hover:border-emerald-500 hover:shadow-2xs transition-all text-left dark:border-zinc-700 dark:bg-zinc-800 disabled:opacity-50 cursor-pointer"
             >
-              <div className="flex items-center gap-1.5 w-full">
-                <span className="text-sm">{user.icon}</span>
-                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                  {user.title}
-                </span>
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="text-sm shrink-0">{u.icon}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                    {u.businessName || u.name}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
+                    {u.city} • {u.email}
+                  </div>
+                </div>
               </div>
-              <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate w-full mt-0.5">
-                {user.subtitle}
-              </span>
-              <span className="text-[9px] text-zinc-400 font-mono truncate w-full" title={user.email}>
-                {user.email}
-              </span>
-              <span className="mt-1 inline-block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                {locale === 'en' ? 'Log in →' : 'Entrar →'}
+              <span className="shrink-0 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 pl-1">
+                Entrar →
               </span>
             </button>
           ))}
