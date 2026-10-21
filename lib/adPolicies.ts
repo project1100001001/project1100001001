@@ -305,3 +305,123 @@ export function buildInitialFreeAdAttrs(existingAttrs: Record<string, any> = {})
     ad_policy: '7_days_free_initial',
   }
 }
+
+/**
+ * Claves internas exclusivas del vendedor / administración publicitaria que NUNCA
+ * deben mostrarse a compradores sin registro ni a perfiles de comprador.
+ */
+export const INTERNAL_LISTING_ATTR_KEYS = new Set([
+  'free_trial_days',
+  'free_ad_starts_at',
+  'free_ad_ends_at',
+  'ad_policy',
+  'ad_placement',
+  'price_history',
+  'campaign_id',
+  'campaign_plan',
+  'internal_notes',
+  'moderation_notes',
+])
+
+const PUBLIC_ATTR_LABELS_ES: Record<string, string> = {
+  condition: 'Condición / Estado',
+  condicion: 'Condición / Estado',
+  delivery_method: 'Método de Entrega',
+  metodo_entrega: 'Método de Entrega',
+  modality: 'Modalidad de Atención',
+  modalidad: 'Modalidad de Atención',
+  lead_time: 'Tiempo de Respuesta / Entrega',
+  tiempo_entrega: 'Tiempo de Respuesta / Entrega',
+  disponibilidad: 'Disponibilidad',
+  duracion: 'Duración Estimada',
+  tiempo_estimado: 'Duración Estimada',
+  capacidad_diaria: 'Capacidad de Atención (Cupos/día)',
+  notas_servicio: 'Condiciones e Instrucciones para el Cliente',
+  garantia: 'Garantía',
+  warranty: 'Garantía',
+  marca: 'Marca',
+  brand: 'Marca',
+  modelo: 'Modelo',
+  model: 'Modelo',
+}
+
+const PUBLIC_ATTR_LABELS_EN: Record<string, string> = {
+  condition: 'Condition',
+  condicion: 'Condition',
+  delivery_method: 'Delivery Method',
+  metodo_entrega: 'Delivery Method',
+  modality: 'Service Modality',
+  modalidad: 'Service Modality',
+  lead_time: 'Response / Delivery Time',
+  tiempo_entrega: 'Response / Delivery Time',
+  disponibilidad: 'Availability',
+  duracion: 'Estimated Duration',
+  tiempo_estimado: 'Estimated Duration',
+  capacidad_diaria: 'Daily Capacity (Slots/day)',
+  notas_servicio: 'Client Instructions & Terms',
+  garantia: 'Warranty',
+  warranty: 'Warranty',
+  marca: 'Brand',
+  brand: 'Brand',
+  modelo: 'Model',
+  model: 'Model',
+}
+
+/**
+ * Filtra y formatea únicamente los atributos públicos pensados para el comprador,
+ * excluyendo tiempos de publicidad, políticas de anuncios e historiales internos del vendedor.
+ */
+export function getPublicListingSpecs(
+  attrs: Record<string, any> | null | undefined,
+  locale: string = 'es'
+): Array<{ key: string; label: string; value: string }> {
+  if (!attrs || typeof attrs !== 'object') return []
+
+  const labelMap = locale === 'en' ? PUBLIC_ATTR_LABELS_EN : PUBLIC_ATTR_LABELS_ES
+  const seenLabels = new Set<string>()
+  const result: Array<{ key: string; label: string; value: string }> = []
+
+  for (const [rawKey, rawVal] of Object.entries(attrs)) {
+    const normalizedKey = rawKey.trim().toLowerCase()
+
+    // Excluir metadatos internos o de tiempo de publicidad exclusivos del vendedor
+    if (
+      INTERNAL_LISTING_ATTR_KEYS.has(normalizedKey) ||
+      normalizedKey.startsWith('free_') ||
+      normalizedKey.startsWith('ad_') ||
+      normalizedKey.startsWith('internal_')
+    ) {
+      continue
+    }
+
+    // Excluir valores nulos, vacíos u objetos complejos internos (como arrays de historial)
+    if (
+      rawVal === null ||
+      rawVal === undefined ||
+      rawVal === '' ||
+      typeof rawVal === 'object'
+    ) {
+      continue
+    }
+
+    const label =
+      labelMap[normalizedKey] ||
+      rawKey
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (l) => l.toUpperCase())
+
+    // Evitar duplicados cuando existen claves sinónimas (ej. duracion y tiempo_estimado con el mismo valor)
+    const dedupKey = `${label.toLowerCase()}::${String(rawVal).trim().toLowerCase()}`
+    if (seenLabels.has(dedupKey)) continue
+    seenLabels.add(dedupKey)
+
+    result.push({
+      key: rawKey,
+      label,
+      value: String(rawVal),
+    })
+  }
+
+  return result
+}
+

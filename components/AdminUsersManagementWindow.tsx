@@ -85,6 +85,11 @@ export default function AdminUsersManagementWindow({
   const [searchQuery, setSearchQuery] = useState('')
   const [showPermissionsMatrix, setShowPermissionsMatrix] = useState(false)
 
+  // Modo de vista y cantidad de ítems a cargar inicialmente (mínimo 10 por defecto)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10)
+  const [visibleLimit, setVisibleLimit] = useState<number>(10)
+
   // Mapa de registros de moderación por usuario (persistido en Supabase ad_slot + seller + localStorage)
   const [moderationMap, setModerationMap] = useState<Record<string, UserModerationRecord>>({})
   const [processingActionUserId, setProcessingActionUserId] = useState<string | null>(null)
@@ -561,6 +566,11 @@ export default function AdminUsersManagementWindow({
     })
   }, [users, roleFilter, statusFilter, searchQuery, moderationMap])
 
+  const visibleUsers = useMemo(() => {
+    if (visibleLimit >= 9999) return filteredUsers
+    return filteredUsers.slice(0, visibleLimit)
+  }, [filteredUsers, visibleLimit])
+
   const renderStatusBadge = (mod: UserModerationRecord) => {
     if (mod.status === 'blocked') {
       return (
@@ -834,249 +844,332 @@ export default function AdminUsersManagementWindow({
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-              <thead className="border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50">
-                <tr>
-                  <th className="py-3.5 px-4 font-semibold">Usuario / Contacto</th>
-                  <th className="py-3.5 px-4 font-semibold">Estado de Cuenta</th>
-                  <th className="py-3.5 px-4 font-semibold">Comercio & Anuncios</th>
-                  <th className="py-3.5 px-4 font-semibold">Rol Asignado</th>
-                  <th className="py-3.5 px-4 font-semibold text-right">
-                    Acciones de Moderación (Suspender / Bloquear / Administrar)
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {filteredUsers.map((u) => {
-                  const isUpdatingRole = updatingUserId === u.id
-                  const isProcessingMod = processingActionUserId === u.id
-                  const initials = (u.full_name || 'U').slice(0, 2).toUpperCase()
-                  const sellerInfo = getSellerInfo(u)
-                  const mod = getUserModeration(u)
+        <div className="space-y-4">
+          {/* Barra de cantidad de ítems a cargar al lado del cambio de modo a lista */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              Mostrando <strong className="text-zinc-900 dark:text-zinc-100">{visibleUsers.length}</strong> de <strong className="text-zinc-900 dark:text-zinc-100">{filteredUsers.length}</strong> usuarios
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-1 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                  Cargar:
+                </span>
+                <select
+                  aria-label="Cantidad de usuarios a cargar"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const next = Number(e.target.value)
+                    setItemsPerPage(next)
+                    setVisibleLimit(next)
+                  }}
+                  className="bg-transparent text-xs font-extrabold text-zinc-800 focus:outline-none dark:text-zinc-100 cursor-pointer"
+                >
+                  <option value={10}>10 ítems (Mín.)</option>
+                  <option value={15}>15 ítems</option>
+                  <option value={20}>20 ítems</option>
+                  <option value={30}>30 ítems</option>
+                  <option value={50}>50 ítems</option>
+                  <option value={9999}>Todos ({filteredUsers.length})</option>
+                </select>
+              </div>
 
-                  const sellerListings = sellerInfo
-                    ? listings.filter((l) => l.seller_id === sellerInfo.id)
-                    : []
-                  const publishedCount = sellerListings.filter(
-                    (l) => l.status === 'published'
-                  ).length
-                  const pausedCount = sellerListings.filter((l) => l.status === 'paused').length
+              <div className="inline-flex items-center rounded-xl border border-zinc-200 bg-white p-1 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <span>☰</span>
+                  <span>Lista</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <span>⊞</span>
+                  <span>Cuadrícula</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  return (
-                    <tr
-                      key={u.id}
-                      className={`transition-colors ${
-                        mod.status === 'blocked'
-                          ? 'bg-red-50/30 dark:bg-red-950/10'
-                          : mod.status === 'suspended'
-                          ? 'bg-amber-50/30 dark:bg-amber-950/10'
-                          : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
-                      }`}
-                    >
-                      {/* Columna 1: Usuario y Ciudad */}
-                      <td className="py-4 px-4 font-medium text-zinc-900 dark:text-zinc-100">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-xs ${
-                              mod.status === 'blocked'
-                                ? 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200'
-                                : mod.status === 'suspended'
-                                ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
-                                : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                            }`}
-                          >
-                            {initials}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="font-bold truncate text-xs flex items-center gap-1.5">
-                              <span>{u.full_name || 'Usuario sin nombre'}</span>
-                            </div>
-                            <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-0.5">
-                              <span>📍 {u.city || sellerInfo?.city || 'Sin ciudad'}</span>
-                              {(u.phone || sellerInfo?.whatsapp) && (
-                                <span>• 📞 {u.phone || sellerInfo?.whatsapp}</span>
-                              )}
-                            </div>
-                            <div
-                              className="text-[10px] text-zinc-400 font-mono truncate"
-                              title={u.id}
+          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
+                <thead className="border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50">
+                  <tr>
+                    <th className="py-3.5 px-4 font-semibold">Usuario / Contacto</th>
+                    <th className="py-3.5 px-4 font-semibold">Estado de Cuenta</th>
+                    <th className="py-3.5 px-4 font-semibold">Comercio & Anuncios</th>
+                    <th className="py-3.5 px-4 font-semibold">Rol Asignado</th>
+                    <th className="py-3.5 px-4 font-semibold text-right">
+                      Acciones de Moderación (Suspender / Bloquear / Administrar)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {visibleUsers.map((u) => {
+                    const isUpdatingRole = updatingUserId === u.id
+                    const isProcessingMod = processingActionUserId === u.id
+                    const initials = (u.full_name || 'U').slice(0, 2).toUpperCase()
+                    const sellerInfo = getSellerInfo(u)
+                    const mod = getUserModeration(u)
+
+                    const sellerListings = sellerInfo
+                      ? listings.filter((l) => l.seller_id === sellerInfo.id)
+                      : []
+                    const publishedCount = sellerListings.filter(
+                      (l) => l.status === 'published'
+                    ).length
+                    const pausedCount = sellerListings.filter((l) => l.status === 'paused').length
+
+                    return (
+                      <tr
+                        key={u.id}
+                        className={`transition-colors ${
+                          mod.status === 'blocked'
+                            ? 'bg-red-50/30 dark:bg-red-950/10'
+                            : mod.status === 'suspended'
+                            ? 'bg-amber-50/30 dark:bg-amber-950/10'
+                            : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
+                        }`}
+                      >
+                        {/* Columna 1: Usuario y Ciudad */}
+                        <td className="py-4 px-4 font-medium text-zinc-900 dark:text-zinc-100">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-xs ${
+                                mod.status === 'blocked'
+                                  ? 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200'
+                                  : mod.status === 'suspended'
+                                  ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
+                                  : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                              }`}
                             >
-                              ID: {u.id.slice(0, 8)}...
+                              {initials}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-bold truncate text-xs flex items-center gap-1.5">
+                                <span>{u.full_name || 'Usuario sin nombre'}</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-0.5">
+                                <span>📍 {u.city || sellerInfo?.city || 'Sin ciudad'}</span>
+                                {(u.phone || sellerInfo?.whatsapp) && (
+                                  <span>• 📞 {u.phone || sellerInfo?.whatsapp}</span>
+                                )}
+                              </div>
+                              <div
+                                className="text-[10px] text-zinc-400 font-mono truncate"
+                                title={u.id}
+                              >
+                                ID: {u.id.slice(0, 8)}...
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Columna 2: Estado de Cuenta y Restricciones */}
-                      <td className="py-4 px-4">
-                        <div className="space-y-1">
-                          {renderStatusBadge(mod)}
-                          {mod.reason && mod.status !== 'active' && (
-                            <p
-                              className="text-[10px] text-zinc-500 dark:text-zinc-400 max-w-48 line-clamp-2"
-                              title={mod.reason}
-                            >
-                              Motivo: {mod.reason}
-                            </p>
-                          )}
-                          {(!mod.canPublishListings || !mod.canCreateCampaigns) && (
-                            <div className="flex flex-wrap gap-1 pt-0.5">
-                              {!mod.canPublishListings && (
-                                <span className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
-                                  Sin publicar
-                                </span>
-                              )}
-                              {!mod.canCreateCampaigns && (
-                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-                                  Sin campañas
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Columna 3: Comercio Vinculado y Publicaciones */}
-                      <td className="py-4 px-4 text-xs">
-                        {sellerInfo ? (
+                        {/* Columna 2: Estado de Cuenta y Restricciones */}
+                        <td className="py-4 px-4">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-44">
-                                {sellerInfo.business_name}
-                              </span>
+                            {renderStatusBadge(mod)}
+                            {mod.reason && mod.status !== 'active' && (
+                              <p
+                                className="text-[10px] text-zinc-500 dark:text-zinc-400 max-w-48 line-clamp-2"
+                                title={mod.reason}
+                              >
+                                Motivo: {mod.reason}
+                              </p>
+                            )}
+                            {(!mod.canPublishListings || !mod.canCreateCampaigns) && (
+                              <div className="flex flex-wrap gap-1 pt-0.5">
+                                {!mod.canPublishListings && (
+                                  <span className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                                    Sin publicar
+                                  </span>
+                                )}
+                                {!mod.canCreateCampaigns && (
+                                  <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                                    Sin campañas
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Columna 3: Comercio Vinculado y Publicaciones */}
+                        <td className="py-4 px-4 text-xs">
+                          {sellerInfo ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-44">
+                                  {sellerInfo.business_name}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={isProcessingMod}
+                                  onClick={() => handleToggleVerifySeller(u)}
+                                  title={
+                                    sellerInfo.verified
+                                      ? 'Comercio Verificado (Clic para quitar verificación)'
+                                      : 'No verificado (Clic para verificar comercio)'
+                                  }
+                                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer ${
+                                    sellerInfo.verified
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300'
+                                      : 'bg-zinc-100 text-zinc-500 border-zinc-200 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-zinc-800 dark:border-zinc-700'
+                                  }`}
+                                >
+                                  {sellerInfo.verified ? '🏅 Verificado' : '☆ Verificar'}
+                                </button>
+                              </div>
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-2">
+                                <span>
+                                  📦 <strong>{publishedCount}</strong> activos
+                                </span>
+                                {pausedCount > 0 && (
+                                  <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                    • ⏸️ {pausedCount} pausados
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-400 text-[11px]">Sin comercio vinculado</span>
+                          )}
+                        </td>
+
+                        {/* Columna 4: Selector Rápido de Rol */}
+                        <td className="py-4 px-4">
+                          {isUpdatingRole ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 animate-pulse">
+                              ⏳ Actualizando...
+                            </span>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
                               <button
                                 type="button"
-                                disabled={isProcessingMod}
-                                onClick={() => handleToggleVerifySeller(u)}
-                                title={
-                                  sellerInfo.verified
-                                    ? 'Comercio Verificado (Clic para quitar verificación)'
-                                    : 'No verificado (Clic para verificar comercio)'
-                                }
-                                className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold border transition-colors cursor-pointer ${
-                                  sellerInfo.verified
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300'
-                                    : 'bg-zinc-100 text-zinc-500 border-zinc-200 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-zinc-800 dark:border-zinc-700'
+                                onClick={() => onUpdateUserRole(u, 'buyer')}
+                                disabled={u.role === 'buyer'}
+                                className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
+                                  u.role === 'buyer'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-zinc-600 hover:text-blue-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
                                 }`}
                               >
-                                {sellerInfo.verified ? '🏅 Verificado' : '☆ Verificar'}
+                                🛒 Buyer
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onUpdateUserRole(u, 'seller')}
+                                disabled={u.role === 'seller'}
+                                className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
+                                  u.role === 'seller'
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'text-zinc-600 hover:text-emerald-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
+                                }`}
+                              >
+                                🏪 Seller
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onUpdateUserRole(u, 'admin')}
+                                disabled={u.role === 'admin'}
+                                className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
+                                  u.role === 'admin'
+                                    ? 'bg-purple-600 text-white shadow-xs'
+                                    : 'text-zinc-600 hover:text-purple-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
+                                }`}
+                              >
+                                🛡️ Admin
                               </button>
                             </div>
-                            <div className="text-[11px] text-zinc-500 flex items-center gap-2">
-                              <span>
-                                📦 <strong>{publishedCount}</strong> activos
-                              </span>
-                              {pausedCount > 0 && (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  • ⏸️ {pausedCount} pausados
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-400 text-[11px]">Sin comercio vinculado</span>
-                        )}
-                      </td>
+                          )}
+                        </td>
 
-                      {/* Columna 4: Selector Rápido de Rol */}
-                      <td className="py-4 px-4">
-                        {isUpdatingRole ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 animate-pulse">
-                            ⏳ Actualizando...
-                          </span>
-                        ) : (
-                          <div className="inline-flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+                        {/* Columna 5: Botones de Suspensión, Bloqueo y Ventana de Administración */}
+                        <td className="py-4 px-4 text-right">
+                          <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                            {mod.status !== 'suspended' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenUserModal(u, 'status', 'suspended')}
+                                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 transition-colors cursor-pointer"
+                                title="Suspender temporalmente al usuario"
+                              >
+                                ⏸️ Suspender
+                              </button>
+                            )}
+
+                            {mod.status !== 'blocked' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenUserModal(u, 'status', 'blocked')}
+                                className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 transition-colors cursor-pointer"
+                                title="Bloquear cuenta permanentemente"
+                              >
+                                🚫 Bloquear
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenUserModal(u, 'status', 'active')}
+                                className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors cursor-pointer"
+                                title="Desbloquear y reactivar usuario"
+                              >
+                                ✅ Reactivar
+                              </button>
+                            )}
+
                             <button
                               type="button"
-                              onClick={() => onUpdateUserRole(u, 'buyer')}
-                              disabled={u.role === 'buyer'}
-                              className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-                                u.role === 'buyer'
-                                  ? 'bg-blue-600 text-white shadow-xs'
-                                  : 'text-zinc-600 hover:text-blue-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                              }`}
+                              onClick={() => handleOpenUserModal(u, 'status')}
+                              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300 transition-colors cursor-pointer"
                             >
-                              🛒 Buyer
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onUpdateUserRole(u, 'seller')}
-                              disabled={u.role === 'seller'}
-                              className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-                                u.role === 'seller'
-                                  ? 'bg-emerald-600 text-white shadow-xs'
-                                  : 'text-zinc-600 hover:text-emerald-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                              }`}
-                            >
-                              🏪 Seller
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onUpdateUserRole(u, 'admin')}
-                              disabled={u.role === 'admin'}
-                              className={`rounded-lg px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-                                u.role === 'admin'
-                                  ? 'bg-purple-600 text-white shadow-xs'
-                                  : 'text-zinc-600 hover:text-purple-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                              }`}
-                            >
-                              🛡️ Admin
+                              ⚙️ Administrar
                             </button>
                           </div>
-                        )}
-                      </td>
-
-                      {/* Columna 5: Botones de Suspensión, Bloqueo y Ventana de Administración */}
-                      <td className="py-4 px-4 text-right">
-                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                          {mod.status !== 'suspended' && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenUserModal(u, 'status', 'suspended')}
-                              className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 transition-colors cursor-pointer"
-                              title="Suspender temporalmente al usuario"
-                            >
-                              ⏸️ Suspender
-                            </button>
-                          )}
-
-                          {mod.status !== 'blocked' ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenUserModal(u, 'status', 'blocked')}
-                              className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 transition-colors cursor-pointer"
-                              title="Bloquear cuenta permanentemente"
-                            >
-                              🚫 Bloquear
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenUserModal(u, 'status', 'active')}
-                              className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors cursor-pointer"
-                              title="Desbloquear y reactivar usuario"
-                            >
-                              ✅ Reactivar
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenUserModal(u, 'status')}
-                            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300 transition-colors cursor-pointer"
-                          >
-                            ⚙️ Administrar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {filteredUsers.length > visibleUsers.length && (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleLimit((prev) =>
+                    prev === 9999 ? 9999 : prev + (itemsPerPage === 9999 ? 10 : itemsPerPage)
+                  )
+                }
+                className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
+              >
+                ➕ Cargar {Math.min(itemsPerPage === 9999 ? 10 : itemsPerPage, filteredUsers.length - visibleUsers.length)} más ({visibleUsers.length} de {filteredUsers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibleLimit(9999)}
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 cursor-pointer"
+              >
+                Ver todos ({filteredUsers.length})
+              </button>
+            </div>
+          )}
         </div>
       )}
 

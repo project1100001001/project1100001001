@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingWithRelations } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
 import HeroRunway, { type ShowcaseItem } from '@/components/HeroRunway'
@@ -53,8 +54,9 @@ export default function HomeClientView({
   const [adPageConfig, setAdPageConfig] = useState<AdPageConfig>(() =>
     sanitizeAdPageConfig(initialAdPageConfig || DEFAULT_AD_PAGE_CONFIG)
   )
+  const [viewerRole, setViewerRole] = useState<'guest' | 'buyer' | 'seller' | 'admin'>('guest')
 
-  // Sincronizar con ajustes administrativos locales o eventos en vivo
+  // Sincronizar con ajustes administrativos locales o eventos en vivo y detectar rol de sesión
   useEffect(() => {
     try {
       const saved = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
@@ -65,6 +67,32 @@ export default function HomeClientView({
     } catch {
       // Ignorar errores de almacenamiento local
     }
+
+    async function detectViewerRole() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setViewerRole('guest')
+          return
+        }
+        const { data: profile } = await supabase
+          .from('app_user')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (profile?.role === 'admin') {
+          setViewerRole('admin')
+        } else if (profile?.role === 'seller') {
+          setViewerRole('seller')
+        } else {
+          setViewerRole('buyer')
+        }
+      } catch {
+        setViewerRole('guest')
+      }
+    }
+    detectViewerRole()
 
     const handleConfigUpdate = (e: any) => {
       if (e?.detail) {
@@ -315,16 +343,12 @@ export default function HomeClientView({
           itemsCount: 1,
           sampleImages: [item.imageUrl].filter(Boolean) as string[],
           isPromoted: isPromotedSeller,
-          adBadge:
-            placement === 'combo'
-              ? '🔥 Plan Combo'
-              : placement === 'pasarela'
-              ? '✨ Plan Pasarela'
-              : placement === 'gran_vitrina'
-              ? '🏆 Gran Vitrina'
-              : placement === 'free_trial_7d' || placement === 'free_initial'
-              ? `🎁 7d Gratis (${item.daysRemaining}d)`
-              : undefined,
+          // Etiqueta comercial pública (sin exponer tiempos de publicidad ni planes internos del vendedor)
+          adBadge: item.sellerVerified
+            ? '✓ Verificado'
+            : item.isPaidCampaign
+            ? '⭐ Destacado'
+            : undefined,
         })
       } else {
         const m = map.get(item.sellerId)!
@@ -527,34 +551,57 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 7. BANNER PARA VENDEDORES: IMPULSA TU CAMPAÑA                             */}
+      {/* 7. BANNER INFORMATIVO DIFERENCIADO SEGÚN PERFIL (COMPRADOR VS VENDEDOR)   */}
       {/* ========================================================================= */}
       {adPageConfig.showPromotionalBanner && (
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 p-6 sm:p-10 text-white shadow-xl">
-            <div className="relative z-10 max-w-2xl space-y-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
-                <span>🚀</span>
-                <span>Campañas & Vitrina Comercial</span>
-              </span>
-
-              <h3 className="text-xl sm:text-3xl font-black tracking-tight">
-                {t.home.boostYourProductCta}
-              </h3>
-
-              <p className="text-xs sm:text-sm text-purple-100 leading-relaxed max-w-xl">
-                {t.home.boostYourProductDesc}
-              </p>
-
-              <div className="pt-2 flex items-center gap-2 text-xs text-purple-200">
-                <span className="font-semibold">💡 Tip para vendedores:</span>
-                <span>
-                  Activa y administra tus campañas patrocinadas desde el menú lateral izquierdo en{' '}
-                  <strong className="text-white">Mis Campañas → Configurar Campaña</strong>.
+          {viewerRole === 'seller' || viewerRole === 'admin' ? (
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 p-6 sm:p-10 text-white shadow-xl">
+              <div className="relative z-10 max-w-2xl space-y-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
+                  <span>🚀</span>
+                  <span>Exclusivo Vendedor • Campañas & Vitrina Comercial</span>
                 </span>
+
+                <h3 className="text-xl sm:text-3xl font-black tracking-tight">
+                  {t.home.boostYourProductCta}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-purple-100 leading-relaxed max-w-xl">
+                  {t.home.boostYourProductDesc}
+                </p>
+
+                <div className="pt-2 flex items-center gap-2 text-xs text-purple-200">
+                  <span className="font-semibold">💡 Gestión de vendedor:</span>
+                  <span>
+                    Administra el tiempo de publicidad y tus campañas patrocinadas desde{' '}
+                    <strong className="text-white">Mis Campañas → Configurar Campaña</strong>.
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-900 p-6 sm:p-10 text-white shadow-xl">
+              <div className="relative z-10 max-w-2xl space-y-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
+                  <span>💬</span>
+                  <span>Compra Directa sin Registro Obligatorio</span>
+                </span>
+
+                <h3 className="text-xl sm:text-3xl font-black tracking-tight">
+                  {locale === 'en'
+                    ? 'Contact Verified Local Businesses Directly on WhatsApp'
+                    : 'Contacta directo por WhatsApp con comercios locales verificados'}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed max-w-xl">
+                  {locale === 'en'
+                    ? 'Explore products, used articles, and professional services freely without registration. Compare prices, check verified ratings, and chat directly with the seller.'
+                    : 'Explora productos nuevos, artículos usados y servicios profesionales sin necesidad de registro previo. Consulta precios reales, reseñas verificadas y acuerda tu compra o servicio directamente con el comercio.'}
+                </p>
+              </div>
+            </div>
+          )}
         </section>
       )}
     </main>

@@ -7,9 +7,14 @@ import { useTranslation } from '@/lib/i18n'
 interface ListingCardProps {
   listing: ListingWithRelations
   viewMode?: 'list' | 'grid'
+  showSellerStatus?: boolean
 }
 
-export default function ListingCard({ listing, viewMode = 'list' }: ListingCardProps) {
+export default function ListingCard({
+  listing,
+  viewMode = 'list',
+  showSellerStatus = false,
+}: ListingCardProps) {
   const { t, locale } = useTranslation()
 
   // Format price
@@ -134,7 +139,7 @@ export default function ListingCard({ listing, viewMode = 'list' }: ListingCardP
                   </span>
                 )}
 
-                {listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
+                {showSellerStatus && listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
                   <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${statusBadges[listing.status].color}`}>
                     {statusBadges[listing.status].label}
                   </span>
@@ -296,7 +301,7 @@ export default function ListingCard({ listing, viewMode = 'list' }: ListingCardP
           >
             {currentType.label}
           </span>
-          {listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
+          {showSellerStatus && listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
             <span
               className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${statusBadges[listing.status].color}`}
             >

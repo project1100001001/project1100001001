@@ -210,6 +210,39 @@ export default function AdminModerationPanel({
   const liveAdsCount = adOrders.filter((a) => a.status === 'live' || a.status === 'approved').length
   const rejectedAdsCount = adOrders.filter((a) => a.status === 'rejected').length
 
+  // --- Pagination & View Mode for Admin Lists (Min 10 initially) ---
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10)
+  const [visibleLimit, setVisibleLimit] = useState<number>(10)
+
+  useEffect(() => {
+    const currentLen = section === 'ads' ? filteredAds.length : filteredListings.length
+    setVisibleLimit(itemsPerPage === 0 ? currentLen : Math.max(10, itemsPerPage))
+  }, [
+    itemsPerPage,
+    section,
+    activeTab,
+    adActiveTab,
+    searchQuery,
+    filteredListings.length,
+    filteredAds.length,
+  ])
+
+  const visibleListings =
+    itemsPerPage === 0
+      ? filteredListings
+      : filteredListings.slice(0, Math.max(10, visibleLimit))
+
+  const visibleAds =
+    itemsPerPage === 0
+      ? filteredAds
+      : filteredAds.slice(0, Math.max(10, visibleLimit))
+
+  const handleChangeItemsPerPage = (newCount: number, totalLen: number) => {
+    setItemsPerPage(newCount)
+    setVisibleLimit(newCount === 0 ? totalLen : Math.max(10, newCount))
+  }
+
   // --- Handlers: Sync Official Ad Packages ---
   const handleSyncOfficialAdPackages = async () => {
     setIsSyncingPolicies(true)
@@ -1042,6 +1075,70 @@ export default function AdminModerationPanel({
             })}
           </div>
 
+          {/* Barra de Control de Cantidad de Ítems y Modo de Visualización (Lista vs Cuadrícula) */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              {filteredListings.length === 0
+                ? '0 publicaciones en esta vista'
+                : `Mostrando ${visibleListings.length} de ${filteredListings.length} publicaciones`}
+            </span>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Selector de Cantidad de Ítems a Cargar (Mínimo 10 inicialmente) */}
+              <div className="flex items-center gap-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 shadow-2xs">
+                <label
+                  htmlFor="admin-listings-items-per-page"
+                  className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
+                >
+                  Cargar:
+                </label>
+                <select
+                  id="admin-listings-items-per-page"
+                  value={itemsPerPage}
+                  onChange={(e) =>
+                    handleChangeItemsPerPage(Number(e.target.value), filteredListings.length)
+                  }
+                  className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:border-emerald-500 focus:outline-none cursor-pointer shadow-2xs"
+                >
+                  <option value={10}>10 ítems</option>
+                  <option value={15}>15 ítems</option>
+                  <option value={20}>20 ítems</option>
+                  <option value={30}>30 ítems</option>
+                  <option value={50}>50 ítems</option>
+                  <option value={0}>Todos ({filteredListings.length})</option>
+                </select>
+              </div>
+
+              {/* Selector de Modo de Visualización (Lista vs Cuadrícula) */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <span>☰</span>
+                  <span>Lista</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <span>⊞</span>
+                  <span className="hidden sm:inline">Cuadrícula</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Listings List */}
           {filteredListings.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
@@ -1058,8 +1155,8 @@ export default function AdminModerationPanel({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredListings.map((listing) => {
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+              {visibleListings.map((listing) => {
                 const primaryMedia = listing.listing_media?.sort((a, b) => a.position - b.position)[0]
                 const isPending = pendingListingStatuses.includes(listing.status)
                 const isProcessing = processingId === listing.id
@@ -1197,6 +1294,37 @@ export default function AdminModerationPanel({
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {filteredListings.length > visibleListings.length && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Mostrando {visibleListings.length} de {filteredListings.length} publicaciones
+              </span>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleLimit((prev) =>
+                      Math.min(
+                        filteredListings.length,
+                        prev + (itemsPerPage > 0 ? itemsPerPage : 10)
+                      )
+                    )
+                  }
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
+                >
+                  ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredListings.length - visibleListings.length)} más
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChangeItemsPerPage(0, filteredListings.length)}
+                  className="rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Ver todos ({filteredListings.length})
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1338,55 +1466,116 @@ export default function AdminModerationPanel({
           </div>
 
           {/* Tabs for Ads */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-            {[
-              {
-                id: 'pending',
-                label: 'Campañas Pendientes (submitted)',
-                count: pendingAdsCount,
-                color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-              },
-              {
-                id: 'live',
-                label: 'Activas / En Vivo (live)',
-                count: liveAdsCount,
-                color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-              },
-              {
-                id: 'rejected',
-                label: 'Rechazadas',
-                count: rejectedAdsCount,
-                color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-              },
-              {
-                id: 'all',
-                label: 'Todas',
-                count: adOrders.length,
-                color: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200',
-              },
-            ].map((tab) => {
-              const isActive = adActiveTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setAdActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      isActive ? 'bg-white/20 text-white' : tab.color
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                {
+                  id: 'pending',
+                  label: 'Campañas Pendientes (submitted)',
+                  count: pendingAdsCount,
+                  color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+                },
+                {
+                  id: 'live',
+                  label: 'Activas / En Vivo (live)',
+                  count: liveAdsCount,
+                  color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+                },
+                {
+                  id: 'rejected',
+                  label: 'Rechazadas',
+                  count: rejectedAdsCount,
+                  color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+                },
+                {
+                  id: 'all',
+                  label: 'Todas',
+                  count: adOrders.length,
+                  color: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200',
+                },
+              ].map((tab) => {
+                const isActive = adActiveTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAdActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+                      isActive
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700'
                     }`}
                   >
-                    {tab.count}
-                  </span>
+                    <span>{tab.label}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        isActive ? 'bg-white/20 text-white' : tab.color
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                Mostrando {visibleAds.length} de {filteredAds.length}
+              </span>
+
+              {/* Selector de Cantidad de Ítems a Cargar (Mínimo 10 inicialmente) */}
+              <div className="flex items-center gap-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 shadow-2xs">
+                <label
+                  htmlFor="admin-ads-items-per-page"
+                  className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
+                >
+                  Cargar:
+                </label>
+                <select
+                  id="admin-ads-items-per-page"
+                  value={itemsPerPage}
+                  onChange={(e) =>
+                    handleChangeItemsPerPage(Number(e.target.value), filteredAds.length)
+                  }
+                  className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:border-purple-500 focus:outline-none cursor-pointer shadow-2xs"
+                >
+                  <option value={10}>10 ítems</option>
+                  <option value={15}>15 ítems</option>
+                  <option value={20}>20 ítems</option>
+                  <option value={30}>30 ítems</option>
+                  <option value={50}>50 ítems</option>
+                  <option value={0}>Todos ({filteredAds.length})</option>
+                </select>
+              </div>
+
+              {/* Selector de Modo de Visualización (Lista vs Cuadrícula) */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-white text-purple-700 shadow-xs dark:bg-zinc-900 dark:text-purple-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <span>☰</span>
+                  <span>Lista</span>
                 </button>
-              )
-            })}
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-purple-700 shadow-xs dark:bg-zinc-900 dark:text-purple-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <span>⊞</span>
+                  <span className="hidden sm:inline">Cuadrícula</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Ads List */}
@@ -1405,8 +1594,8 @@ export default function AdminModerationPanel({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredAds.map((ad) => {
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+              {visibleAds.map((ad) => {
                 const isPending = pendingAdStatuses.includes(ad.status)
                 const isProcessing = processingId === ad.id
                 const placement = resolveAdOrderPlacement(ad)
@@ -1538,6 +1727,30 @@ export default function AdminModerationPanel({
                 )
               })}
             </div>
+
+            {filteredAds.length > visibleAds.length && (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleLimit((prev) =>
+                      prev === 9999 ? 9999 : prev + (itemsPerPage === 9999 ? 10 : itemsPerPage)
+                    )
+                  }
+                  className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
+                >
+                  ➕ Cargar {Math.min(itemsPerPage === 9999 ? 10 : itemsPerPage, filteredAds.length - visibleAds.length)} más ({visibleAds.length} de {filteredAds.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleLimit(9999)}
+                  className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 cursor-pointer"
+                >
+                  Ver todos ({filteredAds.length})
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       )}

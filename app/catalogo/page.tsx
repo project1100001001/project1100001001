@@ -53,7 +53,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
 
   const categories = (categoriesData as Category[]) || []
 
-  // 2. Construir la consulta de listings con joins
+  // 2. Construir la consulta de listings con joins (solo anuncios activos/publicados para el catálogo público)
   let query = supabase
     .from('listing')
     .select(`
@@ -62,6 +62,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
       seller:seller_id(*),
       listing_media(*)
     `)
+    .eq('status', 'published')
 
   // Filtro de búsqueda por texto (título y descripción)
   if (q) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { AdOrderWithRelations, AdOrderStatus } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
@@ -20,6 +20,9 @@ export default function CampaignsList({
   const { t, locale } = useTranslation()
   const [orders] = useState<AdOrderWithRelations[]>(initialOrders)
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10)
+  const [visibleLimit, setVisibleLimit] = useState<number>(10)
   const [selectedAnalyticsOrder, setSelectedAnalyticsOrder] =
     useState<AdOrderWithRelations | null>(null)
 
@@ -97,6 +100,20 @@ export default function CampaignsList({
     if (filterStatus === 'rejected') return o.status === 'rejected'
     return o.status === filterStatus
   })
+
+  useEffect(() => {
+    setVisibleLimit(itemsPerPage === 0 ? filteredOrders.length : Math.max(10, itemsPerPage))
+  }, [itemsPerPage, filteredOrders.length, filterStatus])
+
+  const visibleOrders =
+    itemsPerPage === 0
+      ? filteredOrders
+      : filteredOrders.slice(0, Math.max(10, visibleLimit))
+
+  const handleChangeItemsPerPage = (newCount: number) => {
+    setItemsPerPage(newCount)
+    setVisibleLimit(newCount === 0 ? filteredOrders.length : Math.max(10, newCount))
+  }
 
   // Métricas agregadas globales
   const countInReview = orders.filter(
@@ -317,22 +334,86 @@ export default function CampaignsList({
         </div>
       </div>
 
-      {/* 3. Filtros de Estado */}
+      {/* 3. Filtros de Estado y Controles de Cantidad / Modo de Vista */}
       {orders.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterStatus(tab.id)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-                filterStatus === tab.id
-                  ? 'bg-purple-600 text-white shadow-xs scale-105'
-                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+          <div className="flex flex-wrap items-center gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterStatus(tab.id)}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                  filterStatus === tab.id
+                    ? 'bg-purple-600 text-white shadow-xs scale-105'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              {locale === 'en'
+                ? `Showing ${visibleOrders.length} of ${filteredOrders.length}`
+                : `Mostrando ${visibleOrders.length} de ${filteredOrders.length}`}
+            </span>
+
+            {/* Selector de Cantidad de Ítems a Cargar (Mínimo 10 inicialmente) */}
+            <div className="flex items-center gap-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 shadow-2xs">
+              <label
+                htmlFor="campaigns-items-per-page"
+                className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
+              >
+                {locale === 'en' ? 'Load:' : 'Cargar:'}
+              </label>
+              <select
+                id="campaigns-items-per-page"
+                value={itemsPerPage}
+                onChange={(e) => handleChangeItemsPerPage(Number(e.target.value))}
+                className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:border-purple-500 focus:outline-none cursor-pointer shadow-2xs"
+                title="Seleccionar cantidad de campañas a cargar (mínimo 10 inicialmente)"
+              >
+                <option value={10}>10 ítems</option>
+                <option value={15}>15 ítems</option>
+                <option value={20}>20 ítems</option>
+                <option value={30}>30 ítems</option>
+                <option value={50}>50 ítems</option>
+                <option value={0}>{locale === 'en' ? `All (${filteredOrders.length})` : `Todos (${filteredOrders.length})`}</option>
+              </select>
+            </div>
+
+            {/* Selector de Modo de Visualización (Lista predeterminada) */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'list'
+                    ? 'bg-white text-purple-700 shadow-xs dark:bg-zinc-900 dark:text-purple-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                }`}
+                title="Modo de visualización en lista"
+              >
+                <span>☰</span>
+                <span>Lista</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-purple-700 shadow-xs dark:bg-zinc-900 dark:text-purple-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                }`}
+                title="Modo de visualización en cuadrícula"
+              >
+                <span>⊞</span>
+                <span className="hidden sm:inline">Cuadrícula</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -363,9 +444,9 @@ export default function CampaignsList({
         </div>
       ) : (
         <>
-          {/* Vista Móvil (Tarjetas Adaptables con Métricas) */}
-          <div className="md:hidden space-y-4">
-            {filteredOrders.map((order) => {
+          {/* Vista Cuadrícula / Móvil (Tarjetas Adaptables con Métricas) */}
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'md:hidden space-y-4'}>
+            {visibleOrders.map((order) => {
               const badge = statusBadges[order.status] || {
                 label: order.status,
                 bg: 'bg-zinc-100 dark:bg-zinc-800',
@@ -483,176 +564,212 @@ export default function CampaignsList({
             })}
           </div>
 
-          {/* Vista Escritorio (Tabla Exhaustiva con Métricas y Tiempos) */}
-          <div className="hidden md:block overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
-                <thead className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50">
-                  <tr>
-                    <th scope="col" className="px-5 py-4 font-bold">
-                      {locale === 'en' ? 'Ad Creative & Product' : 'Anuncio & Publicación'}
-                    </th>
-                    <th scope="col" className="px-4 py-4 font-bold">
-                      {t.campaigns.status}
-                    </th>
-                    <th scope="col" className="px-5 py-4 font-bold">
-                      {t.campaigns.timeRemaining}
-                    </th>
-                    <th scope="col" className="px-5 py-4 font-bold">
-                      {locale === 'en' ? 'Performance Metrics' : 'Métricas de Tráfico'}
-                    </th>
-                    <th scope="col" className="px-4 py-4 font-bold">
-                      {locale === 'en' ? 'Paid / Package' : 'Inversión'}
-                    </th>
-                    <th scope="col" className="px-4 py-4 text-center font-bold">
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {filteredOrders.map((order) => {
-                    const badge = statusBadges[order.status] || {
-                      label: order.status,
-                      bg: 'bg-zinc-100 dark:bg-zinc-800',
-                      text: 'text-zinc-700 dark:text-zinc-300',
-                      dot: 'bg-zinc-400',
-                    }
-                    const remaining = formatRemainingTime(order)
-                    const ctr =
-                      order.impressions_count && order.impressions_count > 0
-                        ? (
-                            ((order.clicks_count || 0) / order.impressions_count) *
-                            100
-                          ).toFixed(1)
-                        : '0.0'
+          {/* Vista Escritorio Modo Lista (Tabla Exhaustiva con Métricas y Tiempos) */}
+          {viewMode === 'list' && (
+            <div className="hidden md:block overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
+                  <thead className="border-b border-zinc-200 bg-zinc-50/80 text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50">
+                    <tr>
+                      <th scope="col" className="px-5 py-4 font-bold">
+                        {locale === 'en' ? 'Ad Creative & Product' : 'Anuncio & Publicación'}
+                      </th>
+                      <th scope="col" className="px-4 py-4 font-bold">
+                        {t.campaigns.status}
+                      </th>
+                      <th scope="col" className="px-5 py-4 font-bold">
+                        {t.campaigns.timeRemaining}
+                      </th>
+                      <th scope="col" className="px-5 py-4 font-bold">
+                        {locale === 'en' ? 'Performance Metrics' : 'Métricas de Tráfico'}
+                      </th>
+                      <th scope="col" className="px-4 py-4 font-bold">
+                        {locale === 'en' ? 'Paid / Package' : 'Inversión'}
+                      </th>
+                      <th scope="col" className="px-4 py-4 text-center font-bold">
+                        Acción
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {visibleOrders.map((order) => {
+                      const badge = statusBadges[order.status] || {
+                        label: order.status,
+                        bg: 'bg-zinc-100 dark:bg-zinc-800',
+                        text: 'text-zinc-700 dark:text-zinc-300',
+                        dot: 'bg-zinc-400',
+                      }
+                      const remaining = formatRemainingTime(order)
+                      const ctr =
+                        order.impressions_count && order.impressions_count > 0
+                          ? (
+                              ((order.clicks_count || 0) / order.impressions_count) *
+                              100
+                            ).toFixed(1)
+                          : '0.0'
 
-                    return (
-                      <tr key={order.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors">
-                        {/* 1. Anuncio Creatividad */}
-                        <td className="px-5 py-4 font-medium text-zinc-900 dark:text-zinc-100">
-                          <div className="flex items-start gap-3.5">
-                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100 border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-800">
-                              {order.image_url ? (
-                                <img
-                                  src={order.image_url}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-lg">
-                                  📢
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 max-w-xs">
-                              <div className="font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
-                                {order.headline}
+                      return (
+                        <tr key={order.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors">
+                          {/* 1. Anuncio Creatividad */}
+                          <td className="px-5 py-4 font-medium text-zinc-900 dark:text-zinc-100">
+                            <div className="flex items-start gap-3.5">
+                              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100 border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-800">
+                                {order.image_url ? (
+                                  <img
+                                    src={order.image_url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-lg">
+                                    📢
+                                  </div>
+                                )}
                               </div>
-                              {order.body && (
-                                <div className="text-xs text-zinc-500 truncate mt-0.5">
-                                  {order.body}
+                              <div className="min-w-0 max-w-xs">
+                                <div className="font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
+                                  {order.headline}
                                 </div>
-                              )}
-                              {order.listing && (
-                                <div className="mt-1 text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 truncate">
-                                  <span>🔗 Publicación:</span>
-                                  <Link
-                                    href={`/catalogo/${order.listing.id}`}
-                                    className="underline hover:text-purple-700 truncate"
-                                  >
-                                    {order.listing.title}
-                                  </Link>
-                                </div>
-                              )}
+                                {order.body && (
+                                  <div className="text-xs text-zinc-500 truncate mt-0.5">
+                                    {order.body}
+                                  </div>
+                                )}
+                                {order.listing && (
+                                  <div className="mt-1 text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 truncate">
+                                    <span>🔗 Publicación:</span>
+                                    <Link
+                                      href={`/catalogo/${order.listing.id}`}
+                                      className="underline hover:text-purple-700 truncate"
+                                    >
+                                      {order.listing.title}
+                                    </Link>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* 2. Estado */}
-                        <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${badge.bg} ${badge.text}`}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
-                            {badge.label}
-                          </span>
-                        </td>
+                          {/* 2. Estado */}
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${badge.bg} ${badge.text}`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
+                              {badge.label}
+                            </span>
+                          </td>
 
-                        {/* 3. Vigencia y Tiempo Restante */}
-                        <td className="px-5 py-4">
-                          <div className="space-y-1.5 min-w-[170px]">
-                            <div className="flex items-center justify-between">
-                              <span className={`rounded-md px-2 py-0.5 text-[10px] border ${remaining.color}`}>
-                                {remaining.label}
-                              </span>
+                          {/* 3. Vigencia y Tiempo Restante */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-1.5 min-w-[170px]">
+                              <div className="flex items-center justify-between">
+                                <span className={`rounded-md px-2 py-0.5 text-[10px] border ${remaining.color}`}>
+                                  {remaining.label}
+                                </span>
+                              </div>
+                              <div className="h-2 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden border border-zinc-200/60 dark:border-zinc-700/60">
+                                <div
+                                  className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full transition-all duration-500"
+                                  style={{ width: `${remaining.percent}%` }}
+                                />
+                              </div>
+                              <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                                {remaining.detail}
+                              </div>
                             </div>
-                            <div className="h-2 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden border border-zinc-200/60 dark:border-zinc-700/60">
-                              <div
-                                className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full transition-all duration-500"
-                                style={{ width: `${remaining.percent}%` }}
-                              />
-                            </div>
-                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
-                              {remaining.detail}
-                            </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* 4. Métricas de Rendimiento */}
-                        <td className="px-5 py-4">
-                          <div className="space-y-1 text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-purple-600 dark:text-purple-400">
-                                👆 {order.clicks_count || 0} clics
-                              </span>
-                              <span className="text-zinc-300 dark:text-zinc-600">•</span>
-                              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                                💬 {order.contacts_count || 0} WhatsApp
-                              </span>
+                          {/* 4. Métricas de Rendimiento */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-purple-600 dark:text-purple-400">
+                                  👆 {order.clicks_count || 0} clics
+                                </span>
+                                <span className="text-zinc-300 dark:text-zinc-600">•</span>
+                                <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                                  💬 {order.contacts_count || 0} WhatsApp
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-zinc-500 flex items-center gap-2">
+                                <span>👁️ {order.impressions_count || 0} vistas</span>
+                                <span>•</span>
+                                <span className="font-bold text-amber-600 dark:text-amber-400">
+                                  CTR: {ctr}%
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-zinc-500 flex items-center gap-2">
-                              <span>👁️ {order.impressions_count || 0} vistas</span>
-                              <span>•</span>
-                              <span className="font-bold text-amber-600 dark:text-amber-400">
-                                CTR: {ctr}%
-                              </span>
+                          </td>
+
+                          {/* 5. Inversión y Plan Oficial */}
+                          <td className="px-4 py-4">
+                            <div className="font-black text-sm text-zinc-900 dark:text-zinc-50">
+                              ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}
                             </div>
-                          </div>
-                        </td>
+                            <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-400">
+                              {(() => {
+                                const pl = resolveAdOrderPlacement(order)
+                                if (pl === 'combo') return '🔥 Combo (Vitrina + Pasarela)'
+                                if (pl === 'gran_vitrina') return '🏆 Individual Gran Vitrina'
+                                return '✨ Individual Pasarela'
+                              })()}
+                            </div>
+                          </td>
 
-                        {/* 5. Inversión y Plan Oficial */}
-                        <td className="px-4 py-4">
-                          <div className="font-black text-sm text-zinc-900 dark:text-zinc-50">
-                            ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}
-                          </div>
-                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-400">
-                            {(() => {
-                              const pl = resolveAdOrderPlacement(order)
-                              if (pl === 'combo') return '🔥 Combo (Vitrina + Pasarela)'
-                              if (pl === 'gran_vitrina') return '🏆 Individual Gran Vitrina'
-                              return '✨ Individual Pasarela'
-                            })()}
-                          </div>
-                        </td>
-
-                        {/* 6. Botón de Analítica */}
-                        <td className="px-4 py-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnalyticsOrder(order)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                          >
-                            <span>📊</span>
-                            <span>Métricas</span>
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          {/* 6. Botón de Analítica */}
+                          <td className="px-4 py-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAnalyticsOrder(order)}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                              <span>📊</span>
+                              <span>Métricas</span>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Control inferior para cargar más campañas si hay más que el límite actual */}
+          {filteredOrders.length > visibleOrders.length && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                {locale === 'en'
+                  ? `Showing ${visibleOrders.length} of ${filteredOrders.length} campaigns`
+                  : `Mostrando ${visibleOrders.length} de ${filteredOrders.length} campañas disponibles`}
+              </span>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleLimit((prev) =>
+                      Math.min(
+                        filteredOrders.length,
+                        prev + (itemsPerPage > 0 ? itemsPerPage : 10)
+                      )
+                    )
+                  }
+                  className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
+                >
+                  ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredOrders.length - visibleOrders.length)} más
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChangeItemsPerPage(0)}
+                  className="rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Ver todos ({filteredOrders.length})
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 

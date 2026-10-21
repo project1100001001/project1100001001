@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingStatus, ListingType, ListingWithRelations, PriceHistoryRecord, Sale, SaleStatus, Seller } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
-import { buildInitialFreeAdAttrs } from '@/lib/adPolicies'
+import { buildInitialFreeAdAttrs, getListingFreeTrialStatus } from '@/lib/adPolicies'
 
 interface InventoryManagerProps {
   initialListings: ListingWithRelations[]
@@ -204,6 +204,32 @@ export default function InventoryManager({
 
     return true
   })
+
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10)
+  const [visibleLimit, setVisibleLimit] = useState<number>(10)
+
+  useEffect(() => {
+    setVisibleLimit(itemsPerPage === 0 ? filteredListings.length : Math.max(10, itemsPerPage))
+  }, [
+    itemsPerPage,
+    filteredListings.length,
+    selectedSellerId,
+    macroTypeScope,
+    subFilter,
+    statusFilter,
+    searchQuery,
+  ])
+
+  const visibleListings =
+    itemsPerPage === 0
+      ? filteredListings
+      : filteredListings.slice(0, Math.max(10, visibleLimit))
+
+  const handleChangeItemsPerPage = (newCount: number) => {
+    setItemsPerPage(newCount)
+    setVisibleLimit(newCount === 0 ? filteredListings.length : Math.max(10, newCount))
+  }
 
   // -------------------------------------------------------------
   // Filtered Sales
@@ -1397,6 +1423,73 @@ export default function InventoryManager({
             </div>
           </div>
 
+          {/* Barra de Control de Resultados, Cantidad de Ítems y Selector de Modo de Visualización (Lista vs Cuadrícula) */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs sm:text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+              {filteredListings.length === 0
+                ? '0 artículos encontrados'
+                : locale === 'en'
+                ? `Showing ${visibleListings.length} of ${filteredListings.length} items`
+                : `Mostrando ${visibleListings.length} de ${filteredListings.length} artículos`}
+            </span>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Selector de Cantidad de Ítems a Cargar (Mínimo 10 inicialmente) */}
+              <div className="flex items-center gap-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 shadow-2xs">
+                <label
+                  htmlFor="inventory-items-per-page"
+                  className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 whitespace-nowrap"
+                >
+                  {locale === 'en' ? 'Load:' : 'Cargar:'}
+                </label>
+                <select
+                  id="inventory-items-per-page"
+                  value={itemsPerPage}
+                  onChange={(e) => handleChangeItemsPerPage(Number(e.target.value))}
+                  className="rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 px-2 py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:border-emerald-500 focus:outline-none cursor-pointer shadow-2xs"
+                  title="Seleccionar cantidad de ítems a cargar (mínimo 10 inicialmente)"
+                >
+                  <option value={10}>10 ítems</option>
+                  <option value={15}>15 ítems</option>
+                  <option value={20}>20 ítems</option>
+                  <option value={30}>30 ítems</option>
+                  <option value={50}>50 ítems</option>
+                  <option value={0}>{locale === 'en' ? `All (${filteredListings.length})` : `Todos (${filteredListings.length})`}</option>
+                </select>
+              </div>
+
+              {/* Selector de Modo de Visualización (Lista predeterminada) */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                  title="Modo de visualización en lista"
+                >
+                  <span>☰</span>
+                  <span>Lista</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                  title="Modo de visualización en cuadrícula"
+                >
+                  <span>⊞</span>
+                  <span className="hidden sm:inline">Cuadrícula</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Listado / Tabla de Artículos con Ajustes */}
           {filteredListings.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
@@ -1414,8 +1507,8 @@ export default function InventoryManager({
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredListings.map((item) => {
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}>
+              {visibleListings.map((item) => {
                 const isService = item.type === 'service'
                 const rawStock = item.stock ?? 0
                 const editedStock = stockEdits[item.id] !== undefined ? stockEdits[item.id] : rawStock
@@ -1435,6 +1528,7 @@ export default function InventoryManager({
                 // Atributos para productos
                 const condition = item.attrs?.condition || 'Nuevo'
                 const deliveryMethod = item.attrs?.delivery_method || 'Entrega estándar / Envío'
+                const adTrialStatus = getListingFreeTrialStatus(item)
 
                 return (
                   <div
@@ -1507,6 +1601,21 @@ export default function InventoryManager({
                               }`}
                             >
                               {statusBadges[item.status]?.label || item.status}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+                                adTrialStatus.isFreeTrialActive
+                                  ? 'border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                  : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                              }`}
+                              title="Información exclusiva para el vendedor: Tiempo restante de publicidad activa"
+                            >
+                              <span>⏱️</span>
+                              <span>
+                                {adTrialStatus.isFreeTrialActive
+                                  ? `Publicidad: ${adTrialStatus.daysRemaining}d ${adTrialStatus.hoursRemaining}h restantes`
+                                  : 'Publicidad inicial finalizada'}
+                              </span>
                             </span>
                           </div>
 
@@ -1743,6 +1852,40 @@ export default function InventoryManager({
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Control inferior para cargar más artículos si hay más que el límite actual */}
+          {filteredListings.length > visibleListings.length && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                {locale === 'en'
+                  ? `Showing ${visibleListings.length} of ${filteredListings.length} items`
+                  : `Mostrando ${visibleListings.length} de ${filteredListings.length} artículos en inventario`}
+              </span>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleLimit((prev) =>
+                      Math.min(
+                        filteredListings.length,
+                        prev + (itemsPerPage > 0 ? itemsPerPage : 10)
+                      )
+                    )
+                  }
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
+                >
+                  ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredListings.length - visibleListings.length)} más
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChangeItemsPerPage(0)}
+                  className="rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Ver todos ({filteredListings.length})
+                </button>
+              </div>
             </div>
           )}
         </div>

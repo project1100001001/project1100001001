@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { ListingWithRelations, Review } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { getPublicListingSpecs, getListingFreeTrialStatus } from '@/lib/adPolicies'
 import ReviewsSection from './ReviewsSection'
 
 interface ListingDetailViewProps {
@@ -61,8 +62,9 @@ export default function ListingDetailView({
     }
   }
 
-  // Admin moderation state
+  // Seller ownership & Admin moderation state
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSellerOwner, setIsSellerOwner] = useState(false)
   const [listingStatus, setListingStatus] = useState<string>(listing.status)
   const [rejectReason, setRejectReason] = useState<string | null>(listing.reject_reason || null)
   const [moderating, setModerating] = useState(false)
@@ -70,22 +72,36 @@ export default function ListingDetailView({
   const [rejectText, setRejectText] = useState('')
 
   useEffect(() => {
-    async function checkRole() {
+    async function checkViewerPermissions() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('app_user')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        if (profile?.role === 'admin') {
-          setIsAdmin(true)
+      if (!user) return
+
+      // Verificar si el usuario autenticado es el vendedor dueño de este producto/servicio
+      if (listing.seller?.owner_user_id && listing.seller.owner_user_id === user.id) {
+        setIsSellerOwner(true)
+      } else if (listing.seller_id) {
+        const { data: sellerRow } = await supabase
+          .from('seller')
+          .select('owner_user_id')
+          .eq('id', listing.seller_id)
+          .maybeSingle()
+        if (sellerRow?.owner_user_id === user.id) {
+          setIsSellerOwner(true)
         }
       }
+
+      const { data: profile } = await supabase
+        .from('app_user')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (profile?.role === 'admin') {
+        setIsAdmin(true)
+      }
     }
-    checkRole()
-  }, [])
+    checkViewerPermissions()
+  }, [listing.seller?.owner_user_id, listing.seller_id])
 
   const handleAdminApprove = async () => {
     setModerating(true)
@@ -157,11 +173,27 @@ export default function ListingDetailView({
     },
   }
 
-  const isNotPublished = listing.status && listing.status !== 'published'
-  const currentStatus = isNotPublished ? statusInfo[listing.status] : null
+  const isNotPublished = listingStatus && listingStatus !== 'published'
+  const currentStatus = isNotPublished ? statusInfo[listingStatus] : null
 
-  // Parse attrs
-  const attrsEntries = Object.entries(listing.attrs || {})
+  // Atributos públicos pensados para compradores (sin tiempos de publicidad ni historiales internos)
+  const publicSpecs = getPublicListingSpecs(listing.attrs, locale)
+
+  // Datos exclusivos del perfil vendedor (tiempo de publicidad y auditoría de precios)
+  const canViewSellerExclusiveInfo = isSellerOwner || isAdmin
+  const adTrialStatus = getListingFreeTrialStatus(listing)
+  const priceHistoryCount = Array.isArray(listing.attrs?.price_history)
+    ? listing.attrs.price_history.length
+    : 0
+  const adPlacementRaw = listing.attrs?.ad_placement || 'free_trial_7d'
+  const adPlacementLabel =
+    adPlacementRaw === 'combo'
+      ? 'Plan Combo (Gran Vitrina + Pasarela)'
+      : adPlacementRaw === 'gran_vitrina'
+      ? 'Plan Gran Vitrina Principal'
+      : adPlacementRaw === 'pasarela'
+      ? 'Plan Pasarela Continua'
+      : '7 Días Iniciales de Publicidad Gratis'
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -243,14 +275,14 @@ export default function ListingDetailView({
         </div>
       )}
 
-      {/* Owner preview alert if not published */}
-      {currentStatus && (
+      {/* Owner preview alert if not published (Solo visible para el vendedor autor o administrador) */}
+      {canViewSellerExclusiveInfo && currentStatus && (
         <div className={`mb-6 rounded-xl border p-4 ${currentStatus.bg} ${currentStatus.text}`}>
           <div className="flex items-center gap-3">
             <span className="text-xl">⚠️</span>
             <div>
               <strong className="block text-sm font-bold">
-                {locale === 'en' ? 'Author preview' : 'Vista previa del autor'}: {currentStatus.label}
+                {locale === 'en' ? 'Seller preview' : 'Vista previa del vendedor'}: {currentStatus.label}
               </strong>
               <p className="text-xs mt-0.5">{currentStatus.desc}</p>
             </div>
@@ -259,7 +291,7 @@ export default function ListingDetailView({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Image Gallery (7 cols) */}
+        {/* Left Column: Image Gallery, Description, Public Buyer Specs & Reviews (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 flex items-center justify-center">
             {activeImageUrl ? (
@@ -299,7 +331,7 @@ export default function ListingDetailView({
             </div>
           )}
 
-          {/* Description Section */}
+          {/* Description Section (Pública para compradores) */}
           <div className="mt-8 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-3">
               {t.listingDetail.description}
@@ -309,23 +341,23 @@ export default function ListingDetailView({
             </div>
           </div>
 
-          {/* Technical Specs / Attrs Section */}
-          {attrsEntries.length > 0 && (
+          {/* Public Technical Specs / Buyer Attributes Section (Limpia de datos de publicidad internos) */}
+          {publicSpecs.length > 0 && (
             <div className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">
                 {t.listingDetail.specifications}
               </h2>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {attrsEntries.map(([key, val]) => (
+                {publicSpecs.map((spec) => (
                   <div
-                    key={key}
+                    key={spec.key}
                     className="rounded-xl border border-zinc-100 bg-zinc-50/70 p-3 dark:border-zinc-800/80 dark:bg-zinc-800/50"
                   >
                     <dt className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                      {key.replace(/_/g, ' ')}
+                      {spec.label}
                     </dt>
                     <dd className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {String(val)}
+                      {spec.value}
                     </dd>
                   </div>
                 ))}
@@ -344,7 +376,7 @@ export default function ListingDetailView({
           />
         </div>
 
-        {/* Right Column: Listing Details & Seller Contact (5 cols) */}
+        {/* Right Column: Listing Details, Seller Contact & Seller-Only Advertising Panel (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6">
             {/* Badges: Type and Category */}
@@ -387,10 +419,14 @@ export default function ListingDetailView({
               </div>
             </div>
 
-            {/* Stock info */}
+            {/* Stock info (Visible para el comprador para conocer disponibilidad inmediata) */}
             {listing.stock !== null && listing.type !== 'service' && (
               <div className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    listing.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'
+                  }`}
+                />
                 <span>
                   {listing.stock > 0
                     ? `${listing.stock} ${locale === 'en' ? 'units in stock' : 'disponibles en stock'}`
@@ -399,7 +435,7 @@ export default function ListingDetailView({
               </div>
             )}
 
-            {/* Seller Contact Card */}
+            {/* Seller Contact Card (Información Pública para Compradores con o sin registro) */}
             <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800 space-y-4">
               <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block">
                 {t.listingDetail.sellerInfo}
@@ -460,14 +496,118 @@ export default function ListingDetailView({
               </div>
             </div>
 
-            {/* Metadata Footer */}
-            <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800/80 text-[11px] text-zinc-400 space-y-1">
+            {/* Public Metadata Footer (Solo fecha de publicación, sin IDs internos) */}
+            <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800/80 text-[11px] text-zinc-400">
               <div>
                 {t.listingDetail.publishedOn}: {new Date(listing.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
               </div>
-              <div>ID: {listing.id}</div>
             </div>
           </div>
+
+          {/* 🔒 PANEL EXCLUSIVO DEL PERFIL VENDEDOR: TIEMPO DE PUBLICIDAD Y GESTIÓN INTERNA */}
+          {canViewSellerExclusiveInfo && (
+            <div className="rounded-2xl border-2 border-purple-200 bg-purple-50/40 p-5 sm:p-6 shadow-xs dark:border-purple-900/60 dark:bg-purple-950/20 space-y-4">
+              <div className="flex items-start justify-between gap-2 border-b border-purple-200/70 pb-3 dark:border-purple-800/60">
+                <div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-purple-800 dark:bg-purple-900/70 dark:text-purple-200">
+                    🔒 Exclusivo Perfil Vendedor
+                  </span>
+                  <h3 className="mt-1.5 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                    {locale === 'en'
+                      ? 'Advertising Time & Internal Status'
+                      : 'Tiempo de Publicidad y Gestión del Anuncio'}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {locale === 'en'
+                      ? 'Hidden from unregistered buyers and buyer profiles.'
+                      : 'Esta información es privada de tu negocio y no es visible para los compradores.'}
+                  </p>
+                </div>
+                <span className="text-xl shrink-0">⏱️</span>
+              </div>
+
+              {/* Estado del Tiempo de Publicidad */}
+              <div className="rounded-xl bg-white p-3.5 border border-purple-200/80 dark:bg-zinc-900 dark:border-purple-800/60 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                    Tiempo de Publicidad Activa:
+                  </span>
+                  {adTrialStatus.isFreeTrialActive ? (
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      ⏳ {adTrialStatus.daysRemaining}d {adTrialStatus.hoursRemaining}h restantes
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      ⚠️ Periodo inicial finalizado
+                    </span>
+                  )}
+                </div>
+
+                {/* Barra de progreso del tiempo publicitario */}
+                <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      adTrialStatus.isFreeTrialActive ? 'bg-purple-600' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${adTrialStatus.progressPercent}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-zinc-500">
+                  <div>
+                    <span className="block text-[10px] uppercase text-zinc-400">Inicio publicidad</span>
+                    <strong className="text-zinc-800 dark:text-zinc-200">
+                      {new Date(adTrialStatus.startsAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase text-zinc-400">Vencimiento</span>
+                    <strong className="text-zinc-800 dark:text-zinc-200">
+                      {new Date(adTrialStatus.endsAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metadatos Internos del Vendedor */}
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div className="rounded-xl bg-white/80 p-2.5 border border-purple-100 dark:bg-zinc-900/80 dark:border-purple-900/40">
+                  <span className="text-[10px] text-zinc-400 block uppercase font-bold">Modalidad Publicitaria</span>
+                  <span className="font-bold text-purple-700 dark:text-purple-300 text-[11px]">
+                    {adPlacementLabel}
+                  </span>
+                </div>
+                <div className="rounded-xl bg-white/80 p-2.5 border border-purple-100 dark:bg-zinc-900/80 dark:border-purple-900/40">
+                  <span className="text-[10px] text-zinc-400 block uppercase font-bold">Revisiones de Precio</span>
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200 text-[11px]">
+                    {priceHistoryCount > 0 ? `${priceHistoryCount} registros` : 'Precio inicial'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[10px] font-mono text-zinc-400">
+                ID Interno: {listing.id}
+              </div>
+
+              {/* Acciones Rápidas exclusivas del Vendedor */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <Link
+                  href={listing.type === 'service' ? '/mis-servicios' : '/mis-publicaciones'}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-white px-3 py-2 text-xs font-bold text-purple-800 hover:bg-purple-50 dark:border-purple-700 dark:bg-zinc-900 dark:text-purple-200 transition-colors"
+                >
+                  <span>🛠️</span>
+                  <span>Gestionar Publicación</span>
+                </Link>
+                <Link
+                  href={`/promocionar?listing_id=${listing.id}`}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-500 transition-colors"
+                >
+                  <span>🚀</span>
+                  <span>Impulsar / Extender</span>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
