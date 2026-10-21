@@ -72,3 +72,16 @@ Este documento registra los fundamentos y decisiones de diseño aprobadas por el
   - **PROHIBIDO que el recuadro cambie de tamaño, brinque o se deforme con los efectos de movimiento, transiciones o rotación automática del contenido interior**.
   - No debe ocurrir ningún salto de diseño (*Layout Shift / CLS*) que desplace la ventana o las secciones inferiores de la página al rotar entre publicaciones con diferentes longitudes de texto, atributos o fotos.
   - La tipografía, espaciados y elementos interiores (titular recortado a máximo 2 líneas con `line-clamp-2`, descripción con `line-clamp-2`, botones y fotos con alturas acotadas) deben adaptarse consecuente y proporcionalmente para que cualquier publicación encaje de manera armónica dentro de las dimensiones fijas del recuadro estático.
+
+---
+
+## 5. Políticas Oficiales de Publicidad y Tarifas (Ver `POLITICAS_PUBLICIDAD.md`)
+- **Periodo Inicial Gratuito (7 Días)**:
+  - Cuando se crea un producto o servicio, dura inicialmente **7 días con publicidad gratis ($0 COP)**.
+- **Planes de Publicidad Pagada (después de los 7 días iniciales)**:
+  - **Plan Individual — Gran Vitrina**: **$20.000 COP** (7 días en Gran Vitrina Principal).
+  - **Plan Individual — Pasarela**: **$10.000 COP** (7 días en Pasarela de Productos/Servicios/Usados).
+  - **Plan en Combo (Las dos ubicaciones)**: **$25.000 COP** (Gran Vitrina + Pasarela simultáneamente por 7 días).
+- **Reflejo en Paneles**:
+  - Esta estructura tarifaria y de vigencia gratuita inicial debe reflejarse de manera uniforme tanto en los **paneles de configuración de los clientes** (`/publicar`, `/inventario`, `/mis-servicios`, `/promocionar`, `/mis-campanas`) como en los **paneles administrativos de configuración** (`/admin`).
+

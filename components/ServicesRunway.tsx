@@ -15,15 +15,16 @@ interface ServicesRunwayProps {
   items: ShowcaseItem[]
   locale: string
   t: any
+  scrollSpeed?: number
 }
 
-function ServicesRunwayComponent({ items, locale, t }: ServicesRunwayProps) {
+function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: ServicesRunwayProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const loopedItems = useMemo(() => createLoopedItems(items), [items])
   const control = useGpuContinuousScroll({
     trackRef,
     itemCount: items.length,
-    speed: 0.65,
+    speed: scrollSpeed,
   })
 
   if (items.length === 0) return null

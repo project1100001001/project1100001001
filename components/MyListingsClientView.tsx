@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { ListingWithRelations } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { getListingFreeTrialStatus, FREE_INITIAL_AD_DAYS } from '@/lib/adPolicies'
 
 interface MyListingsClientViewProps {
   listings: ListingWithRelations[]
@@ -33,6 +34,18 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
           </p>
         </div>
 
+        {/* Banner de Política de Publicidad del Cliente */}
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-white to-purple-50/70 p-4 shadow-2xs dark:border-emerald-900/60 dark:from-emerald-950/30 dark:via-zinc-900 dark:to-purple-950/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="text-xs text-zinc-700 dark:text-zinc-300">
+              <span className="font-extrabold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                🎁 Política de Publicidad:
+              </span>{' '}
+              Cada producto o servicio creado dura inicialmente <strong>{FREE_INITIAL_AD_DAYS} días con publicidad gratis ($0 COP)</strong>. Luego puedes elegir: <strong>Plan Individual Gran Vitrina ($20.000)</strong>, <strong>Plan Individual Pasarela ($10.000)</strong> o <strong>Plan en Combo las dos por $25.000 COP</strong>.
+            </div>
+          </div>
+        </div>
+
         {listings.length === 0 ? (
           <div className="my-12 rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <span className="text-4xl">📝</span>
@@ -42,14 +55,6 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
             <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-600 dark:text-zinc-400">
               {t.myListings.emptyDesc}
             </p>
-            <div className="mt-6">
-              <Link
-                href="/publicar"
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-              >
-                {t.myListings.createListingBtn}
-              </Link>
-            </div>
           </div>
         ) : (
           <div className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
@@ -61,8 +66,8 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
                     <th scope="col" className="px-6 py-3.5 font-semibold">{locale === 'en' ? 'Type' : 'Tipo'}</th>
                     <th scope="col" className="px-6 py-3.5 font-semibold">{t.common.price}</th>
                     <th scope="col" className="px-6 py-3.5 font-semibold">{t.common.status}</th>
+                    <th scope="col" className="px-6 py-3.5 font-semibold">{locale === 'en' ? 'Advertising Policy' : 'Publicidad / Plan'}</th>
                     <th scope="col" className="px-6 py-3.5 font-semibold">{locale === 'en' ? 'Date' : 'Fecha'}</th>
-                    <th scope="col" className="px-6 py-3.5 font-semibold text-right">{locale === 'en' ? 'Action' : 'Acción'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -72,6 +77,7 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
                       color: 'bg-zinc-100 text-zinc-700',
                     }
                     const primaryMedia = l.listing_media?.sort((a, b) => a.position - b.position)[0]
+                    const freeTrial = getListingFreeTrialStatus(l)
 
                     return (
                       <tr key={l.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
@@ -110,35 +116,21 @@ export default function MyListingsClientView({ listings }: MyListingsClientViewP
                             {badge.label}
                           </span>
                         </td>
+                        <td className="px-6 py-4">
+                          {freeTrial.isInFreePeriod ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300">
+                              <span>🎁</span>
+                              <span>Gratis ({freeTrial.daysRemaining}d restantes de {FREE_INITIAL_AD_DAYS}d)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 border border-purple-200 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300">
+                              <span>🚀</span>
+                              <span>Pasarela $10k | Vitrina $20k | Combo $25k</span>
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-xs">
                           {new Date(l.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-CO')}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2.5">
-                            <Link
-                              href={`/inventario?edit=${l.id}`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shrink-0 shadow-2xs"
-                              title={t.inventory.editItem || 'Editar Artículo Completo'}
-                            >
-                              <span>🛠️</span>
-                              <span>{t.myListings.editBtn || 'Editar'}</span>
-                            </Link>
-                            {l.status === 'published' && (
-                              <Link
-                                href={`/promocionar?listing_id=${l.id}`}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-purple-500 transition-colors shrink-0"
-                              >
-                                <span>🚀</span>
-                                <span>{t.myListings.promoteBtn}</span>
-                              </Link>
-                            )}
-                            <Link
-                              href={`/catalogo/${l.id}`}
-                              className="font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 text-xs shrink-0"
-                            >
-                              {t.myListings.viewBtn} →
-                            </Link>
-                          </div>
                         </td>
                       </tr>
                     )

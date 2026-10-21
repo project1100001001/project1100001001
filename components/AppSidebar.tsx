@@ -77,6 +77,7 @@ function SidebarNavContent({
   // Admin
   const isAdminListingsActive = pathname === '/admin' && (effectiveSection === '' || effectiveSection === 'listings')
   const isAdminAdsActive = pathname === '/admin' && effectiveSection === 'ads'
+  const isAdminAdPageActive = pathname === '/admin' && effectiveSection === 'adpage'
   const isAdminBalancesActive = pathname === '/admin' && effectiveSection === 'balances'
   const isAdminUsersActive = pathname === '/admin' && effectiveSection === 'users'
 
@@ -456,6 +457,31 @@ function SidebarNavContent({
                   <span>{t.nav.adminAds}</span>
                 </div>
                 {isAdminAdsActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+
+              <Link
+                href="/admin?section=adpage"
+                onClick={() => {
+                  close()
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('admin-section-change', { detail: 'adpage' }))
+                  }
+                }}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all text-xs ${
+                  isAdminAdPageActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>⚙️</span>
+                  <span>
+                    {locale === 'en' ? 'Ad Page Control' : 'Control Página Publicidad'}
+                  </span>
+                </div>
+                {isAdminAdPageActive && (
                   <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
                 )}
               </Link>

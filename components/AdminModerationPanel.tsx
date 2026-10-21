@@ -15,6 +15,16 @@ import type {
   AdRechargeRequestWithRelations,
 } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import {
+  OFFICIAL_AD_PLANS,
+  FREE_INITIAL_AD_DAYS,
+  resolveAdOrderPlacement,
+  getListingFreeTrialStatus,
+  buildInitialFreeAdAttrs,
+} from '@/lib/adPolicies'
+import { type AdPageConfig, DEFAULT_AD_PAGE_CONFIG } from '@/lib/adPageConfig'
+import AdPageAdminConfigWindow from '@/components/AdPageAdminConfigWindow'
+import AdminUsersManagementWindow from '@/components/AdminUsersManagementWindow'
 
 interface AdminModerationPanelProps {
   initialListings: ListingWithRelations[]
@@ -24,7 +34,8 @@ interface AdminModerationPanelProps {
   initialTransactions?: WalletTransactionWithRelations[]
   initialRechargeRequests?: AdRechargeRequestWithRelations[]
   initialUsers?: any[]
-  defaultSection?: 'listings' | 'ads' | 'balances' | 'users'
+  initialAdPageConfig?: AdPageConfig
+  defaultSection?: 'listings' | 'ads' | 'adpage' | 'balances' | 'users'
 }
 
 export default function AdminModerationPanel({
@@ -35,10 +46,13 @@ export default function AdminModerationPanel({
   initialTransactions = [],
   initialRechargeRequests = [],
   initialUsers = [],
+  initialAdPageConfig = DEFAULT_AD_PAGE_CONFIG,
   defaultSection = 'listings',
 }: AdminModerationPanelProps) {
   const { t, locale } = useTranslation()
-  const [section, setSection] = useState<'listings' | 'ads' | 'balances' | 'users'>(defaultSection)
+  const [section, setSection] = useState<'listings' | 'ads' | 'adpage' | 'balances' | 'users'>(
+    defaultSection
+  )
   const [users, setUsers] = useState<any[]>(initialUsers)
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'buyer' | 'seller' | 'admin'>('all')
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
@@ -56,7 +70,7 @@ export default function AdminModerationPanel({
   useEffect(() => {
     if (searchParams) {
       const sec = searchParams.get('section') || searchParams.get('tab')
-      if (sec && ['listings', 'ads', 'balances', 'users'].includes(sec)) {
+      if (sec && ['listings', 'ads', 'adpage', 'balances', 'users'].includes(sec)) {
         setSection(sec as any)
         setSearchQuery('')
       }
@@ -65,7 +79,7 @@ export default function AdminModerationPanel({
 
   useEffect(() => {
     const handleSectionChange = (e: any) => {
-      if (e.detail && ['listings', 'ads', 'balances', 'users'].includes(e.detail)) {
+      if (e.detail && ['listings', 'ads', 'adpage', 'balances', 'users'].includes(e.detail)) {
         setSection(e.detail)
         setSearchQuery('')
       }
@@ -74,7 +88,7 @@ export default function AdminModerationPanel({
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search)
         const sec = params.get('section') || params.get('tab')
-        if (sec && ['listings', 'ads', 'balances', 'users'].includes(sec)) {
+        if (sec && ['listings', 'ads', 'adpage', 'balances', 'users'].includes(sec)) {
           setSection(sec as any)
           setSearchQuery('')
         } else if (!sec) {
@@ -104,6 +118,7 @@ export default function AdminModerationPanel({
   const [adActiveTab, setAdActiveTab] = useState<'pending' | 'live' | 'rejected' | 'all'>('pending')
   const [rejectingAd, setRejectingAd] = useState<AdOrderWithRelations | null>(null)
   const [adRejectReason, setAdRejectReason] = useState('')
+  const [isSyncingPolicies, setIsSyncingPolicies] = useState(false)
 
   // Balances & Wallets state
   const [adAccounts, setAdAccounts] = useState<AdAccountWithRelations[]>(initialAdAccounts)
@@ -195,14 +210,48 @@ export default function AdminModerationPanel({
   const liveAdsCount = adOrders.filter((a) => a.status === 'live' || a.status === 'approved').length
   const rejectedAdsCount = adOrders.filter((a) => a.status === 'rejected').length
 
+  // --- Handlers: Sync Official Ad Packages ---
+  const handleSyncOfficialAdPackages = async () => {
+    setIsSyncingPolicies(true)
+    try {
+      for (const plan of OFFICIAL_AD_PLANS) {
+        const { error } = await supabase
+          .from('ad_package')
+          .upsert(
+            {
+              id: plan.id,
+              slot_id: plan.slot_id,
+              name: plan.name,
+              duration_days: plan.duration_days,
+              price: plan.price,
+              active: true,
+            },
+            { onConflict: 'id' }
+          )
+        if (error) throw error
+      }
+      showToast('Políticas y tarifas oficiales sincronizadas en base de datos (Pasarela $10.000, Gran Vitrina $20.000, Combo $25.000).')
+    } catch (err: any) {
+      showToast(err.message || 'Error al sincronizar paquetes publicitarios', 'error')
+    } finally {
+      setIsSyncingPolicies(false)
+    }
+  }
+
   // --- Handlers: Listings ---
   const handleApproveListing = async (listingId: string) => {
     setProcessingId(listingId)
     try {
+      const targetListing = listings.find((item) => item.id === listingId)
+      const nowIso = new Date().toISOString()
+      const updatedAttrs = buildInitialFreeAdAttrs(targetListing?.attrs)
+
       const { error } = await supabase
         .from('listing')
         .update({
           status: 'published',
+          published_at: targetListing?.published_at || nowIso,
+          attrs: updatedAttrs,
           reject_reason: null,
         })
         .eq('id', listingId)
@@ -211,11 +260,19 @@ export default function AdminModerationPanel({
 
       setListings((prev) =>
         prev.map((item) =>
-          item.id === listingId ? { ...item, status: 'published', reject_reason: null } : item
+          item.id === listingId
+            ? {
+                ...item,
+                status: 'published',
+                published_at: item.published_at || nowIso,
+                attrs: updatedAttrs,
+                reject_reason: null,
+              }
+            : item
         )
       )
 
-      showToast('Publicación aprobada exitosamente. Ya es visible en el catálogo.')
+      showToast(`Publicación aprobada con ${FREE_INITIAL_AD_DAYS} días iniciales de publicidad gratis activados.`)
     } catch (err: any) {
       showToast(err.message || 'Error al aprobar la publicación', 'error')
     } finally {
@@ -840,6 +897,17 @@ export default function AdminModerationPanel({
           ? 'Review and approve sponsored advertising campaigns in the catalog.'
           : 'Revisión y activación de campañas publicitarias patrocinadas en el catálogo.',
     },
+    adpage: {
+      icon: '⚙️',
+      title:
+        locale === 'en'
+          ? 'Advertising Page & Showcase Control'
+          : 'Administración de la Página de Publicidad y Vitrinas',
+      subtitle:
+        locale === 'en'
+          ? 'Control publication limits per runway, visualization speed, active sections, and extensible settings.'
+          : 'Controla la cantidad de publicaciones por pasarela, velocidad de visualización, secciones activas y futuras configuraciones.',
+    },
     balances: {
       icon: '💳',
       title: locale === 'en' ? 'Wallets & Balance Recharges' : 'Gestión de Billeteras y Recargas',
@@ -850,11 +918,14 @@ export default function AdminModerationPanel({
     },
     users: {
       icon: '👥',
-      title: locale === 'en' ? 'Users, Roles & Permissions' : 'Gestión de Usuarios, Roles y Permisos',
+      title:
+        locale === 'en'
+          ? 'Users Administration, Suspensions, Blocks & Roles'
+          : 'Administración de Usuarios, Bloqueos, Suspensiones y Roles',
       subtitle:
         locale === 'en'
-          ? 'Control system user accounts, assign roles (Buyer, Seller, Admin) and manage permissions.'
-          : 'Control de cuentas de usuario, asignación de roles (Comprador, Vendedor, Administrador) y permisos.',
+          ? 'Control user accounts, suspend or block access, verify businesses, manage permissions and assign roles.'
+          : 'Administra cuentas de usuario, suspende o bloquea accesos, verifica comercios, restringe permisos y asigna roles.',
     },
   }[section]
 
@@ -886,16 +957,29 @@ export default function AdminModerationPanel({
         </div>
 
         {/* Quick Search */}
-        <div className="relative w-full sm:w-72">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.admin.searchPlaceholder}
-            className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          />
-        </div>
+        {section !== 'adpage' && section !== 'users' && (
+          <div className="relative w-full sm:w-72">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.admin.searchPlaceholder}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-purple-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+          </div>
+        )}
       </div>
+
+      {/* ---------------- SECTION: AD PAGE CONTROL WINDOW ---------------- */}
+      {section === 'adpage' && (
+        <AdPageAdminConfigWindow
+          initialConfig={initialAdPageConfig}
+          listings={listings}
+          adOrders={adOrders}
+          locale={locale}
+          onNotify={showToast}
+        />
+      )}
 
       {/* ---------------- SECTION 1: LISTINGS ---------------- */}
       {section === 'listings' && (
@@ -979,6 +1063,7 @@ export default function AdminModerationPanel({
                 const primaryMedia = listing.listing_media?.sort((a, b) => a.position - b.position)[0]
                 const isPending = pendingListingStatuses.includes(listing.status)
                 const isProcessing = processingId === listing.id
+                const freeTrial = getListingFreeTrialStatus(listing)
 
                 return (
                   <div
@@ -1027,6 +1112,15 @@ export default function AdminModerationPanel({
                                 ? 'Rechazado'
                                 : 'Borrador'}
                             </span>
+                            {freeTrial.isInFreePeriod ? (
+                              <span className="rounded-md bg-emerald-50 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300">
+                                🎁 Publicidad Gratis ({freeTrial.daysRemaining}d restantes de {FREE_INITIAL_AD_DAYS}d)
+                              </span>
+                            ) : (
+                              <span className="rounded-md bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300">
+                                ⏱️ 7 días gratis finalizados (Elegible Plan $10k / $20k / Combo $25k)
+                              </span>
+                            )}
                             {listing.city && (
                               <span className="text-[11px] text-zinc-500">📍 {listing.city}</span>
                             )}
@@ -1080,7 +1174,7 @@ export default function AdminModerationPanel({
                             className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 transition-colors"
                           >
                             <span>✓</span>
-                            <span>{isProcessing ? 'Procesando...' : 'Aprobar publicación'}</span>
+                            <span>{isProcessing ? 'Procesando...' : 'Aprobar (+7d Gratis)'}</span>
                           </button>
                         )}
 
@@ -1108,9 +1202,141 @@ export default function AdminModerationPanel({
         </div>
       )}
 
-      {/* ---------------- SECTION 2: AD ORDERS ---------------- */}
+      {/* ---------------- SECTION 2: AD ORDERS & ADVERTISING POLICIES CONFIG ---------------- */}
       {section === 'ads' && (
         <div className="space-y-6">
+          {/* Panel Administrativo de Configuración de Políticas y Tarifas de Publicidad */}
+          <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/60 p-5 shadow-xs dark:border-purple-900/60 dark:from-purple-950/30 dark:via-zinc-900 dark:to-zinc-900">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-purple-200/70 dark:border-purple-900/50">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-lg bg-purple-600 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">
+                    Política Oficial Activa
+                  </span>
+                  <h3 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50">
+                    Configuración de Políticas y Tarifas de Publicidad
+                  </h3>
+                </div>
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  Todo producto o servicio creado recibe <strong>{FREE_INITIAL_AD_DAYS} días iniciales de publicidad gratis ($0 COP)</strong>. Finalizado el periodo inicial, aplican los planes individuales o en combo por ciclos de 7 días:
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSection('adpage')
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(
+                        new CustomEvent('admin-section-change', { detail: 'adpage' })
+                      )
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-purple-300 bg-white px-3.5 py-2 text-xs font-bold text-purple-800 shadow-2xs hover:bg-purple-50 dark:border-purple-800 dark:bg-zinc-800 dark:text-purple-200 transition-colors cursor-pointer"
+                >
+                  <span>⚙️</span>
+                  <span>Controlar Cantidad y Página de Publicidad</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isSyncingPolicies}
+                  onClick={handleSyncOfficialAdPackages}
+                  className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-500 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  <span>🔄</span>
+                  <span>
+                    {isSyncingPolicies
+                      ? 'Sincronizando Tarifas...'
+                      : 'Sincronizar Tarifas Oficiales en BD'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Regla 1: 7 Días Gratis */}
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50/70 p-3.5 dark:border-emerald-800/70 dark:bg-emerald-950/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                    1. Beneficio Inicial
+                  </span>
+                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {FREE_INITIAL_AD_DAYS} Días
+                  </span>
+                </div>
+                <div className="mt-1.5 text-base font-black text-emerald-700 dark:text-emerald-400">
+                  GRATIS ($0 COP)
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                  Se activa automáticamente al crear/publicar cualquier producto o servicio nuevo.
+                </p>
+              </div>
+
+              {/* Regla 2: Individual Pasarela */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-3.5 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                    2. Plan Individual
+                  </span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    7 Días
+                  </span>
+                </div>
+                <div className="mt-1 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                  ✨ Pasarela
+                </div>
+                <div className="text-base font-black text-zinc-900 dark:text-zinc-50">
+                  $10.000 COP
+                </div>
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  Aparición en Carruseles de Pasarela (Productos y Servicios).
+                </p>
+              </div>
+
+              {/* Regla 3: Individual Gran Vitrina */}
+              <div className="rounded-xl border border-zinc-200 bg-white p-3.5 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 dark:text-purple-400">
+                    3. Plan Individual
+                  </span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    7 Días
+                  </span>
+                </div>
+                <div className="mt-1 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                  🏆 Gran Vitrina
+                </div>
+                <div className="text-base font-black text-zinc-900 dark:text-zinc-50">
+                  $20.000 COP
+                </div>
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  Exposición principal en la Gran Vitrina rotativa superior.
+                </p>
+              </div>
+
+              {/* Regla 4: Combo las dos */}
+              <div className="rounded-xl border-2 border-purple-500 bg-purple-50/60 p-3.5 dark:border-purple-500/80 dark:bg-purple-950/40">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-800 dark:text-purple-300">
+                    4. Plan en Combo
+                  </span>
+                  <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-extrabold text-zinc-950">
+                    Ahorra $5.000
+                  </span>
+                </div>
+                <div className="mt-1 text-xs font-bold text-purple-950 dark:text-purple-100">
+                  🔥 Las Dos (Vitrina + Pasarela)
+                </div>
+                <div className="text-base font-black text-purple-700 dark:text-purple-300">
+                  $25.000 COP
+                </div>
+                <p className="mt-0.5 text-[11px] text-zinc-600 dark:text-zinc-300">
+                  Presencia simultánea en Gran Vitrina + Pasarela por 7 días.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Tabs for Ads */}
           <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
             {[
@@ -1183,6 +1409,7 @@ export default function AdminModerationPanel({
               {filteredAds.map((ad) => {
                 const isPending = pendingAdStatuses.includes(ad.status)
                 const isProcessing = processingId === ad.id
+                const placement = resolveAdOrderPlacement(ad)
 
                 return (
                   <div
@@ -1206,6 +1433,13 @@ export default function AdminModerationPanel({
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase tracking-wider">
                               {ad.package?.name || 'Paquete'}
+                            </span>
+                            <span className="rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300">
+                              {placement === 'combo'
+                                ? '🔥 Ubicación: Combo (Gran Vitrina + Pasarela)'
+                                : placement === 'gran_vitrina'
+                                ? '🏆 Ubicación: Gran Vitrina ($20.000)'
+                                : '✨ Ubicación: Pasarela ($10.000)'}
                             </span>
                             <span
                               className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
@@ -1792,28 +2026,9 @@ export default function AdminModerationPanel({
         </div>
       )}
 
-      {/* ---------------- SECTION 4: USUARIOS, ROLES Y PERMISOS ---------------- */}
+      {/* ---------------- SECTION 4: ADMINISTRACIÓN INTEGRAL DE USUARIOS ---------------- */}
       {section === 'users' && (
-        <div className="space-y-6">
-          {/* Header de la sección */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-            <div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                <span>👥</span>
-                <span>{t.admin.usersTitle}</span>
-              </h2>
-              <p className="mt-1 text-xs text-zinc-500 max-w-2xl">
-                {t.admin.usersSubtitle}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50">
-                {users.length} {locale === 'en' ? 'registered users' : 'usuarios registrados'}
-              </span>
-            </div>
-          </div>
-
-          {/* Feedback Alerts */}
+        <div className="space-y-4">
           {roleSuccessNotice && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1846,310 +2061,17 @@ export default function AdminModerationPanel({
             </div>
           )}
 
-          {/* Matriz Explicativa de Permisos por Rol */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-              📋 {t.admin.permissionsMatrixTitle}
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: Comprador */}
-              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🛒</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-blue-900 dark:text-blue-100 uppercase">
-                      {t.auth.buyerRole} (buyer)
-                    </h4>
-                    <span className="text-[10px] text-blue-700 dark:text-blue-300">
-                      Acceso básico y compras
-                    </span>
-                  </div>
-                </div>
-                <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 pt-1 border-t border-blue-200/60 dark:border-blue-900/50">
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Explorar catálogo y categorías
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Contactar comercios por WhatsApp
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Gestionar su cuenta personal
-                  </li>
-                  <li className="flex items-center gap-1.5 text-zinc-400 line-through">
-                    <span>✕</span> Publicar productos o servicios
-                  </li>
-                  <li className="flex items-center gap-1.5 text-zinc-400 line-through">
-                    <span>✕</span> Crear campañas publicitarias
-                  </li>
-                  <li className="flex items-center gap-1.5 text-zinc-400 line-through">
-                    <span>✕</span> Moderación o administración
-                  </li>
-                </ul>
-              </div>
-
-              {/* Card 2: Vendedor */}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🏪</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-100 uppercase">
-                      {t.auth.sellerRole} (seller)
-                    </h4>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300">
-                      Comercio y publicidad
-                    </span>
-                  </div>
-                </div>
-                <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 pt-1 border-t border-emerald-200/60 dark:border-emerald-900/50">
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Todos los permisos de comprador
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Publicar anuncios (productos/servicios)
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Gestionar inventario en Mis Publicaciones
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Recargar saldo de billetera publicitaria
-                  </li>
-                  <li className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
-                    <span>✓</span> Crear y gestionar campañas patrocinadas
-                  </li>
-                  <li className="flex items-center gap-1.5 text-zinc-400 line-through">
-                    <span>✕</span> Moderar contenido de otros vendedores
-                  </li>
-                </ul>
-              </div>
-
-              {/* Card 3: Administrador */}
-              <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/40 dark:bg-purple-950/20 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🛡️</span>
-                  <div>
-                    <h4 className="text-xs font-bold text-purple-900 dark:text-purple-100 uppercase">
-                      {t.auth.adminRole} (admin)
-                    </h4>
-                    <span className="text-[10px] text-purple-700 dark:text-purple-300">
-                      Control total del sistema
-                    </span>
-                  </div>
-                </div>
-                <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 pt-1 border-t border-purple-200/60 dark:border-purple-900/50">
-                  <li className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
-                    <span>✓</span> Permisos totales de la plataforma
-                  </li>
-                  <li className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
-                    <span>✓</span> Moderar y aprobar/rechazar publicaciones
-                  </li>
-                  <li className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
-                    <span>✓</span> Aprobar/rechazar campañas patrocinadas
-                  </li>
-                  <li className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
-                    <span>✓</span> Validar transferencias y acreditar saldo
-                  </li>
-                  <li className="flex items-center gap-1.5 text-purple-700 dark:text-purple-300 font-medium">
-                    <span>✓</span> <strong>Asignar, quitar o cambiar roles</strong>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros y Buscador de Usuarios */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'all', label: t.admin.filterAll, count: users.length },
-                { id: 'buyer', label: t.auth.buyerRole, count: users.filter((u) => u.role === 'buyer').length },
-                { id: 'seller', label: t.auth.sellerRole, count: users.filter((u) => u.role === 'seller').length },
-                { id: 'admin', label: t.auth.adminRole, count: users.filter((u) => u.role === 'admin').length },
-              ].map((filterTab) => (
-                <button
-                  key={filterTab.id}
-                  type="button"
-                  onClick={() => setUserRoleFilter(filterTab.id as any)}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                    userRoleFilter === filterTab.id
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                  }`}
-                >
-                  <span>{filterTab.label}</span>
-                  <span className="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.2 text-[10px]">
-                    {filterTab.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="w-full sm:w-64">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={locale === 'en' ? 'Search by name or city...' : 'Buscar por nombre o ciudad...'}
-                className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 shadow-xs focus:border-indigo-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              />
-            </div>
-          </div>
-
-          {/* Lista / Tabla de Usuarios con Quitar/Poner Roles */}
-          {(() => {
-            const filteredUsers = users.filter((u) => {
-              const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter
-              const q = searchQuery.toLowerCase().trim()
-              const matchSearch =
-                !q ||
-                u.full_name?.toLowerCase().includes(q) ||
-                u.city?.toLowerCase().includes(q) ||
-                u.id?.toLowerCase().includes(q)
-              return matchRole && matchSearch
-            })
-
-            if (filteredUsers.length === 0) {
-              return (
-                <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                  <span className="text-4xl">👥</span>
-                  <p className="mt-3 text-sm text-zinc-500">{t.admin.noRecords}</p>
-                </div>
-              )
-            }
-
-            return (
-              <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                    <thead className="border-b border-zinc-200 bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:bg-zinc-800/50">
-                      <tr>
-                        <th className="py-3 px-4 font-semibold">{locale === 'en' ? 'User' : 'Usuario'}</th>
-                        <th className="py-3 px-4 font-semibold">{locale === 'en' ? 'Current Role' : 'Rol Actual'}</th>
-                        <th className="py-3 px-4 font-semibold">{locale === 'en' ? 'Location' : 'Ubicación'}</th>
-                        <th className="py-3 px-4 font-semibold">{locale === 'en' ? 'Linked Business' : 'Negocio Vinculado'}</th>
-                        <th className="py-3 px-4 font-semibold text-right">{locale === 'en' ? 'Manage Role' : 'Asignar / Cambiar Rol'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {filteredUsers.map((u) => {
-                        const isUpdating = updatingUserId === u.id
-                        const initials = (u.full_name || 'U').slice(0, 2).toUpperCase()
-                        const sellerInfo = Array.isArray(u.seller) ? u.seller[0] : u.seller
-
-                        const badgeColor =
-                          u.role === 'admin'
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                            : u.role === 'seller'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                            : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-
-                        return (
-                          <tr key={u.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                            <td className="py-3.5 px-4 font-medium text-zinc-900 dark:text-zinc-100">
-                              <div className="flex items-center gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-200 dark:bg-zinc-700 font-bold text-xs text-zinc-700 dark:text-zinc-300">
-                                  {initials}
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="font-bold truncate text-xs">
-                                    {u.full_name || 'Sin nombre'}
-                                  </div>
-                                  <div className="text-[10px] text-zinc-400 font-mono truncate" title={u.id}>
-                                    ID: {u.id.slice(0, 8)}...
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${badgeColor}`}>
-                                <span>{u.role === 'admin' ? '🛡️' : u.role === 'seller' ? '🏪' : '🛒'}</span>
-                                <span className="uppercase">{u.role}</span>
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-xs whitespace-nowrap">
-                              {u.city || <span className="text-zinc-400">No registrada</span>}
-                            </td>
-
-                            <td className="py-3.5 px-4 text-xs">
-                              {sellerInfo ? (
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                                    {sellerInfo.business_name}
-                                  </div>
-                                  {sellerInfo.whatsapp && (
-                                    <div className="text-[10px] text-emerald-600 font-mono">
-                                      WA: {sellerInfo.whatsapp}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-zinc-400 text-[11px]">Sin comercio vinculado</span>
-                              )}
-                            </td>
-
-                            <td className="py-3.5 px-4 text-right">
-                              {isUpdating ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 animate-pulse">
-                                  <span>⏳</span>
-                                  <span>Actualizando rol...</span>
-                                </span>
-                              ) : (
-                                <div className="inline-flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateUserRole(u, 'buyer')}
-                                    disabled={u.role === 'buyer'}
-                                    className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all ${
-                                      u.role === 'buyer'
-                                        ? 'bg-blue-600 text-white shadow-xs cursor-default'
-                                        : 'text-zinc-600 hover:text-blue-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                                    }`}
-                                    title="Asignar rol Comprador"
-                                  >
-                                    🛒 Comprador
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateUserRole(u, 'seller')}
-                                    disabled={u.role === 'seller'}
-                                    className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all ${
-                                      u.role === 'seller'
-                                        ? 'bg-emerald-600 text-white shadow-xs cursor-default'
-                                        : 'text-zinc-600 hover:text-emerald-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                                    }`}
-                                    title="Asignar rol Vendedor"
-                                  >
-                                    🏪 Vendedor
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateUserRole(u, 'admin')}
-                                    disabled={u.role === 'admin'}
-                                    className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition-all ${
-                                      u.role === 'admin'
-                                        ? 'bg-purple-600 text-white shadow-xs cursor-default'
-                                        : 'text-zinc-600 hover:text-purple-700 hover:bg-white dark:text-zinc-400 dark:hover:bg-zinc-700'
-                                    }`}
-                                    title="Asignar rol Administrador"
-                                  >
-                                    🛡️ Admin
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          })()}
+          <AdminUsersManagementWindow
+            users={users}
+            setUsers={setUsers}
+            listings={listings}
+            setListings={setListings}
+            locale={locale}
+            t={t}
+            updatingUserId={updatingUserId}
+            onUpdateUserRole={handleUpdateUserRole}
+            onNotify={showToast}
+          />
         </div>
       )}
 
@@ -2349,20 +2271,26 @@ export default function AdminModerationPanel({
                   />
                 </div>
 
-                {/* Chips rápidos de valor */}
+                {/* Chips rápidos de valor según Políticas Oficiales */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {[20000, 30000, 40000, 50000, 100000].map((val) => (
+                  {[
+                    { val: 10000, label: '+$10.000 (Pasarela)' },
+                    { val: 20000, label: '+$20.000 (Gran Vitrina)' },
+                    { val: 25000, label: '+$25.000 (Combo las dos)' },
+                    { val: 50000, label: '+$50.000 (2 Combos)' },
+                    { val: 100000, label: '+$100.000' },
+                  ].map((chip) => (
                     <button
-                      key={val}
+                      key={chip.val}
                       type="button"
-                      onClick={() => setTopupAmount(val)}
+                      onClick={() => setTopupAmount(chip.val)}
                       className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-colors ${
-                        Number(topupAmount) === val
+                        Number(topupAmount) === chip.val
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
                       }`}
                     >
-                      +${val.toLocaleString('es-CO')}
+                      {chip.label}
                     </button>
                   ))}
                 </div>

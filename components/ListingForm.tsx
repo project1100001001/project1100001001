@@ -6,6 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingType, ListingWithRelations, Seller } from '@/lib/types'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
+import {
+  buildInitialFreeAdAttrs,
+  FREE_INITIAL_AD_DAYS,
+  PLAN_PASARELA_PRICE,
+  PLAN_GRAN_VITRINA_PRICE,
+  PLAN_COMBO_PRICE,
+} from '@/lib/adPolicies'
 
 interface ListingFormProps {
   categories: Category[]
@@ -470,6 +477,12 @@ export default function ListingForm({
         attrsObj[attr.key] = attr.value
       })
 
+      // Incluir metadatos de los 7 días iniciales de publicidad gratis
+      const finalAttrs = buildInitialFreeAdAttrs({
+        ...(inventoryItemData?.attrs || {}),
+        ...attrsObj,
+      })
+
       const numericPrice = priceType === 'fixed' && price ? parseInt(price, 10) : null
       const numericStock = isServiceMode ? null : stock ? parseInt(stock, 10) : null
       const finalListingType: ListingType = isServiceMode ? 'service' : (productCondition === 'used' ? 'article' : 'product')
@@ -490,7 +503,7 @@ export default function ListingForm({
             city: city.trim() || null,
             status: targetStatus,
             stock: numericStock,
-            attrs: attrsObj,
+            attrs: finalAttrs,
           })
           .eq('id', selectedInventoryId)
           .select()
@@ -526,7 +539,7 @@ export default function ListingForm({
             city: city.trim() || null,
             status: targetStatus,
             stock: numericStock,
-            attrs: attrsObj,
+            attrs: finalAttrs,
           })
           .select()
           .single()
@@ -589,22 +602,8 @@ export default function ListingForm({
           Inicia sesión para publicar
         </h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Para publicar productos o servicios y asociarlos a tu negocio, necesitas estar autenticado.
+          Para publicar productos o servicios y asociarlos a tu negocio, necesitas estar autenticado. Usa el menú lateral izquierdo para iniciar sesión.
         </p>
-        <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
-          <Link
-            href="/login?redirectTo=/publicar"
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors"
-          >
-            Iniciar sesión
-          </Link>
-          <Link
-            href="/catalogo"
-            className="rounded-lg border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
-          >
-            Ver catálogo primero
-          </Link>
-        </div>
       </div>
     )
   }
@@ -714,37 +713,26 @@ export default function ListingForm({
         </div>
         <h2 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
           {successInfo.status === 'submitted'
-            ? '¡Publicación enviada para revisión!'
+            ? '¡Publicación creada con 7 Días de Publicidad Gratis!'
             : '¡Borrador guardado exitosamente!'}
         </h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           {successInfo.status === 'submitted'
-            ? 'Tu anuncio está en estado "En revisión" (submitted). Cuando sea aprobado por el equipo de moderación, aparecerá en el catálogo público.'
-            : 'Tu publicación ha quedado en borrador. Podrás editarla y publicarla cuando desees desde tu panel.'}
+            ? 'Tu producto o servicio incluye 7 días iniciales de publicidad gratis ($0 COP). Al finalizar los 7 días podrás renovar en Gran Vitrina ($20.000), Pasarela ($10.000) o Combo las dos por $25.000.'
+            : 'Tu publicación ha quedado en borrador. Al publicarla activará sus 7 días iniciales de publicidad gratis.'}
         </p>
 
-        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
-          <Link
-            href={`/catalogo/${successInfo.id}`}
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors"
-          >
-            Ver vista previa del anuncio
-          </Link>
-          {isServiceMode ? (
-            <Link
-              href="/mis-servicios"
-              className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
-            >
-              🛠️ Mis Servicios
-            </Link>
-          ) : (
-            <Link
-              href="/mis-publicaciones"
-              className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors"
-            >
-              📦 Inventario
-            </Link>
-          )}
+        <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-left text-xs text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 space-y-1">
+          <div className="font-extrabold flex items-center gap-1.5">
+            <span>🎁</span>
+            <span>Política Oficial de Publicidad Activada:</span>
+          </div>
+          <p>• <strong>Primeros {FREE_INITIAL_AD_DAYS} días:</strong> Publicidad Inicial GRATIS ($0 COP).</p>
+          <p>• <strong>Luego Plan Individual:</strong> Gran Vitrina ${PLAN_GRAN_VITRINA_PRICE.toLocaleString('es-CO')} | Pasarela ${PLAN_PASARELA_PRICE.toLocaleString('es-CO')}.</p>
+          <p>• <strong>Plan en Combo (Las dos):</strong> ${PLAN_COMBO_PRICE.toLocaleString('es-CO')} COP (Ahorras $5.000).</p>
+        </div>
+
+        <div className="mt-6 flex justify-center">
           <button
             onClick={() => {
               setSuccessInfo(null)
@@ -763,9 +751,9 @@ export default function ListingForm({
               setMediaUrls([])
               setCustomAttrs([])
             }}
-            className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400"
+            className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 transition-colors"
           >
-            Publicar otro anuncio
+            + Publicar otro anuncio
           </button>
         </div>
       </div>
@@ -792,6 +780,30 @@ export default function ListingForm({
                 ? 'Manage stock inventory, physical condition (new or pre-owned), and shipping methods for your products.'
                 : 'Gestiona existencias de inventario, condición física (nuevo o segunda mano) y entregas para tus productos.')}
         </p>
+      </div>
+
+      {/* Banner de Política Oficial de Publicidad: 7 Días Gratis + Planes */}
+      <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-purple-50/60 p-4 shadow-2xs dark:border-emerald-900/60 dark:from-emerald-950/40 dark:via-zinc-900 dark:to-purple-950/30">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white text-lg shadow-xs">
+              🎁
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
+                  Beneficio de Lanzamiento: {FREE_INITIAL_AD_DAYS} Días Iniciales con Publicidad Gratis
+                </h2>
+                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  $0 COP por 7 días
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                Cuando creas un producto o servicio dura inicialmente <strong>{FREE_INITIAL_AD_DAYS} días con publicidad gratis</strong>. Luego puedes continuar con: <strong>Plan Individual Gran Vitrina ($20.000)</strong>, <strong>Plan Individual Pasarela ($10.000)</strong> o <strong>Plan en Combo las dos por $25.000 COP</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {errorMsg && (

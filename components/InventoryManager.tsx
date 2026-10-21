@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingStatus, ListingType, ListingWithRelations, PriceHistoryRecord, Sale, SaleStatus, Seller } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { buildInitialFreeAdAttrs } from '@/lib/adPolicies'
 
 interface InventoryManagerProps {
   initialListings: ListingWithRelations[]
@@ -506,6 +507,8 @@ export default function InventoryManager({
         attrsObj.delivery_method = 'Domicilio local'
       }
 
+      const finalAttrs = buildInitialFreeAdAttrs(attrsObj)
+
       const { data, error } = await supabase
         .from('listing')
         .insert({
@@ -519,7 +522,7 @@ export default function InventoryManager({
           stock: numericStock,
           city: newItemCity.trim() || null,
           status: 'draft',
-          attrs: attrsObj,
+          attrs: finalAttrs,
         })
         .select(`
           *,

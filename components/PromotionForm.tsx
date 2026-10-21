@@ -13,6 +13,16 @@ import type {
 } from '@/lib/types'
 import Link from 'next/link'
 import { useTranslation } from '@/lib/i18n'
+import {
+  normalizeToOfficialPackages,
+  getListingFreeTrialStatus,
+  MIN_AD_PLAN_PRICE,
+  FREE_INITIAL_AD_DAYS,
+  PLAN_PASARELA_PRICE,
+  PLAN_GRAN_VITRINA_PRICE,
+  PLAN_COMBO_PRICE,
+  PLAN_COMBO_SAVINGS,
+} from '@/lib/adPolicies'
 
 interface PromotionFormProps {
   userId: string
@@ -34,12 +44,13 @@ export default function PromotionForm({
   initialRechargeRequests = [],
   publishedListings,
   preselectedListingId,
-  packages,
+  packages: rawPackages,
   initialTab,
 }: PromotionFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const { t, locale } = useTranslation()
+  const packages = normalizeToOfficialPackages(rawPackages)
 
   // Advertiser & Account state
   const [advertiser, setAdvertiser] = useState<Advertiser | null>(initialAdvertiser)
@@ -98,8 +109,8 @@ export default function PromotionForm({
   const tabFromUrl = searchParams ? searchParams.get('tab') : null
 
   const currentBalance = adAccount?.balance || 0
-  const minRequiredPrice = packages[0]?.price || 30000
-  const hasApprovedBalance = currentBalance >= (selectedCampaignPackage?.price || minRequiredPrice)
+  const minRequiredPrice = packages[0]?.price || MIN_AD_PLAN_PRICE
+  const hasApprovedBalance = currentBalance >= minRequiredPrice
 
   const [activeTab, setActiveTab] = useState<'recharge' | 'campaign'>(() => {
     if (initialTab) return initialTab
@@ -547,10 +558,105 @@ export default function PromotionForm({
     )
   }
 
-  const isCampaignUnlocked = currentBalance >= selectedCampaignPackage.price
+  const isCampaignUnlocked = currentBalance >= minRequiredPrice
+  const selectedListingFreeTrial = selectedListing
+    ? getListingFreeTrialStatus(selectedListing)
+    : null
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* 0. Cuadro Oficial de Políticas de Publicidad (Cliente) */}
+      <div className="rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-white to-purple-50/80 p-5 sm:p-6 shadow-xs dark:border-emerald-900/50 dark:from-emerald-950/30 dark:via-zinc-900 dark:to-purple-950/30">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 border-b border-emerald-200/70 dark:border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white text-lg shadow-xs">
+              📜
+            </span>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-50">
+                {locale === 'en'
+                  ? 'Official Marketplace Advertising Policies'
+                  : 'Políticas y Tarifas Oficiales de Publicidad'}
+              </h2>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                {locale === 'en'
+                  ? 'Every new product or service includes 7 initial days of free advertising, followed by our Individual or Combo plans.'
+                  : 'Cuando creas un producto o servicio dura inicialmente 7 días con publicidad gratis. Luego puedes elegir plan individual o en combo:'}
+              </p>
+            </div>
+          </div>
+          <span className="self-start sm:self-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+            🎁 {FREE_INITIAL_AD_DAYS} {locale === 'en' ? 'Initial Days Free' : 'Días Iniciales Gratis'}
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+          {/* Regla 1: 7 días gratis iniciales */}
+          <div className="rounded-2xl border border-emerald-200 bg-white/90 p-3.5 dark:border-emerald-900/60 dark:bg-zinc-900/90">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                {locale === 'en' ? 'Initial Benefit' : 'Al Crear Publicación'}
+              </span>
+              <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                GRATIS
+              </span>
+            </div>
+            <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
+              {locale === 'en' ? '7 Days Free Ad' : '7 Días Publicidad Gratis'}
+            </div>
+            <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+              {locale === 'en'
+                ? 'Automatic upon creating any product or service.'
+                : 'Automático al crear cualquier producto o servicio.'}
+            </p>
+          </div>
+
+          {/* Plan Individual: Pasarela */}
+          <div className="rounded-2xl border border-zinc-200 bg-white/90 p-3.5 dark:border-zinc-800 dark:bg-zinc-900/90">
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">
+              {locale === 'en' ? 'Individual Plan' : 'Plan Individual'}
+            </span>
+            <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
+              Pasarela
+            </div>
+            <div className="mt-1 text-base font-black text-blue-600 dark:text-blue-400">
+              ${PLAN_PASARELA_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-400">COP</span>
+            </div>
+          </div>
+
+          {/* Plan Individual: Gran Vitrina */}
+          <div className="rounded-2xl border border-zinc-200 bg-white/90 p-3.5 dark:border-zinc-800 dark:bg-zinc-900/90">
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">
+              {locale === 'en' ? 'Individual Plan' : 'Plan Individual'}
+            </span>
+            <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
+              Gran Vitrina
+            </div>
+            <div className="mt-1 text-base font-black text-purple-600 dark:text-purple-400">
+              ${PLAN_GRAN_VITRINA_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-400">COP</span>
+            </div>
+          </div>
+
+          {/* Plan en Combo: Las dos */}
+          <div className="rounded-2xl border-2 border-amber-400/80 bg-amber-50/60 p-3.5 dark:border-amber-700 dark:bg-amber-950/30">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                {locale === 'en' ? 'Combo Plan' : 'Plan en Combo'}
+              </span>
+              <span className="rounded-md bg-amber-200/80 px-1.5 py-0.5 text-[9px] font-black text-amber-900 dark:bg-amber-900 dark:text-amber-200">
+                -${PLAN_COMBO_SAVINGS.toLocaleString('es-CO')}
+              </span>
+            </div>
+            <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
+              {locale === 'en' ? 'Both (Showcase + Runway)' : 'Las dos (Gran Vitrina + Pasarela)'}
+            </div>
+            <div className="mt-1 text-base font-black text-amber-700 dark:text-amber-400">
+              ${PLAN_COMBO_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-500">COP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 1. Header: Saldo Aprobado y Estado de Cuenta */}
       <div className="rounded-3xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 via-indigo-50/70 to-purple-50 p-6 shadow-sm dark:border-purple-900/60 dark:from-purple-950/40 dark:via-zinc-900 dark:to-purple-950/40">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -625,12 +731,10 @@ export default function PromotionForm({
           <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 dark:border-blue-900/60 dark:bg-blue-950/30">
             <h3 className="text-sm font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
               <span>ℹ️</span>
-              <span>Proceso de Recarga y Habilitación de Campañas</span>
+              <span>Proceso de Recarga y Planes de Publicidad (Individuales y Combo)</span>
             </h3>
             <p className="mt-1 text-xs text-blue-800/90 dark:text-blue-300 leading-relaxed">
-              El proceso de recarga es <strong>independiente</strong> de la creación del anuncio. 
-              Selecciona el paquete publicitario que deseas adquirir, transfiere el valor correspondiente a nuestras cuentas oficiales y sube el comprobante. 
-              Una vez aprobado por el administrador, el saldo se acreditará inmediatamente en tu cuenta y se habilitará la ventana de configuración del anuncio publicitario.
+              Recuerda que al crear un producto o servicio tienes <strong>7 días iniciales con publicidad gratis</strong>. Para continuar promocionando o impulsar tus anuncios, elige entre el <strong>Plan Individual Pasarela ($10.000 COP)</strong>, <strong>Plan Individual Gran Vitrina ($20.000 COP)</strong> o el <strong>Plan en Combo con las dos por $25.000 COP</strong>.
             </p>
           </div>
 
@@ -651,38 +755,66 @@ export default function PromotionForm({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  1. Elige el Paquete Publicitario que deseas Recargar *
+                  1. Elige el Plan Publicitario que deseas Recargar *
                 </label>
                 <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">
-                  Precios oficiales
+                  Tarifas oficiales vigentes
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {packages.map((pkg) => {
                   const isSelected = selectedRechargePackageId === pkg.id
+                  const isCombo = pkg.categoryType === 'combo'
                   return (
                     <button
                       key={pkg.id}
                       type="button"
                       onClick={() => setSelectedRechargePackageId(pkg.id)}
-                      className={`flex flex-col p-4 rounded-2xl border text-left transition-all ${
+                      className={`relative flex flex-col justify-between p-5 rounded-2xl border text-left transition-all cursor-pointer ${
                         isSelected
                           ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 ring-2 ring-purple-600 shadow-sm'
+                          : isCombo
+                          ? 'border-amber-300 bg-amber-50/20 dark:border-amber-800/70 dark:bg-amber-950/10 hover:border-amber-400'
                           : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900'
                       }`}
                     >
-                      <span className="text-[11px] font-bold text-purple-700 dark:text-purple-400">
-                        ⏱️ {pkg.duration_days} días de visibilidad
-                      </span>
-                      <span className="mt-1 text-sm font-bold text-zinc-900 dark:text-zinc-50">
-                        {pkg.name}
-                      </span>
-                      <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-baseline justify-between">
-                        <span className="text-base font-black text-zinc-900 dark:text-zinc-100">
-                          ${Number(pkg.price).toLocaleString('es-CO')}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 font-bold">COP</span>
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                              isCombo
+                                ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
+                                : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                            }`}
+                          >
+                            {locale === 'en' ? pkg.badgeEn : pkg.badgeEs}
+                          </span>
+                          <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                            ⏱️ {pkg.duration_days} días
+                          </span>
+                        </div>
+
+                        <div className="mt-2.5 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                          {locale === 'en' ? pkg.nameEn : pkg.nameEs}
+                        </div>
+                        <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          {locale === 'en' ? pkg.descriptionEn : pkg.descriptionEs}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-zinc-200/70 dark:border-zinc-800 flex items-baseline justify-between">
+                        <div>
+                          <span className="text-lg font-black text-zinc-900 dark:text-zinc-100">
+                            ${Number(pkg.price).toLocaleString('es-CO')}
+                          </span>
+                          <span className="ml-1 text-[10px] text-zinc-400 font-bold">COP</span>
+                        </div>
+                        {isCombo && (
+                          <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
+                            ¡Ahorras $5.000!
+                          </span>
+                        )}
                       </div>
                     </button>
                   )
@@ -978,15 +1110,15 @@ export default function PromotionForm({
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Inversión Mínima Requerida:</span>
+                  <span className="text-zinc-500">Plan Mínimo Disponible (Pasarela):</span>
                   <span className="font-extrabold text-purple-600 dark:text-purple-400">
-                    ${selectedCampaignPackage.price.toLocaleString('es-CO')} COP ({selectedCampaignPackage.name})
+                    ${minRequiredPrice.toLocaleString('es-CO')} COP
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-zinc-200 dark:border-zinc-700">
                   <span className="text-zinc-700 dark:text-zinc-300 font-semibold">Faltante para Desbloquear:</span>
                   <span className="font-black text-red-600 dark:text-red-400">
-                    ${Math.max(0, selectedCampaignPackage.price - currentBalance).toLocaleString('es-CO')} COP
+                    ${Math.max(0, minRequiredPrice - currentBalance).toLocaleString('es-CO')} COP
                   </span>
                 </div>
               </div>
@@ -1014,7 +1146,7 @@ export default function PromotionForm({
               ) : (
                 <div className="space-y-2">
                   <div className="rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 p-3.5 text-xs text-purple-900 dark:text-purple-200">
-                    <span>👈 Para adquirir saldo y desbloquear la campaña, utiliza la opción <strong>Recarga de Saldo</strong> en el menú lateral izquierdo.</span>
+                    <span>👈 Para adquirir saldo y desbloquear la campaña (desde $10.000 COP), utiliza la opción <strong>Recarga de Saldo</strong> en el menú lateral izquierdo.</span>
                   </div>
                 </div>
               )}
@@ -1039,10 +1171,10 @@ export default function PromotionForm({
 
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-                  Configurar Creatividad y Lanzar Anuncio
+                  Configurar Plan de Publicidad y Lanzar Anuncio
                 </h2>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Personaliza cómo se verá tu anuncio publicitario patrocinado en el marketplace.
+                  Después de los 7 días iniciales de publicidad gratis, elige tu Plan Individual (Pasarela $10.000 o Gran Vitrina $20.000) o el Plan en Combo (las dos por $25.000).
                 </p>
               </div>
 
@@ -1052,61 +1184,129 @@ export default function PromotionForm({
                 </div>
               )}
 
-              {/* 1. Seleccionar Producto/Servicio */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-2">
-                  1. Publicación a Promocionar *
+              {/* 1. Seleccionar Producto/Servicio + Estado de sus 7 días gratis iniciales */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  1. Publicación (Producto o Servicio) a Promocionar *
                 </label>
                 <select
                   value={selectedListingId}
                   onChange={(e) => setSelectedListingId(e.target.value)}
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs text-zinc-900 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 >
-                  {publishedListings.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.title} — ({l.type}) {l.price ? `$${Number(l.price).toLocaleString('es-CO')}` : 'Cotización'}
-                    </option>
-                  ))}
+                  {publishedListings.map((l) => {
+                    const ft = getListingFreeTrialStatus(l)
+                    return (
+                      <option key={l.id} value={l.id}>
+                        {l.title} — ({l.type === 'service' ? 'Servicio' : l.type === 'article' ? 'Usado' : 'Producto'}) {l.price ? `$${Number(l.price).toLocaleString('es-CO')}` : 'Cotización'} [{ft.isFreeTrialActive ? `🎁 ${ft.daysRemaining}d gratis restantes` : 'Periodo gratis finalizado'}]
+                      </option>
+                    )
+                  })}
                 </select>
+
+                {/* Indicador de Política de 7 Días Gratis del Producto/Servicio Seleccionado */}
+                {selectedListing && selectedListingFreeTrial && (
+                  <div
+                    className={`rounded-2xl p-4 border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      selectedListingFreeTrial.isFreeTrialActive
+                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200'
+                        : 'border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-lg shrink-0">
+                        {selectedListingFreeTrial.isFreeTrialActive ? '🎁' : '⏰'}
+                      </span>
+                      <div>
+                        <div className="font-bold">
+                          {selectedListingFreeTrial.isFreeTrialActive
+                            ? `Beneficio Inicial Activo: ${selectedListingFreeTrial.daysRemaining} días y ${selectedListingFreeTrial.hoursRemaining}h restantes de publicidad gratis`
+                            : 'El periodo inicial de 7 días de publicidad gratis ha concluido'}
+                        </div>
+                        <p className="mt-0.5 text-[11px] opacity-90">
+                          {selectedListingFreeTrial.isFreeTrialActive
+                            ? 'Tu producto o servicio fue creado recientemente y goza de 7 días iniciales gratis. Puedes adquirir un Plan Individual o en Combo ahora para extender y multiplicar su alcance.'
+                            : 'Activa a continuación el Plan Individual (Gran Vitrina $20.000 o Pasarela $10.000) o el Plan en Combo (las dos por $25.000) para mantener tu anuncio en vitrina.'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="self-start sm:self-center shrink-0 rounded-full bg-white/80 dark:bg-zinc-900/80 px-3 py-1 text-[10px] font-black uppercase tracking-wider border border-current/20">
+                      {selectedListingFreeTrial.isFreeTrialActive
+                        ? `Vence: ${new Date(selectedListingFreeTrial.endsAt).toLocaleDateString('es-CO')}`
+                        : 'Listo para Plan Pago'}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* 2. Seleccionar Paquete Publicitario */}
+              {/* 2. Seleccionar Paquete Publicitario (Individual o Combo) */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-2">
-                  2. Paquete a Aplicar con tu Saldo Aprobado *
-                </label>
+                <div className="flex items-center justify-between mb-2.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                    2. Elige tu Plan Publicitario (Individual o en Combo) *
+                  </label>
+                  <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                    Vigencia: 7 días por plan
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {packages.map((pkg) => {
                     const isSelected = selectedCampaignPackageId === pkg.id
                     const canAfford = currentBalance >= pkg.price
+                    const isCombo = pkg.categoryType === 'combo'
                     return (
                       <button
                         key={pkg.id}
                         type="button"
                         onClick={() => setSelectedCampaignPackageId(pkg.id)}
-                        className={`flex flex-col p-4 rounded-2xl border text-left transition-all ${
+                        className={`flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-purple-600 bg-purple-50/60 dark:bg-purple-950/30 ring-2 ring-purple-600 shadow-sm'
+                            ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 ring-2 ring-purple-600 shadow-sm'
+                            : isCombo
+                            ? 'border-amber-300 bg-amber-50/20 dark:border-amber-800/70 dark:bg-amber-950/10 hover:border-amber-400'
                             : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
-                        } ${!canAfford ? 'opacity-50' : ''}`}
+                        } ${!canAfford ? 'opacity-60' : ''}`}
                       >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400">
-                            ⏱️ {pkg.duration_days} días
+                        <div>
+                          <div className="flex items-center justify-between w-full gap-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                                isCombo
+                                  ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
+                                  : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                              }`}
+                            >
+                              {locale === 'en' ? pkg.badgeEn : pkg.badgeEs}
+                            </span>
+                            {!canAfford ? (
+                              <span className="text-[10px] text-red-500 font-bold">Saldo insuficiente</span>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-zinc-500">
+                                ⏱️ {pkg.duration_days} días
+                              </span>
+                            )}
+                          </div>
+                          <span className="mt-2 block text-sm font-black text-zinc-900 dark:text-zinc-50">
+                            {locale === 'en' ? pkg.nameEn : pkg.nameEs}
                           </span>
-                          {!canAfford && (
-                            <span className="text-[10px] text-red-500 font-bold">Saldo bajo</span>
-                          )}
+                          <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                            {locale === 'en' ? pkg.subtitleEn : pkg.subtitleEs}
+                          </p>
                         </div>
-                        <span className="mt-1 text-sm font-bold text-zinc-900 dark:text-zinc-50">
-                          {pkg.name}
-                        </span>
+
                         <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-baseline justify-between">
-                          <span className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">
-                            ${Number(pkg.price).toLocaleString('es-CO')}
-                          </span>
-                          <span className="text-[10px] text-zinc-400">COP</span>
+                          <div>
+                            <span className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">
+                              ${Number(pkg.price).toLocaleString('es-CO')}
+                            </span>
+                            <span className="ml-1 text-[10px] text-zinc-400">COP</span>
+                          </div>
+                          {isCombo && (
+                            <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
+                              Ahorras $5.000
+                            </span>
+                          )}
                         </div>
                       </button>
                     )

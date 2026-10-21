@@ -15,15 +15,16 @@ interface ArticlesRunwayProps {
   items: ShowcaseItem[]
   locale: string
   t: any
+  scrollSpeed?: number
 }
 
-function ArticlesRunwayComponent({ items, locale, t }: ArticlesRunwayProps) {
+function ArticlesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: ArticlesRunwayProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const loopedItems = useMemo(() => createLoopedItems(items), [items])
   const control = useGpuContinuousScroll({
     trackRef,
     itemCount: items.length,
-    speed: 0.65,
+    speed: scrollSpeed,
   })
 
   if (items.length === 0) return null

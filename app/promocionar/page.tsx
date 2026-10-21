@@ -16,35 +16,9 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-const DEFAULT_PACKAGES: AdPackage[] = [
-  {
-    id: 'd1000000-0000-0000-0000-000000000001',
-    name: 'Destacado 7 días',
-    slot_id: 'search.top',
-    duration_days: 7,
-    price: 30000,
-    max_active_slots: 1,
-    active: true,
-  },
-  {
-    id: 'd1000000-0000-0000-0000-000000000002',
-    name: 'Destacado 14 días',
-    slot_id: 'search.top',
-    duration_days: 14,
-    price: 50000,
-    max_active_slots: 1,
-    active: true,
-  },
-  {
-    id: 'd1000000-0000-0000-0000-000000000003',
-    name: 'Banner Top 3 días',
-    slot_id: 'home.carousel',
-    duration_days: 3,
-    price: 40000,
-    max_active_slots: 1,
-    active: true,
-  },
-]
+import { OFFICIAL_AD_PLANS, normalizeToOfficialPackages } from '@/lib/adPolicies'
+
+const DEFAULT_PACKAGES: AdPackage[] = OFFICIAL_AD_PLANS
 
 export default async function PromocionarPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams
@@ -185,7 +159,7 @@ export default async function PromocionarPage({ searchParams }: PageProps) {
       .order('price', { ascending: true })
 
     if (!pkgErr && dbPackages && dbPackages.length > 0) {
-      packages = dbPackages as AdPackage[]
+      packages = normalizeToOfficialPackages(dbPackages as AdPackage[])
     } else {
       packages = DEFAULT_PACKAGES
     }

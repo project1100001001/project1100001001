@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import AdminModerationPanel from '@/components/AdminModerationPanel'
 import type { ListingWithRelations } from '@/lib/types'
+import { decodeAdPageConfigFromSlots } from '@/lib/adPageConfig'
 
 export const metadata = {
   title: 'Panel de Moderación | Admin Marketplace',
@@ -21,8 +22,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const resolvedParams = searchParams ? await searchParams : {}
   const rawSection = resolvedParams.section || resolvedParams.tab
   const defaultSection =
-    rawSection === 'users' || rawSection === 'ads' || rawSection === 'balances' || rawSection === 'listings'
-      ? (rawSection as 'listings' | 'ads' | 'balances' | 'users')
+    rawSection === 'users' ||
+    rawSection === 'ads' ||
+    rawSection === 'adpage' ||
+    rawSection === 'balances' ||
+    rawSection === 'listings'
+      ? (rawSection as 'listings' | 'ads' | 'adpage' | 'balances' | 'users')
       : 'listings'
 
   const supabase = await createClient()
@@ -247,6 +252,18 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     console.warn('Aviso en consulta de app_user:', err?.message || err)
   }
 
+  // 10. Configuración administrativa de la página de publicidad (ad_slot)
+  let adSlotsData: any[] = []
+  try {
+    const { data: slots } = await supabase.from('ad_slot').select('*')
+    if (slots) {
+      adSlotsData = slots
+    }
+  } catch {
+    // Usar valores por defecto
+  }
+  const adPageConfig = decodeAdPageConfigFromSlots(adSlotsData)
+
   return (
     <main className="flex-1 bg-zinc-50/50 py-10 dark:bg-zinc-950">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -265,6 +282,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             initialTransactions={recentTransactionsData}
             initialRechargeRequests={rechargeRequestsData}
             initialUsers={usersData}
+            initialAdPageConfig={adPageConfig}
             defaultSection={defaultSection}
           />
         </Suspense>

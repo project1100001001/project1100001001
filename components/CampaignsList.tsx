@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import type { AdOrderWithRelations, AdOrderStatus } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { resolveAdOrderPlacement, FREE_INITIAL_AD_DAYS } from '@/lib/adPolicies'
 
 interface CampaignsListProps {
   initialOrders: AdOrderWithRelations[]
@@ -204,6 +205,42 @@ export default function CampaignsList({
               Recarga saldo o activa nuevos paquetes desde el menú lateral izquierdo en{' '}
               <strong>Mis Campañas → Recarga de Saldo</strong>.
             </p>
+          </div>
+        </div>
+
+        {/* Resumen de Políticas y Tarifas de Publicidad para el Cliente */}
+        <div className="mt-5 pt-4 border-t border-purple-200/60 dark:border-purple-800/50 grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+          <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 px-3 py-2 dark:bg-emerald-950/40 dark:border-emerald-800/60">
+            <span className="text-[10px] font-extrabold uppercase text-emerald-800 dark:text-emerald-300 block">
+              🎁 Publicidad Inicial
+            </span>
+            <span className="font-black text-emerald-700 dark:text-emerald-400">
+              {FREE_INITIAL_AD_DAYS} Días GRATIS ($0)
+            </span>
+            <span className="block text-[10px] text-zinc-500">Al crear producto o servicio</span>
+          </div>
+          <div className="rounded-xl bg-white/90 border border-zinc-200 px-3 py-2 dark:bg-zinc-800/70 dark:border-zinc-700">
+            <span className="text-[10px] font-extrabold uppercase text-blue-700 dark:text-blue-400 block">
+              ✨ Individual Pasarela
+            </span>
+            <span className="font-black text-zinc-900 dark:text-zinc-50">$10.000 COP</span>
+            <span className="block text-[10px] text-zinc-500">Ciclo de 7 días</span>
+          </div>
+          <div className="rounded-xl bg-white/90 border border-zinc-200 px-3 py-2 dark:bg-zinc-800/70 dark:border-zinc-700">
+            <span className="text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400 block">
+              🏆 Individual Gran Vitrina
+            </span>
+            <span className="font-black text-zinc-900 dark:text-zinc-50">$20.000 COP</span>
+            <span className="block text-[10px] text-zinc-500">Ciclo de 7 días</span>
+          </div>
+          <div className="rounded-xl bg-purple-100/80 border border-purple-300 px-3 py-2 dark:bg-purple-950/60 dark:border-purple-700">
+            <span className="text-[10px] font-extrabold uppercase text-purple-900 dark:text-purple-300 block">
+              🔥 Plan en Combo (Las dos)
+            </span>
+            <span className="font-black text-purple-700 dark:text-purple-300">$25.000 COP</span>
+            <span className="block text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">
+              Vitrina + Pasarela (Ahorras $5.000)
+            </span>
           </div>
         </div>
       </div>
@@ -583,13 +620,18 @@ export default function CampaignsList({
                           </div>
                         </td>
 
-                        {/* 5. Inversión */}
+                        {/* 5. Inversión y Plan Oficial */}
                         <td className="px-4 py-4">
                           <div className="font-black text-sm text-zinc-900 dark:text-zinc-50">
                             ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}
                           </div>
-                          <div className="text-[10px] text-zinc-400">
-                            {order.package?.name || 'Paquete Estándar'}
+                          <div className="text-[10px] font-semibold text-purple-700 dark:text-purple-400">
+                            {(() => {
+                              const pl = resolveAdOrderPlacement(order)
+                              if (pl === 'combo') return '🔥 Combo (Vitrina + Pasarela)'
+                              if (pl === 'gran_vitrina') return '🏆 Individual Gran Vitrina'
+                              return '✨ Individual Pasarela'
+                            })()}
                           </div>
                         </td>
 

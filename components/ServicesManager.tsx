@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingStatus, ListingWithRelations, Seller } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { buildInitialFreeAdAttrs } from '@/lib/adPolicies'
 
 interface ServicesManagerProps {
   initialListings: ListingWithRelations[]
@@ -80,18 +81,20 @@ export default function ServicesManager({
   const handleQuickStatusChange = async (item: ListingWithRelations, newStatus: ListingStatus) => {
     setUpdatingStatusId(item.id)
     try {
+      const updatedAttrs = newStatus === 'published' ? buildInitialFreeAdAttrs(item.attrs) : item.attrs
       const { error } = await supabase
         .from('listing')
         .update({
           status: newStatus,
-          published_at: newStatus === 'published' ? new Date().toISOString() : item.published_at,
+          published_at: newStatus === 'published' ? (item.published_at || new Date().toISOString()) : item.published_at,
+          attrs: updatedAttrs,
         })
         .eq('id', item.id)
 
       if (error) throw error
 
       setServices((prev) =>
-        prev.map((s) => (s.id === item.id ? { ...s, status: newStatus } : s))
+        prev.map((s) => (s.id === item.id ? { ...s, status: newStatus, attrs: updatedAttrs } : s))
       )
       showSuccess(`Estado de "${item.title}" actualizado a: ${newStatus}`)
     } catch (err: any) {

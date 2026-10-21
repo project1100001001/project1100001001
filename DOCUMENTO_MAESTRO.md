@@ -235,13 +235,19 @@ create table ad_slot (
 
 create table ad_package (
   id                uuid primary key default gen_random_uuid(),
-  name              text not null,      -- "Destacado 7 días", "Banner home 3 días"
+  name              text not null,      -- "Plan Individual: Pasarela ($10.000)", "Plan Individual: Gran Vitrina ($20.000)", "Plan en Combo: Gran Vitrina + Pasarela ($25.000)"
   slot_id           text not null references ad_slot(id),
   duration_days     int not null,
   price             bigint not null,
   max_active_slots  int not null default 1,
   active            boolean not null default true
 );
+
+-- Políticas Oficiales de Publicidad (ver POLITICAS_PUBLICIDAD.md):
+-- 1. Al crear un producto o servicio dura inicialmente 7 días con publicidad gratis ($0 COP).
+-- 2. Plan Individual Gran Vitrina: $20.000 COP (7 días).
+-- 3. Plan Individual Pasarela: $10.000 COP (7 días).
+-- 4. Plan en Combo (las dos: Gran Vitrina + Pasarela): $25.000 COP (7 días).
 
 create table ad_order (
   id              uuid primary key default gen_random_uuid(),

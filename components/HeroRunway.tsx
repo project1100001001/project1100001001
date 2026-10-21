@@ -35,9 +35,17 @@ interface HeroRunwayProps {
   heroItems: ShowcaseItem[]
   locale: string
   t: any
+  autoRotate?: boolean
+  rotationSeconds?: number
 }
 
-function HeroRunwayComponent({ heroItems, locale, t }: HeroRunwayProps) {
+function HeroRunwayComponent({
+  heroItems,
+  locale,
+  t,
+  autoRotate = true,
+  rotationSeconds = 5,
+}: HeroRunwayProps) {
   // Estado local e independiente de la Gran Vitrina Principal (Hero Runway)
   // Desplazamiento horizontal continuo al costado sin afectar el resto de la página
   const [trackIndex, setTrackIndex] = useState(1)
@@ -142,14 +150,15 @@ function HeroRunwayComponent({ heroItems, locale, t }: HeroRunwayProps) {
     finishTransition()
   }
 
-  // Rotación automática de la Gran Vitrina cada 5 segundos continuos en dirección invertida
+  // Rotación automática de la Gran Vitrina según intervalo configurado por el administrador
   // Aislada en este componente para NO provocar re-render en las pasarelas continuas
   useEffect(() => {
-    if (heroItems.length <= 1) return
+    if (heroItems.length <= 1 || !autoRotate) return
 
+    const intervalMs = Math.max(2000, (rotationSeconds || 5) * 1000)
     const timer = setInterval(() => {
       goToTrackSlide(trackIndexRef.current - 1)
-    }, 5000)
+    }, intervalMs)
 
     return () => {
       clearInterval(timer)
@@ -158,7 +167,7 @@ function HeroRunwayComponent({ heroItems, locale, t }: HeroRunwayProps) {
         transitionTimeoutRef.current = null
       }
     }
-  }, [heroItems.length, goToTrackSlide])
+  }, [heroItems.length, autoRotate, rotationSeconds, goToTrackSlide])
 
   const currentHero = heroItems[activeHeroIndex] || heroItems[0]
 

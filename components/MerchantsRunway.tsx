@@ -17,21 +17,24 @@ export interface MerchantShowcase {
   whatsapp: string | null
   itemsCount: number
   sampleImages: string[]
+  isPromoted?: boolean
+  adBadge?: string
 }
 
 interface MerchantsRunwayProps {
   merchants: MerchantShowcase[]
   locale: string
   t: any
+  scrollSpeed?: number
 }
 
-function MerchantsRunwayComponent({ merchants, locale, t }: MerchantsRunwayProps) {
+function MerchantsRunwayComponent({ merchants, locale, t, scrollSpeed = 0.65 }: MerchantsRunwayProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const loopedMerchants = useMemo(() => createLoopedItems(merchants), [merchants])
   const control = useGpuContinuousScroll({
     trackRef,
     itemCount: merchants.length,
-    speed: 0.65,
+    speed: scrollSpeed,
   })
 
   if (merchants.length === 0) return null
@@ -117,9 +120,16 @@ function MerchantsRunwayComponent({ merchants, locale, t }: MerchantsRunwayProps
                     {merchant.name[0]?.toUpperCase() || 'C'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
-                      {merchant.name}
-                    </h4>
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
+                        {merchant.name}
+                      </h4>
+                      {merchant.adBadge && (
+                        <span className="shrink-0 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
+                          {merchant.adBadge}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[11px] text-zinc-500">
                       📍 {merchant.city || 'Colombia'}
                     </div>

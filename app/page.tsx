@@ -4,9 +4,22 @@
 import { createClient } from '@/lib/supabase/server'
 import HomeClientView from '@/components/HomeClientView'
 import type { Category, ListingWithRelations } from '@/lib/types'
+import { decodeAdPageConfigFromSlots } from '@/lib/adPageConfig'
 
 export default async function HomePage() {
   const supabase = await createClient()
+
+  // 0. Obtener configuración administrativa de la página de publicidad desde ad_slot
+  let adSlotsData: any[] = []
+  try {
+    const { data: slots } = await supabase.from('ad_slot').select('*')
+    if (slots) {
+      adSlotsData = slots
+    }
+  } catch {
+    // Usar valores por defecto si ad_slot aún no está disponible
+  }
+  const adPageConfig = decodeAdPageConfigFromSlots(adSlotsData)
 
   // 1. Obtener categorías
   const { data: categoriesData } = await supabase
@@ -40,7 +53,7 @@ export default async function HomePage() {
     console.warn('Aviso cargando campañas activas en portada:', err?.message || err)
   }
 
-  // 3. Obtener todas las publicaciones activas del catálogo con sus fotos y atributos
+  // 3. Obtener las publicaciones activas del catálogo respetando el límite administrativo configurado
   let publishedListingsData: any[] = []
   try {
     const { data: listings, error: listingsError } = await supabase
@@ -53,6 +66,7 @@ export default async function HomePage() {
       `)
       .eq('status', 'published')
       .order('created_at', { ascending: false })
+      .limit(adPageConfig.maxTotalListingsFetched)
 
     if (!listingsError && listings) {
       publishedListingsData = listings
@@ -68,6 +82,7 @@ export default async function HomePage() {
       categories={categories}
       campaignAds={campaignAdsData}
       allPublishedListings={allPublishedListings}
+      initialAdPageConfig={adPageConfig}
     />
   )
 }
