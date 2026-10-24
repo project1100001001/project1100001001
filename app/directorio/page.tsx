@@ -7,7 +7,7 @@ import SellersDirectoryClientView, {
 } from '@/components/SellersDirectoryClientView'
 
 export const metadata = {
-  title: 'Directorio de Vendedores y Comercios | Marketplace',
+  title: 'Directorio de Vendedores y Comercios | Indie Clasificados',
   description:
     'Encuentra información de contacto directo, WhatsApp y catálogo de vendedores y emprendedores registrados.',
 }

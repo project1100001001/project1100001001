@@ -1507,7 +1507,7 @@ export default function InventoryManager({
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3'}>
               {visibleListings.map((item) => {
                 const isService = item.type === 'service'
                 const rawStock = item.stock ?? 0
@@ -1533,7 +1533,7 @@ export default function InventoryManager({
                 return (
                   <div
                     key={item.id}
-                    className={`rounded-2xl border bg-white p-4 sm:p-5 shadow-xs transition-all dark:bg-zinc-900 ${
+                    className={`rounded-2xl border bg-white p-3 sm:p-5 shadow-xs transition-all dark:bg-zinc-900 ${
                       isService
                         ? 'border-purple-200/70 dark:border-purple-950/70 hover:border-purple-300'
                         : rawStock === 0
@@ -1543,10 +1543,10 @@ export default function InventoryManager({
                         : 'border-zinc-200 dark:border-zinc-800'
                     }`}
                   >
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
                       {/* Columna Izquierda: Imagen y Datos del Artículo */}
-                      <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                        <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 group">
+                      <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-3.5 min-w-0 flex-1`}>
+                        <div className={`relative ${viewMode === 'grid' ? 'w-full aspect-[4/3] sm:h-16 sm:w-16 sm:aspect-square' : 'h-14 w-14 sm:h-16 sm:w-16'} shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 group`}>
                           <Link
                             href={`/catalogo/${item.id}`}
                             className="block h-full w-full relative"

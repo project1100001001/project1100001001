@@ -239,15 +239,15 @@ export default function CatalogClientView({
             </div>
           </div>
         ) : viewMode === 'list' ? (
-          /* MODO LISTA (PREDETERMINADO CON IMAGEN PEQUEÑA E INFORMACIÓN COMPLETA) */
-          <div className="flex flex-col gap-3.5 sm:gap-4">
+          /* MODO LISTA (PREDETERMINADO CON IMAGEN PEQUEÑA LATERAL E INFORMACIÓN COMPACTA) */
+          <div className="flex flex-col gap-3 sm:gap-4">
             {visibleListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} viewMode="list" />
             ))}
           </div>
         ) : (
           /* MODO CUADRÍCULA */
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visibleListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} viewMode="grid" />
             ))}

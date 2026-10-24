@@ -8,7 +8,7 @@ import PromotionForm from '@/components/PromotionForm'
 import type { AdPackage, Listing, Seller, Advertiser, AdAccount } from '@/lib/types'
 
 export const metadata = {
-  title: 'Promocionar Publicación | Marketplace',
+  title: 'Promocionar Publicación | Indie Clasificados',
   description: 'Crea una campaña publicitaria para destacar tu producto o servicio.',
 }
 

@@ -716,12 +716,12 @@ export default function AppSidebar() {
             onClick={close}
             className="flex items-center gap-2.5 group"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 font-bold text-white shadow-sm transition-transform group-hover:scale-105">
-              M
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 text-base shadow-sm transition-transform group-hover:scale-105">
+              🛠️
             </span>
             <div className="flex flex-col">
-              <span className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Marketplace
+              <span className="text-sm sm:text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                Indie Clasificados
               </span>
               <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
                 {locale === 'en' ? 'Local Businesses' : 'Pymes y Emprendedores'}

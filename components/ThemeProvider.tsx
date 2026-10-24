@@ -21,32 +21,36 @@ const ThemeContext = createContext<ThemeContextType>({
 const STORAGE_KEY = 'marketplace_theme'
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
-
-  useEffect(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'system'
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
-      if (saved && (saved === 'light' || saved === 'dark' || saved === 'system')) {
-        setThemeState(saved)
+      if (saved === 'light' || saved === 'dark' || saved === 'system') {
+        return saved
       }
     } catch {
       // Ignore storage errors
     }
-  }, [])
+    return 'system'
+  })
+
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light'
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  })
 
   useEffect(() => {
     const root = document.documentElement
 
-    const applyTheme = () => {
+    const applyTheme = (currentTheme: Theme) => {
       let activeTheme: 'light' | 'dark' = 'light'
 
-      if (theme === 'system') {
+      if (currentTheme === 'system') {
         activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
           ? 'dark'
           : 'light'
       } else {
-        activeTheme = theme
+        activeTheme = currentTheme
       }
 
       setResolvedTheme(activeTheme)
@@ -60,12 +64,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    applyTheme()
+    applyTheme(theme)
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = () => {
       if (theme === 'system') {
-        applyTheme()
+        applyTheme('system')
       }
     }
 
@@ -83,7 +87,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   const toggleTheme = () => {
-    const nextTheme = resolvedTheme === 'dark' ? 'light' : 'dark'
+    const isCurrentlyDark =
+      typeof document !== 'undefined'
+        ? document.documentElement.classList.contains('dark')
+        : resolvedTheme === 'dark'
+    const nextTheme = isCurrentlyDark ? 'light' : 'dark'
     setTheme(nextTheme)
   }
 

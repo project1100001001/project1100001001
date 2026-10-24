@@ -14,11 +14,11 @@ export default function Footer() {
         {/* Brand and tagline */}
         <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 font-bold text-white text-xs">
-              M
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-zinc-200 dark:border-zinc-700 text-xs shadow-2xs">
+              🛠️
             </span>
             <span className="font-bold text-zinc-900 dark:text-zinc-100">
-              Marketplace Pymes
+              Indie Clasificados
             </span>
           </div>
           <span className="hidden sm:inline text-zinc-300 dark:text-zinc-700">•</span>

@@ -8,7 +8,7 @@ import CampaignsList from '@/components/CampaignsList'
 import type { AdOrderWithRelations, Seller } from '@/lib/types'
 
 export const metadata = {
-  title: 'Mis Campañas Publicitarias | Marketplace',
+  title: 'Mis Campañas Publicitarias | Indie Clasificados',
   description: 'Historial, vigencia y métricas de rendimiento de tus campañas publicitarias.',
 }
 

@@ -7,7 +7,7 @@ import type { AppUser, Seller, AdAccount, Advertiser, Sale } from '@/lib/types'
 import AccountProfileView from '@/components/AccountProfileView'
 
 export const metadata = {
-  title: 'Mi Cuenta y Perfil | Marketplace',
+  title: 'Mi Cuenta y Perfil | Indie Clasificados',
   description: 'Visualiza y actualiza la información de tu cuenta personal y datos comerciales.',
 }
 

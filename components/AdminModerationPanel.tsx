@@ -1155,7 +1155,7 @@ export default function AdminModerationPanel({
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3 sm:space-y-4'}>
               {visibleListings.map((listing) => {
                 const primaryMedia = listing.listing_media?.sort((a, b) => a.position - b.position)[0]
                 const isPending = pendingListingStatuses.includes(listing.status)
@@ -1165,11 +1165,11 @@ export default function AdminModerationPanel({
                 return (
                   <div
                     key={listing.id}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                      <div className="flex items-start gap-4 min-w-0">
-                        <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
+                      <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-4 min-w-0`}>
+                        <div className={`relative ${viewMode === 'grid' ? 'w-full aspect-[4/3] sm:h-20 sm:w-24' : 'h-16 w-16 sm:h-20 sm:w-24'} shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700`}>
                           {primaryMedia ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={primaryMedia.url} alt="" className="h-full w-full object-cover" />
@@ -1594,7 +1594,7 @@ export default function AdminModerationPanel({
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3 sm:space-y-4'}>
               {visibleAds.map((ad) => {
                 const isPending = pendingAdStatuses.includes(ad.status)
                 const isProcessing = processingId === ad.id
@@ -1603,11 +1603,11 @@ export default function AdminModerationPanel({
                 return (
                   <div
                     key={ad.id}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                      <div className="flex items-start gap-4 min-w-0">
-                        <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
+                      <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-4 min-w-0`}>
+                        <div className={`relative ${viewMode === 'grid' ? 'w-full aspect-[4/3] sm:h-20 sm:w-32' : 'h-16 w-20 sm:h-20 sm:w-32'} shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700`}>
                           {ad.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={ad.image_url} alt="" className="h-full w-full object-cover" />
@@ -1727,30 +1727,37 @@ export default function AdminModerationPanel({
                 )
               })}
             </div>
+          )}
 
-            {filteredAds.length > visibleAds.length && (
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+          {filteredAds.length > visibleAds.length && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                Mostrando {visibleAds.length} de {filteredAds.length} campañas
+              </span>
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() =>
                     setVisibleLimit((prev) =>
-                      prev === 9999 ? 9999 : prev + (itemsPerPage === 9999 ? 10 : itemsPerPage)
+                      Math.min(
+                        filteredAds.length,
+                        prev + (itemsPerPage > 0 ? itemsPerPage : 10)
+                      )
                     )
                   }
-                  className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
+                  className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
                 >
-                  ➕ Cargar {Math.min(itemsPerPage === 9999 ? 10 : itemsPerPage, filteredAds.length - visibleAds.length)} más ({visibleAds.length} de {filteredAds.length})
+                  ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredAds.length - visibleAds.length)} más
                 </button>
                 <button
                   type="button"
-                  onClick={() => setVisibleLimit(9999)}
-                  className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 cursor-pointer"
+                  onClick={() => handleChangeItemsPerPage(0, filteredAds.length)}
+                  className="rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                 >
                   Ver todos ({filteredAds.length})
                 </button>
               </div>
-            )}
-            </>
+            </div>
           )}
         </div>
       )}

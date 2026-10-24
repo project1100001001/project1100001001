@@ -79,22 +79,23 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
         </div>
       </div>
 
-      {/* Contenedor Viewport con Aislamiento CSS contain: paint layout y GPU translate3d */}
-      <div
-        className="relative w-full overflow-hidden pb-4 pt-1 select-none"
-        style={{ contain: 'paint layout' }}
-      >
+      {/* Contenedor Viewport con GPU translate3d y flujo continuo en móvil */}
+      <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
         <div
           ref={trackRef}
-          className="flex gap-5 will-change-transform cursor-grab active:cursor-grabbing"
+          className="flex w-max gap-5 will-change-transform cursor-grab active:cursor-grabbing"
           style={{
-            transform: 'translate3d(0, 0, 0)',
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
+            touchAction: 'pan-y',
           }}
           onPointerDown={control.handlePointerDown}
           onPointerMove={control.handlePointerMove}
           onPointerUp={control.handlePointerUp}
+          onTouchStart={control.handleTouchStart}
+          onTouchMove={control.handleTouchMove}
+          onTouchEnd={control.handleTouchEnd}
+          onTouchCancel={control.handleTouchEnd}
           onClickCapture={control.handleClickCapture}
         >
           {loopedItems.map((item, idx) => {

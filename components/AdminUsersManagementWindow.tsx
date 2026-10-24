@@ -903,6 +903,75 @@ export default function AdminUsersManagementWindow({
             </div>
           </div>
 
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {visibleUsers.map((u) => {
+                const initials = (u.full_name || 'U').slice(0, 2).toUpperCase()
+                const sellerInfo = getSellerInfo(u)
+                const mod = getUserModeration(u)
+
+                return (
+                  <div
+                    key={u.id}
+                    className={`flex flex-col justify-between rounded-2xl border p-3.5 sm:p-4 shadow-xs transition-all ${
+                      mod.status === 'blocked'
+                        ? 'border-red-200 bg-red-50/30 dark:border-red-900/50 dark:bg-red-950/10'
+                        : mod.status === 'suspended'
+                        ? 'border-amber-200 bg-amber-50/30 dark:border-amber-900/50 dark:bg-amber-950/10'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-start gap-2.5">
+                        <span
+                          className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl font-bold text-xs ${
+                            mod.status === 'blocked'
+                              ? 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200'
+                              : mod.status === 'suspended'
+                              ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
+                              : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                          }`}
+                        >
+                          {initials}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                            {u.full_name || 'Usuario sin nombre'}
+                          </div>
+                          <div className="text-[10px] text-zinc-500 truncate">
+                            📍 {u.city || sellerInfo?.city || 'Sin ciudad'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1">
+                        {renderStatusBadge(mod)}
+                        <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                          {u.role}
+                        </span>
+                      </div>
+
+                      {sellerInfo && (
+                        <div className="text-[10px] text-zinc-600 dark:text-zinc-400 truncate">
+                          🏪 <strong>{sellerInfo.business_name}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenUserModal(u, 'status')}
+                        className="w-full rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[10px] sm:text-[11px] font-bold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300 transition-colors cursor-pointer"
+                      >
+                        ⚙️ Administrar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
@@ -1147,6 +1216,7 @@ export default function AdminUsersManagementWindow({
               </table>
             </div>
           </div>
+          )}
 
           {filteredUsers.length > visibleUsers.length && (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">

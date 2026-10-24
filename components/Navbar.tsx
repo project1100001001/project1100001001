@@ -93,12 +93,12 @@ export default function Navbar() {
           {/* Brand */}
           <div className="flex items-center gap-4 sm:gap-6">
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 font-bold text-white shadow-sm transition-transform group-hover:scale-105">
-                M
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 text-base shadow-sm transition-transform group-hover:scale-105">
+                🛠️
               </span>
               <div className="flex flex-col">
                 <span className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-                  Marketplace
+                  Indie Clasificados
                 </span>
                 <span className="hidden sm:block text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">
                   Pymes y Emprendedores
@@ -244,11 +244,11 @@ export default function Navbar() {
                 {/* Header of Drawer */}
                 <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 font-bold text-white text-sm">
-                      M
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 font-black text-white text-xs">
+                      IC
                     </span>
                     <span className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                      Marketplace
+                      Indie Clasificados
                     </span>
                   </div>
                   <button

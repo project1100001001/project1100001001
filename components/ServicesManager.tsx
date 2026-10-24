@@ -505,7 +505,7 @@ export default function ServicesManager({
           </div>
         </div>
       ) : (
-        <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3'}>
           {visibleServices.map((service) => {
             const coverImage = service.listing_media && service.listing_media.length > 0 ? service.listing_media[0].url : null
             const serviceTime = service.attrs?.tiempo_estimado || service.attrs?.duracion || '45 min'
@@ -518,10 +518,10 @@ export default function ServicesManager({
             return (
               <div
                 key={service.id}
-                className="rounded-2xl border border-purple-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-purple-400 dark:border-purple-900/60 dark:bg-zinc-900 dark:hover:border-purple-700"
+                className="rounded-2xl border border-purple-200/80 bg-white p-3 sm:p-5 shadow-xs transition-all hover:border-purple-400 dark:border-purple-900/60 dark:bg-zinc-900 dark:hover:border-purple-700"
               >
                 {/* 1. FILA SUPERIOR: Metadata (Servicio Profesional, Categoría, Ciudad, Tiempo de Publicidad) y Tarifa destacada */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 sm:pb-3 border-b border-zinc-100 dark:border-zinc-800">
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase tracking-wider">
                       <span>🛠️</span>
@@ -563,10 +563,10 @@ export default function ServicesManager({
                     </span>
                     {service.price !== null && service.price !== undefined ? (
                       <div className="flex items-baseline gap-1">
-                        <span className="text-base sm:text-lg font-black text-purple-700 dark:text-purple-300">
+                        <span className="text-sm sm:text-lg font-black text-purple-700 dark:text-purple-300">
                           ${Number(service.price).toLocaleString('es-CO')} COP
                         </span>
-                        <span className="text-[11px] font-bold text-zinc-500">
+                        <span className="text-[10px] sm:text-[11px] font-bold text-zinc-500">
                           / {service.price_unit || 'servicio'}
                         </span>
                       </div>
@@ -580,9 +580,9 @@ export default function ServicesManager({
                 </div>
 
                 {/* 2. CUERPO PRINCIPAL: Portada + Título + Criterios de Prestación */}
-                <div className="flex items-start gap-3.5 sm:gap-4 pt-3.5 min-w-0">
+                <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-4 pt-3 min-w-0`}>
                   {/* Imagen / Portada con zoom y acceso al anuncio */}
-                  <div className="relative h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/80 group shadow-2xs">
+                  <div className={`relative ${viewMode === 'grid' ? 'w-full aspect-[4/3] sm:h-24 sm:w-24 sm:aspect-square' : 'h-16 w-16 sm:h-24 sm:w-24'} shrink-0 overflow-hidden rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/80 group shadow-2xs`}>
                     <Link
                       href={`/catalogo/${service.id}`}
                       className="block h-full w-full relative"

@@ -7,7 +7,7 @@ import CatalogClientView from '@/components/CatalogClientView'
 import type { Category, ListingWithRelations } from '@/lib/types'
 
 export const metadata = {
-  title: 'Catálogo de Productos y Servicios | Marketplace',
+  title: 'Catálogo de Productos y Servicios | Indie Clasificados',
   description: 'Explora ofertas de negocios locales y emprendedores en alimentos, servicios, artículos y más.',
 }
 

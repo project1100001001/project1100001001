@@ -9,7 +9,7 @@ import type { Category, ListingWithRelations, Sale, Seller } from '@/lib/types'
 import InventoryManager from '@/components/InventoryManager'
 
 export const metadata = {
-  title: 'Inventario de Productos | Marketplace',
+  title: 'Inventario de Productos | Indie Clasificados',
   description: 'Gestiona existencias de productos físicos, stock disponible y ventas de tu negocio.',
 }
 

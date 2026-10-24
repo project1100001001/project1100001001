@@ -6,11 +6,12 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import AdminModerationPanel from '@/components/AdminModerationPanel'
+import AvantGardeLoader from '@/components/AvantGardeLoader'
 import type { ListingWithRelations } from '@/lib/types'
 import { decodeAdPageConfigFromSlots } from '@/lib/adPageConfig'
 
 export const metadata = {
-  title: 'Panel de Moderación | Admin Marketplace',
+  title: 'Panel de Moderación | Admin Indie Clasificados',
   description: 'Panel administrativo para revisar y aprobar publicaciones del catálogo.',
 }
 
@@ -269,9 +270,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Suspense
           fallback={
-            <div className="flex justify-center items-center py-20 text-sm text-zinc-500">
-              <span>Cargando panel de administración y moderación...</span>
-            </div>
+            <AvantGardeLoader
+              title="Cargando Panel de Moderación y Administración"
+              subtitle="Sincronizando anuncios, campañas, billeteras y usuarios..."
+            />
           }
         >
           <AdminModerationPanel

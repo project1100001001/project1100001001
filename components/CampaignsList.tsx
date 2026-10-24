@@ -444,125 +444,211 @@ export default function CampaignsList({
         </div>
       ) : (
         <>
-          {/* Vista Cuadrícula / Móvil (Tarjetas Adaptables con Métricas) */}
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'md:hidden space-y-4'}>
-            {visibleOrders.map((order) => {
-              const badge = statusBadges[order.status] || {
-                label: order.status,
-                bg: 'bg-zinc-100 dark:bg-zinc-800',
-                text: 'text-zinc-700 dark:text-zinc-300',
-                dot: 'bg-zinc-400',
-              }
-              const remaining = formatRemainingTime(order)
-              const ctr =
-                order.impressions_count && order.impressions_count > 0
-                  ? (
-                      ((order.clicks_count || 0) / order.impressions_count) *
-                      100
-                    ).toFixed(1)
-                  : '0.0'
+          {/* Vista Cuadrícula (Tarjetas en Cuadrícula 2 columnas en móvil) */}
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {visibleOrders.map((order) => {
+                const badge = statusBadges[order.status] || {
+                  label: order.status,
+                  bg: 'bg-zinc-100 dark:bg-zinc-800',
+                  text: 'text-zinc-700 dark:text-zinc-300',
+                  dot: 'bg-zinc-400',
+                }
+                const remaining = formatRemainingTime(order)
+                const ctr =
+                  order.impressions_count && order.impressions_count > 0
+                    ? (
+                        ((order.clicks_count || 0) / order.impressions_count) *
+                        100
+                      ).toFixed(1)
+                    : '0.0'
 
-              return (
-                <div
-                  key={order.id}
-                  className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-4"
-                >
-                  <div className="flex items-start gap-3.5">
-                    <div className="h-18 w-18 shrink-0 overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-800">
+                return (
+                  <div
+                    key={order.id}
+                    className="flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-3 sm:space-y-4"
+                  >
+                    <div className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-3.5">
+                      <div className="w-full sm:h-18 sm:w-18 aspect-[4/3] sm:aspect-square shrink-0 overflow-hidden rounded-xl sm:rounded-2xl bg-zinc-100 border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-800">
+                        {order.image_url ? (
+                          <img src={order.image_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xl">📢</div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1 w-full">
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-black ${badge.bg} ${badge.text}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
+                            {badge.label}
+                          </span>
+                          <span className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400">
+                            ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}
+                          </span>
+                        </div>
+
+                        <h4 className="mt-1 font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-50 line-clamp-2 sm:truncate">
+                          {order.headline}
+                        </h4>
+                        {order.listing && (
+                          <Link
+                            href={`/catalogo/${order.listing.id}`}
+                            className="mt-0.5 text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 hover:underline block truncate"
+                          >
+                            🔗 {order.listing.title}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vigencia y Barra de Tiempo */}
+                    <div className="rounded-xl sm:rounded-2xl bg-zinc-50 p-2 sm:p-3 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
+                      <div className="flex items-center justify-between gap-1 text-xs mb-1">
+                        <span className={`rounded-md px-1.5 py-0.5 text-[9px] sm:text-[10px] border truncate ${remaining.color}`}>
+                          {remaining.label}
+                        </span>
+                        <span className="hidden sm:inline text-[11px] text-zinc-500">{remaining.detail}</span>
+                      </div>
+
+                      {/* Barra de progreso de días */}
+                      <div className="h-1.5 sm:h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${remaining.percent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="rounded-lg sm:rounded-xl bg-purple-50/50 p-1.5 sm:p-2 dark:bg-purple-950/20">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-purple-700 dark:text-purple-300 block">
+                          👆 Clics
+                        </span>
+                        <strong className="text-xs sm:text-sm font-black text-purple-900 dark:text-purple-100">
+                          {order.clicks_count || 0}
+                        </strong>
+                      </div>
+
+                      <div className="rounded-lg sm:rounded-xl bg-emerald-50/50 p-1.5 sm:p-2 dark:bg-emerald-950/20">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">
+                          💬 WA
+                        </span>
+                        <strong className="text-xs sm:text-sm font-black text-emerald-900 dark:text-emerald-100">
+                          {order.contacts_count || 0}
+                        </strong>
+                      </div>
+
+                      <div className="rounded-lg sm:rounded-xl bg-blue-50/50 p-1.5 sm:p-2 dark:bg-blue-950/20">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-blue-700 dark:text-blue-300 block">
+                          🎯 CTR
+                        </span>
+                        <strong className="text-xs sm:text-sm font-black text-blue-900 dark:text-blue-100">
+                          {ctr}%
+                        </strong>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAnalyticsOrder(order)}
+                      className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-300 bg-white py-2 text-[11px] sm:text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                    >
+                      <span>📊</span>
+                      <span className="truncate">{t.campaigns.viewAnalyticsBtn}</span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Vista Móvil Modo Lista (Filas Horizontales Compactas) */}
+          {viewMode === 'list' && (
+            <div className="md:hidden flex flex-col gap-2.5">
+              {visibleOrders.map((order) => {
+                const badge = statusBadges[order.status] || {
+                  label: order.status,
+                  bg: 'bg-zinc-100 dark:bg-zinc-800',
+                  text: 'text-zinc-700 dark:text-zinc-300',
+                  dot: 'bg-zinc-400',
+                }
+                const remaining = formatRemainingTime(order)
+                const ctr =
+                  order.impressions_count && order.impressions_count > 0
+                    ? (
+                        ((order.clicks_count || 0) / order.impressions_count) *
+                        100
+                      ).toFixed(1)
+                    : '0.0'
+
+                return (
+                  <div
+                    key={order.id}
+                    className="flex flex-row items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3 shadow-xs dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    {/* Miniatura izquierda */}
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-100 border border-zinc-200 dark:border-zinc-800 dark:bg-zinc-800">
                       {order.image_url ? (
                         <img src={order.image_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xl">📢</div>
+                        <div className="flex h-full w-full items-center justify-center text-lg">📢</div>
                       )}
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
+                    {/* Información compacta en fila */}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-1.5">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black ${badge.bg} ${badge.text}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black ${badge.bg} ${badge.text}`}
                         >
                           <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
                           {badge.label}
                         </span>
-                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                          ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')} COP
+                        <span className={`rounded-md px-1.5 py-0.5 text-[9px] border truncate ${remaining.color}`}>
+                          {remaining.label}
                         </span>
                       </div>
 
-                      <h4 className="mt-1 font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
+                      <h4 className="font-bold text-xs text-zinc-900 dark:text-zinc-50 truncate">
                         {order.headline}
                       </h4>
-                      {order.listing && (
-                        <Link
-                          href={`/catalogo/${order.listing.id}`}
-                          className="mt-0.5 text-xs text-purple-600 dark:text-purple-400 hover:underline block truncate"
-                        >
-                          🔗 {order.listing.title}
-                        </Link>
-                      )}
+
+                      <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-500">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-purple-600 dark:text-purple-400">
+                            👆 {order.clicks_count || 0}
+                          </span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            💬 {order.contacts_count || 0}
+                          </span>
+                          <span className="font-semibold text-blue-600 dark:text-blue-400">
+                            🎯 {ctr}%
+                          </span>
+                        </div>
+                        <span className="font-black text-zinc-900 dark:text-zinc-100">
+                          ${Number(order.price_paid).toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Botón rápido de métricas */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAnalyticsOrder(order)}
+                      className="shrink-0 rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                      title={t.campaigns.viewAnalyticsBtn}
+                    >
+                      📊
+                    </button>
                   </div>
-
-                  {/* Vigencia y Barra de Tiempo */}
-                  <div className="rounded-2xl bg-zinc-50 p-3 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className={`rounded-lg px-2 py-0.5 text-[10px] border ${remaining.color}`}>
-                        {remaining.label}
-                      </span>
-                      <span className="text-[11px] text-zinc-500">{remaining.detail}</span>
-                    </div>
-
-                    {/* Barra de progreso de días */}
-                    <div className="h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-600 to-emerald-500 rounded-full transition-all duration-500"
-                        style={{ width: `${remaining.percent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Métricas Móviles */}
-                  <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="rounded-xl bg-purple-50/50 p-2 dark:bg-purple-950/20">
-                      <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 block">
-                        👆 Clics
-                      </span>
-                      <strong className="text-sm font-black text-purple-900 dark:text-purple-100">
-                        {order.clicks_count || 0}
-                      </strong>
-                    </div>
-
-                    <div className="rounded-xl bg-emerald-50/50 p-2 dark:bg-emerald-950/20">
-                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">
-                        💬 WhatsApp
-                      </span>
-                      <strong className="text-sm font-black text-emerald-900 dark:text-emerald-100">
-                        {order.contacts_count || 0}
-                      </strong>
-                    </div>
-
-                    <div className="rounded-xl bg-blue-50/50 p-2 dark:bg-blue-950/20">
-                      <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 block">
-                        🎯 CTR
-                      </span>
-                      <strong className="text-sm font-black text-blue-900 dark:text-blue-100">
-                        {ctr}%
-                      </strong>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAnalyticsOrder(order)}
-                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                  >
-                    <span>📊</span>
-                    <span>{t.campaigns.viewAnalyticsBtn}</span>
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Vista Escritorio Modo Lista (Tabla Exhaustiva con Métricas y Tiempos) */}
           {viewMode === 'list' && (

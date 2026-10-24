@@ -7,8 +7,8 @@ import ListingForm from '@/components/ListingForm'
 import type { Category } from '@/lib/types'
 
 export const metadata = {
-  title: 'Publicar Producto o Servicio | Marketplace',
-  description: 'Publica un nuevo artículo, producto o servicio en el catálogo del marketplace',
+  title: 'Publicar Producto o Servicio | Indie Clasificados',
+  description: 'Publica un nuevo artículo, producto o servicio en el catálogo de Indie Clasificados',
 }
 
 interface PageProps {

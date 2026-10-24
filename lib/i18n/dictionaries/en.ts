@@ -132,7 +132,7 @@ export const en: Dictionary = {
     featuredRunwayBadge: 'Grand Showcase Runway',
   },
   catalog: {
-    title: 'Marketplace Catalog',
+    title: 'Indie Clasificados Catalog',
     subtitle:
       'Discover local products, professional services, and items directly from verified creators.',
     publishBtn: '+ Post to catalog',
@@ -150,7 +150,7 @@ export const en: Dictionary = {
     quoteOnRequest: 'Quote on request',
     contactWhatsApp: 'Chat on WhatsApp',
     chatGreetingPrefix: 'Hello, I am interested in your listing',
-    chatGreetingSuffix: 'on the Marketplace.',
+    chatGreetingSuffix: 'on Indie Clasificados.',
     sellerInfo: 'Seller Information',
     location: 'Location',
     verifiedSeller: 'Verified Seller',
@@ -231,7 +231,7 @@ export const en: Dictionary = {
     closeModal: 'Close Window',
   },
   auth: {
-    welcome: 'Welcome to Marketplace',
+    welcome: 'Welcome to Indie Clasificados',
     loginTitle: 'Sign In',
     signupTitle: 'Create an Account',
     email: 'Email Address',

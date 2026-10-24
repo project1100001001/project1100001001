@@ -132,7 +132,7 @@ export const es: Dictionary = {
     featuredRunwayBadge: 'Gran Vitrina Destacada',
   },
   catalog: {
-    title: 'Catálogo del Marketplace',
+    title: 'Catálogo de Indie Clasificados',
     subtitle:
       'Encuentra productos locales, servicios profesionales y artículos disponibles directamente de sus creadores.',
     publishBtn: '+ Publicar en el catálogo',
@@ -150,7 +150,7 @@ export const es: Dictionary = {
     quoteOnRequest: 'Cotización a solicitud',
     contactWhatsApp: 'Contactar por WhatsApp',
     chatGreetingPrefix: 'Hola, me interesa tu publicación',
-    chatGreetingSuffix: 'en el Marketplace.',
+    chatGreetingSuffix: 'en Indie Clasificados.',
     sellerInfo: 'Información del Vendedor',
     location: 'Ubicación',
     verifiedSeller: 'Vendedor verificado',
@@ -231,7 +231,7 @@ export const es: Dictionary = {
     closeModal: 'Cerrar Ventana',
   },
   auth: {
-    welcome: 'Bienvenido al Marketplace',
+    welcome: 'Bienvenido a Indie Clasificados',
     loginTitle: 'Iniciar Sesión',
     signupTitle: 'Crear una Cuenta',
     email: 'Correo Electrónico',

@@ -842,7 +842,7 @@ export default function PromotionForm({
                     300 123 4567
                   </div>
                   <span className="text-[10px] text-zinc-400 block mt-0.5">
-                    Titular: Administrador Marketplace
+                    Titular: Indie Clasificados
                   </span>
                 </div>
 
@@ -855,7 +855,7 @@ export default function PromotionForm({
                     300 123 4567
                   </div>
                   <span className="text-[10px] text-zinc-400 block mt-0.5">
-                    Titular: Administrador Marketplace
+                    Titular: Indie Clasificados
                   </span>
                 </div>
 

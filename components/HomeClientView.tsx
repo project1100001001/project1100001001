@@ -365,7 +365,10 @@ export default function HomeClientView({
     return Array.from(map.values()).slice(0, adPageConfig.maxMerchantsItems || 10)
   }, [showcaseItems, adPageConfig.maxMerchantsItems, adPageConfig.prioritizeVerifiedSellers])
 
-  const effectiveScrollSpeed = adPageConfig.runwayAutoScroll ? adPageConfig.runwayScrollSpeed : 0
+  const effectiveScrollSpeed =
+    adPageConfig.runwayScrollSpeed && adPageConfig.runwayScrollSpeed > 0
+      ? adPageConfig.runwayScrollSpeed
+      : 0.65
 
   return (
     <main className="flex-1 bg-zinc-50/50 pb-20 dark:bg-zinc-950 overflow-hidden select-none">

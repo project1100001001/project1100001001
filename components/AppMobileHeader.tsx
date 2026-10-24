@@ -25,11 +25,11 @@ export default function AppMobileHeader() {
 
       {/* Brand logo in header */}
       <Link href="/" className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 font-bold text-white text-xs">
-          M
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-zinc-200 dark:border-zinc-700 text-sm shadow-2xs">
+          🛠️
         </span>
         <span className="font-extrabold text-sm tracking-tight text-zinc-900 dark:text-zinc-50">
-          Marketplace
+          Indie Clasificados
         </span>
       </Link>
 

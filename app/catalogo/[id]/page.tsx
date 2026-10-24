@@ -23,13 +23,13 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!listing) {
     return {
-      title: 'Publicación no encontrada | Marketplace',
+      title: 'Publicación no encontrada | Indie Clasificados',
     }
   }
 
   return {
-    title: `${listing.title} | Marketplace`,
-    description: listing.description || 'Detalles de la publicación en el Marketplace',
+    title: `${listing.title} | Indie Clasificados`,
+    description: listing.description || 'Detalles de la publicación en Indie Clasificados',
   }
 }
 

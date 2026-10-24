@@ -9,7 +9,7 @@ import type { Category, ListingWithRelations, Seller } from '@/lib/types'
 import ServicesManager from '@/components/ServicesManager'
 
 export const metadata = {
-  title: 'Gestión de Servicios | Marketplace',
+  title: 'Gestión de Servicios | Indie Clasificados',
   description: 'Panel independiente para administrar tus servicios profesionales, modalidades de atención, plazos de respuesta y tarifas.',
 }
 
