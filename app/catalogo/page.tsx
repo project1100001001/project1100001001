@@ -42,6 +42,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const conditionFilter = typeof params.condition === 'string' ? params.condition.trim() : ''
   const deliveryFilter = typeof params.delivery === 'string' ? params.delivery.trim() : ''
   const subTypeFilter = typeof params.subType === 'string' ? params.subType.trim() : ''
+  const exclusiveCatalog = typeof params.exclusive_catalog === 'string' ? params.exclusive_catalog.trim() : ''
 
   const supabase = await createClient()
 
@@ -79,8 +80,8 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     }
   }
 
-  // Filtro por tipo estricto (service | article | product)
-  if (['product', 'service', 'article'].includes(typeFilter)) {
+  // Filtro por tipo estricto (service | article | product), salvo que se esté consultando un Catálogo Exclusivo transversal
+  if (!exclusiveCatalog && ['product', 'service', 'article'].includes(typeFilter)) {
     query = query.eq('type', typeFilter)
   }
 
@@ -173,6 +174,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
         condition: conditionFilter,
         delivery: deliveryFilter,
         subType: subTypeFilter,
+        exclusiveCatalog,
       }}
       listings={listings}
     />

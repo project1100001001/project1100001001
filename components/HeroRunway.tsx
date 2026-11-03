@@ -505,7 +505,16 @@ function HeroRunwayComponent({
                                 item.sellerWhatsapp,
                                 item.sellerName,
                                 item.title,
-                                locale
+                                locale,
+                                {
+                                  listingId: item.listingId,
+                                  type: item.type,
+                                  categoryName: item.categoryName,
+                                  price: item.price,
+                                  priceUnit: item.priceUnit,
+                                  city: item.city,
+                                  attrs: item.attrs,
+                                }
                               )}
                               target="_blank"
                               rel="noopener noreferrer"

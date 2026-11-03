@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
@@ -11,6 +11,7 @@ import ThemeToggle from './ThemeToggle'
 import { useSidebar } from './SidebarContext'
 import { hasPermission } from '@/lib/permissions'
 import TestProfilesModal from './TestProfilesModal'
+import { triggerGlobalNavigationLoader } from './AvantGardeLoader'
 
 interface SidebarNavContentProps {
   pathname: string
@@ -21,6 +22,7 @@ interface SidebarNavContentProps {
   t: any
   locale: string
   role: string | null
+  isLoggedIn: boolean
   pendingCount: number
 }
 
@@ -33,6 +35,7 @@ function SidebarNavContent({
   t,
   locale,
   role,
+  isLoggedIn,
   pendingCount,
 }: SidebarNavContentProps) {
   // Accordion open/close state for suboptions
@@ -54,6 +57,7 @@ function SidebarNavContent({
 
   // Determine active states
   const isHomeActive = pathname === '/'
+  const isDashboardActive = pathname === '/bienvenida'
 
   // Catalog
   const isCatalogServiceActive = pathname === '/catalogo' && currentType === 'service'
@@ -101,6 +105,27 @@ function SidebarNavContent({
           <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
         )}
       </Link>
+
+      {/* OPCIÓN 1.B: Dashboard / Pantalla de Bienvenida (Habilitado solo para usuarios logueados, justo debajo de Inicio) */}
+      {isLoggedIn && (
+        <Link
+          href={role ? `/bienvenida?role=${role}` : '/bienvenida'}
+          onClick={close}
+          className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all ${
+            isDashboardActive
+              ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+              : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-base">📊</span>
+            <span>{locale === 'en' ? 'Dashboard' : 'Dashboard'}</span>
+          </div>
+          {isDashboardActive && (
+            <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+          )}
+        </Link>
+      )}
 
       {/* OPCIÓN 2: Catálogo (Desplegable) */}
       <div className="pt-2">
@@ -565,16 +590,24 @@ function SidebarNav({
   t,
   locale,
   role,
+  isLoggedIn,
   pendingCount,
 }: {
   close: () => void
   t: any
   locale: string
   role: string | null
+  isLoggedIn: boolean
   pendingCount: number
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const searchKey = searchParams ? searchParams.toString() : ''
+
+  useEffect(() => {
+    close()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, searchKey])
 
   const currentType = searchParams ? searchParams.get('type') || '' : ''
   const currentTab = searchParams ? searchParams.get('tab') || '' : ''
@@ -590,6 +623,7 @@ function SidebarNav({
       t={t}
       locale={locale}
       role={role}
+      isLoggedIn={isLoggedIn}
       pendingCount={pendingCount}
     />
   )
@@ -600,12 +634,14 @@ function SidebarNavFallback({
   t,
   locale,
   role,
+  isLoggedIn,
   pendingCount,
 }: {
   close: () => void
   t: any
   locale: string
   role: string | null
+  isLoggedIn: boolean
   pendingCount: number
 }) {
   const pathname = usePathname()
@@ -620,6 +656,7 @@ function SidebarNavFallback({
       t={t}
       locale={locale}
       role={role}
+      isLoggedIn={isLoggedIn}
       pendingCount={pendingCount}
     />
   )
@@ -627,6 +664,7 @@ function SidebarNavFallback({
 
 export default function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { t, locale } = useTranslation()
   const { isOpen, close, isCollapsed, toggleCollapsed } = useSidebar()
 
@@ -634,22 +672,27 @@ export default function AppSidebar() {
   const [role, setRole] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
+  const [quickLoggingIn, setQuickLoggingIn] = useState(false)
   const [showProfilesModal, setShowProfilesModal] = useState(false)
 
   const supabase = createClient()
 
   useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
+    async function loadUser(sessionUser?: User | null) {
+      let activeUser = sessionUser
+      if (activeUser === undefined) {
+        const {
+          data: { user: fetchedUser },
+        } = await supabase.auth.getUser()
+        activeUser = fetchedUser
+      }
+      setUser(activeUser ?? null)
 
-      if (user) {
+      if (activeUser) {
         const { data: profile } = await supabase
           .from('app_user')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', activeUser.id)
           .single()
         setRole(profile?.role || null)
 
@@ -689,7 +732,7 @@ export default function AppSidebar() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadUser()
+        loadUser(session.user)
       } else {
         setRole(null)
         setPendingCount(0)
@@ -724,7 +767,7 @@ export default function AppSidebar() {
                 Indie Clasificados
               </span>
               <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-                {locale === 'en' ? 'Local Businesses' : 'Pymes y Emprendedores'}
+                {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
               </span>
             </div>
           </Link>
@@ -761,6 +804,7 @@ export default function AppSidebar() {
               t={t}
               locale={locale}
               role={role}
+              isLoggedIn={Boolean(user)}
               pendingCount={pendingCount}
             />
           }
@@ -770,6 +814,7 @@ export default function AppSidebar() {
             t={t}
             locale={locale}
             role={role}
+            isLoggedIn={Boolean(user)}
             pendingCount={pendingCount}
           />
         </Suspense>
@@ -845,19 +890,31 @@ export default function AppSidebar() {
             </Link>
             <button
               type="button"
+              disabled={quickLoggingIn}
               onClick={async () => {
-                await supabase.auth.signInWithPassword({
-                  email: 'admin@marketplace.com',
-                  password: 'Password123!',
-                })
-                close()
-                window.location.reload()
+                setQuickLoggingIn(true)
+                const adminWelcomeUrl = '/bienvenida?role=admin&name=Administrador%20Maestro'
+                triggerGlobalNavigationLoader(
+                  adminWelcomeUrl,
+                  'Iniciando Sesión como Administrador',
+                  'Abriendo tu ventana liviana de bienvenida y guía rápida según tu perfil...'
+                )
+                try {
+                  await supabase.auth.signInWithPassword({
+                    email: 'admin@marketplace.com',
+                    password: 'Password123!',
+                  })
+                  close()
+                  router.push(adminWelcomeUrl)
+                } finally {
+                  setQuickLoggingIn(false)
+                }
               }}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 transition-colors cursor-pointer"
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 transition-colors cursor-pointer disabled:opacity-50"
               title="Acceso directo rápido como Administrador Maestro"
             >
               <span>🛡️</span>
-              <span>Acceso Rápido Admin</span>
+              <span>{quickLoggingIn ? 'Iniciando sesión...' : 'Acceso Rápido Admin'}</span>
             </button>
             <button
               type="button"

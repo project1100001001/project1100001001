@@ -112,9 +112,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         badge: '🛠️ Catálogo de Servicios',
         title: 'Servicios Profesionales y Oficios',
         description:
-          'Encontrarás técnicos, asesorías, mantenimiento, transporte y soluciones locales listas para contratar.',
-        guideTip:
-          '💡 Guía: Filtra por tu ciudad y pulsa el botón de WhatsApp para cotizar directo con el profesional.',
+          'Técnicos, asesorías, mantenimiento, transporte y soluciones locales listas para contratar.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('type=article')) {
@@ -122,9 +121,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         badge: '📦 Artículos Usados',
         title: 'Artículos de Segunda Mano y Oportunidades',
         description:
-          'Encontrarás artículos usados en buen estado, fotos reales y precios negociables publicados por vendedores locales.',
-        guideTip:
-          '💡 Guía: Alterna entre vista Cuadrícula o Lista y toca cualquier anuncio para ver todas sus fotos.',
+          'Artículos usados en buen estado, fotos reales y precios negociables publicados por vendedores locales.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('type=product')) {
@@ -132,9 +130,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         badge: '✨ Productos Nuevos',
         title: 'Productos Nuevos de Pymes y Emprendedores',
         description:
-          'Encontrarás productos nuevos con disponibilidad inmediata, precios directos y comercios verificados.',
-        guideTip:
-          '💡 Guía: Revisa las especificaciones del producto y haz tu pedido por WhatsApp sin intermediarios.',
+          'Productos nuevos con disponibilidad inmediata, precios directos y comercios verificados.',
+        guideTip: '',
       }
     }
     if (/^\/catalogo\/[^/?#]+/.test(cleanHref)) {
@@ -142,18 +139,16 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         badge: '🔎 Ficha del Anuncio',
         title: 'Detalle Completo de la Publicación',
         description:
-          'Verás la galería de fotos, características técnicas, ubicación, datos del vendedor y contacto directo.',
-        guideTip:
-          '💡 Guía: Revisa las fotos y pulsa "Contactar por WhatsApp" para hablar de inmediato con el anunciante.',
+          'Galería de fotos, características técnicas, ubicación, datos del vendedor y contacto directo.',
+        guideTip: '',
       }
     }
     return {
       badge: '🔍 Explorador Comercial',
       title: 'Catálogo General de Indie Clasificados',
       description:
-        'Encontrarás todas las publicaciones activas con buscador inteligente por categoría, ciudad y rango de precio.',
-      guideTip:
-        '💡 Guía: Usa los filtros superiores para encontrar rápidamente servicios, artículos o productos.',
+        'Todas las publicaciones activas con buscador inteligente por categoría, ciudad y rango de precio.',
+      guideTip: '',
     }
   }
 
@@ -162,9 +157,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '📇 Directorio Comercial',
       title: 'Directorio de Vendedores y Comercios',
       description:
-        'Encontrarás los perfiles de pymes, emprendedores y profesionales con su calificación, ciudad y catálogo.',
-      guideTip:
-        '💡 Guía: Explora las tiendas verificadas o pulsa en un vendedor para ver todas sus ofertas activas.',
+        'Perfiles de pymes, emprendedores y profesionales con su calificación, ciudad y catálogo.',
+      guideTip: '',
     }
   }
 
@@ -175,8 +169,7 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         title: 'Publicar un Servicio Profesional',
         description:
           'Formulario guiado para describir tu servicio, definir tu tarifa o cotización, cobertura y WhatsApp.',
-        guideTip:
-          '💡 Guía: Agrega un título claro y fotos de tu trabajo para generar mayor confianza en los clientes.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('type=article')) {
@@ -185,8 +178,7 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         title: 'Publicar un Artículo Usado',
         description:
           'Formulario paso a paso para subir fotos reales de tu artículo, detallar su estado y fijar el precio.',
-        guideTip:
-          '💡 Guía: Incluye varias fotos nítidas para que los compradores conozcan el estado real del artículo.',
+        guideTip: '',
       }
     }
     return {
@@ -194,8 +186,7 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       title: 'Publicar un Producto en el Catálogo',
       description:
         'Estudio de publicación para crear la ficha de tu producto con fotos, precio, categoría y contacto directo.',
-      guideTip:
-        '💡 Guía: Al publicar obtienes exhibición inicial para que los compradores te contacten al instante.',
+      guideTip: '',
     }
   }
 
@@ -204,9 +195,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '📦 Gestión de Inventario',
       title: 'Mis Publicaciones e Inventario',
       description:
-        'Encontrarás el listado de tus anuncios para editar precios, actualizar fotos, pausar o impulsar su visibilidad.',
-      guideTip:
-        '💡 Guía: Usa los controles de cada tarjeta para editar tu anuncio o crearle una campaña publicitaria.',
+        'Listado de tus anuncios para editar precios, actualizar fotos, pausar o impulsar su visibilidad.',
+      guideTip: '',
     }
   }
 
@@ -215,9 +205,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '🛠️ Gestión de Servicios',
       title: 'Panel de Mis Servicios Publicados',
       description:
-        'Encontrarás tus servicios activos para actualizar tarifas, horarios de atención y estado de publicación.',
-      guideTip:
-        '💡 Guía: Mantén tu información al día para recibir solicitudes de clientes por WhatsApp.',
+        'Tus servicios activos para actualizar tarifas, horarios de atención y estado de publicación.',
+      guideTip: '',
     }
   }
 
@@ -226,9 +215,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '📈 Rendimiento Publicitario',
       title: 'Mis Campañas y Estadísticas',
       description:
-        'Encontrarás el estado de tus anuncios promocionados, tiempo restante de exhibición, vistas y clics a WhatsApp.',
-      guideTip:
-        '💡 Guía: Monitorea el impacto de tu pauta y renueva las campañas con mejor conversión.',
+        'Estado de tus anuncios promocionados, tiempo restante de exhibición, vistas y clics a WhatsApp.',
+      guideTip: '',
     }
   }
 
@@ -238,18 +226,16 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         badge: '💳 Billetera Comercial',
         title: 'Recarga de Saldo Publicitario',
         description:
-          'Encontrarás las opciones para recargar créditos en tu billetera y activar promociones en las pasarelas.',
-        guideTip:
-          '💡 Guía: Elige el monto deseado y registra tu recarga para impulsar tus publicaciones.',
+          'Opciones para recargar créditos en tu billetera y activar promociones en las pasarelas.',
+        guideTip: '',
       }
     }
     return {
       badge: '🚀 Impulsar Ventas',
       title: 'Configurar Campaña Publicitaria',
       description:
-        'Podrás destacar tus anuncios en la Gran Vitrina Principal o en las pasarelas continuas de alto tráfico.',
-      guideTip:
-        '💡 Guía: Selecciona tu publicación, elige los días de pauta y activa tu campaña con tu saldo.',
+        'Destaca tus anuncios en la Gran Vitrina Principal o en las pasarelas continuas de alto tráfico.',
+      guideTip: '',
     }
   }
 
@@ -260,16 +246,16 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         title: 'Moderación de Campañas Publicitarias',
         description:
           'Control administrativo de órdenes de pauta, tiempos de exhibición y campañas activas en vitrina.',
-        guideTip: '💡 Guía: Revisa y aprueba las campañas solicitadas por los vendedores.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('section=adpage')) {
       return {
-        badge: '🛡️ Administración',
-        title: 'Configuración de Vitrina y Pasarelas',
+        badge: '🛡️ Administración Publicidad',
+        title: 'Control de Página de Publicidad y Pasarelas',
         description:
-          'Ajustes en tiempo real de velocidad de pasarelas, rotación de la Gran Vitrina y anuncios por sección.',
-        guideTip: '💡 Guía: Guarda tus cambios para actualizar de inmediato la experiencia del inicio.',
+          'Administración de pasarelas en la página de publicidad, nuevos catálogos exclusivos, costos de campaña y vendedores habilitados.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('section=balances')) {
@@ -278,7 +264,7 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         title: 'Control de Billeteras y Saldos',
         description:
           'Gestión de recargas de saldo, validación de comprobantes y asignación de créditos publicitarios.',
-        guideTip: '💡 Guía: Aprueba las recargas pendientes para acreditar saldo a los vendedores.',
+        guideTip: '',
       }
     }
     if (cleanHref.includes('section=users')) {
@@ -287,15 +273,15 @@ export function resolveRouteContext(href: string): RouteContextInfo {
         title: 'Gestión de Usuarios y Permisos',
         description:
           'Directorio completo de usuarios registrados, asignación de roles y verificación oficial de comercios.',
-        guideTip: '💡 Guía: Otorga el sello de comercio verificado a los vendedores confiables.',
+        guideTip: '',
       }
     }
     return {
-      badge: '🛡️ Moderación General',
-      title: 'Panel de Moderación y Administración',
+      badge: '🛡️ Catálogo General',
+      title: 'Moderación de Artículos y Servicios',
       description:
-        'Centro de control para revisar, aprobar, editar o moderar las publicaciones enviadas al catálogo.',
-      guideTip: '💡 Guía: Filtra los anuncios pendientes de revisión para mantener la calidad del catálogo.',
+        'Centro de control para revisar, aprobar, clasificar o editar los artículos y servicios publicados en el catálogo.',
+      guideTip: '',
     }
   }
 
@@ -304,9 +290,8 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '⚙️ Perfil Comercial',
       title: 'Mi Cuenta y Datos de Contacto',
       description:
-        'Encontrarás la configuración de tu nombre comercial, WhatsApp de ventas, ciudad y descripción de tu negocio.',
-      guideTip:
-        '💡 Guía: Verifica que tu número de WhatsApp esté correcto para recibir los mensajes de tus clientes.',
+        'Configuración de tu nombre comercial, WhatsApp de ventas, ciudad y descripción de tu negocio.',
+      guideTip: '',
     }
   }
 
@@ -315,9 +300,18 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       badge: '🔐 Acceso Comercial',
       title: 'Iniciar Sesión o Crear Cuenta',
       description:
-        'Accede a tu panel de vendedor para publicar anuncios, administrar tu inventario y promocionar tu negocio.',
-      guideTip:
-        '💡 Guía: Recuerda que para ver el catálogo y contactar vendedores por WhatsApp no necesitas registrarte.',
+        'Panel de vendedor para publicar anuncios, administrar tu inventario y promocionar tu negocio.',
+      guideTip: '',
+    }
+  }
+
+  if (cleanHref.startsWith('/bienvenida')) {
+    return {
+      badge: '📊 Dashboard',
+      title: 'Dashboard y Resumen de tu Perfil',
+      description:
+        'Resumen rápido de tus publicaciones, campañas, compras y actividad reciente según tu perfil.',
+      guideTip: '',
     }
   }
 
@@ -325,58 +319,78 @@ export function resolveRouteContext(href: string): RouteContextInfo {
     badge: '🏠 Vitrina Principal',
     title: 'Vitrina Principal de Indie Clasificados',
     description:
-      'Encontrarás la Gran Vitrina y las pasarelas interactivas con servicios, artículos usados, productos nuevos y comercios.',
-    guideTip:
-      '💡 Guía: Desliza cualquier pasarela con el dedo o toca un anuncio para ver sus detalles y contactar por WhatsApp.',
+      'La Gran Vitrina y las pasarelas interactivas con servicios, artículos usados, productos nuevos y comercios.',
+    guideTip: '',
   }
 }
 
+// Estado compartido entre AvantGardeLoader (loading.tsx / páginas) y GlobalNavigationLoader (overlay único de pantalla completa)
+let isGlobalHostMounted = false
+let activeLoaderCount = 0
+let activeCustomTitle: string | undefined = undefined
+let activeCustomSubtitle: string | undefined = undefined
+let manualNavigationActive = false
+let manualSafetyTimer: ReturnType<typeof setTimeout> | null = null
+const loaderListeners = new Set<() => void>()
+
+function notifyLoaderListeners() {
+  loaderListeners.forEach((fn) => fn())
+}
+
 /**
- * Componente principal de carga vanguardista para páginas y transiciones
+ * Permite disparar la ventana de carga inicial a pantalla completa desde cualquier acción
+ * móvil o de escritorio (menú lateral móvil, inicio rápido de sesión, modales o router.push).
  */
-export default function AvantGardeLoader({
+export function triggerGlobalNavigationLoader(
+  href: string,
+  customTitle?: string,
+  customSubtitle?: string
+) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('close-mobile-sidebar'))
+    const currentFull =
+      window.location.pathname + (window.location.search ? window.location.search : '')
+    if (href === currentFull && !customTitle) return
+  }
+  lastPendingHref = href
+  activeCustomTitle = customTitle
+  activeCustomSubtitle = customSubtitle
+  manualNavigationActive = true
+  if (manualSafetyTimer) clearTimeout(manualSafetyTimer)
+  manualSafetyTimer = setTimeout(() => {
+    manualNavigationActive = false
+    lastPendingHref = null
+    activeCustomTitle = undefined
+    activeCustomSubtitle = undefined
+    notifyLoaderListeners()
+  }, 8000)
+  notifyLoaderListeners()
+}
+
+/**
+ * Tarjeta grande central con la descripción contextual del enlace y telemetría
+ * Se muestra dentro de la pantalla de espera única que bloquea toda la pantalla.
+ */
+function FullScreenDescriptiveLoaderOverlay({
+  routeHref,
+  progress,
   title,
   subtitle,
-  variant = 'full',
-}: AvantGardeLoaderProps) {
-  const [progress, setProgress] = useState(18)
-  const [routeHref, setRouteHref] = useState<string>(() => {
-    if (lastPendingHref) return lastPendingHref
-    if (typeof window !== 'undefined') {
-      return window.location.pathname + (window.location.search || '')
-    }
-    return '/'
-  })
-
-  useEffect(() => {
-    if (lastPendingHref) {
-      setRouteHref(lastPendingHref)
-    } else if (typeof window !== 'undefined') {
-      setRouteHref(window.location.pathname + (window.location.search || ''))
-    }
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 96) return 96
-        const step = prev < 60 ? 9 : prev < 85 ? 4 : 1
-        return Math.min(96, prev + step)
-      })
-    }, 180)
-
-    return () => {
-      clearInterval(progressInterval)
-    }
-  }, [])
-
+}: {
+  routeHref: string
+  progress: number
+  title?: string
+  subtitle?: string
+}) {
   const routeInfo = resolveRouteContext(routeHref)
   const displayTitle =
     title && title !== 'Indie Clasificados' ? title : routeInfo.title
   const displayDescription = subtitle || routeInfo.description
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center min-h-[72vh] px-4 py-10 select-none overflow-hidden">
-      {/* Tarjeta Central Holográfica Vanguardista */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-200/80 dark:border-zinc-800/90 bg-white/90 dark:bg-zinc-900/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950/65 dark:bg-black/80 backdrop-blur-md px-4 py-10 select-none overflow-hidden animate-in fade-in duration-150">
+      {/* Recuadro Grande con la información de descripción actual */}
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-200/80 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
         {/* Luz ambiental decorativa */}
         <div className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-emerald-500/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-purple-600/15 blur-3xl" />
@@ -394,7 +408,7 @@ export default function AvantGardeLoader({
           </span>
         </div>
 
-        {/* Núcleo de Electrones Orbitando + Guía Contextual de la Sección */}
+        {/* Núcleo de Electrones Orbitando + Descripción Contextual del Enlace */}
         <div className="flex flex-col items-center text-center">
           <QuantumGooeyCore size="lg" />
 
@@ -453,35 +467,140 @@ export default function AvantGardeLoader({
   )
 }
 
+/**
+ * Componente principal de carga vanguardista para páginas y transiciones.
+ * Se sincroniza con GlobalNavigationLoader para que SIEMPRE exista una única pantalla de espera
+ * a pantalla completa con el recuadro grande descriptivo, sin duplicarse ni dejar huecos sin cubrir.
+ */
+export default function AvantGardeLoader({
+  title,
+  subtitle,
+}: AvantGardeLoaderProps) {
+  const [hostReady, setHostReady] = useState(() => isGlobalHostMounted)
+
+  useEffect(() => {
+    activeLoaderCount += 1
+    activeCustomTitle = title
+    activeCustomSubtitle = subtitle
+    setHostReady(isGlobalHostMounted)
+    notifyLoaderListeners()
+
+    return () => {
+      activeLoaderCount = Math.max(0, activeLoaderCount - 1)
+      if (activeLoaderCount === 0 && !manualNavigationActive) {
+        activeCustomTitle = undefined
+        activeCustomSubtitle = undefined
+      }
+      notifyLoaderListeners()
+    }
+  }, [title, subtitle])
+
+  // Si el contenedor global ya está montado, él renderiza el único overlay de pantalla completa
+  if (hostReady) {
+    return <div className="flex-1 min-h-[72vh]" aria-hidden="true" />
+  }
+
+  // Fallback para SSR inicial antes de que hidrate GlobalNavigationLoader
+  const initialHref =
+    lastPendingHref ||
+    (typeof window !== 'undefined'
+      ? window.location.pathname + (window.location.search || '')
+      : '/')
+
+  return (
+    <FullScreenDescriptiveLoaderOverlay
+      routeHref={initialHref}
+      progress={24}
+      title={title}
+      subtitle={subtitle}
+    />
+  )
+}
+
 function NavigationProgressInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isNavigating, setIsNavigating] = useState(false)
-  const [barProgress, setBarProgress] = useState(0)
+  const [externalLoaders, setExternalLoaders] = useState(0)
+  const [progress, setProgress] = useState(20)
+  const [targetHref, setTargetHref] = useState<string>('/')
 
-  // Cuando cambia la ruta o los query params, cerramos la barra superior suavemente
+  const currentRouteKey = `${pathname || '/'}?${searchParams ? searchParams.toString() : ''}`
+  const prevRouteKeyRef = React.useRef<string>(currentRouteKey)
+  const navStartTimeRef = React.useRef<number>(0)
+
+  // Suscribirse a cualquier AvantGardeLoader activo o disparo manual (móvil y escritorio)
   useEffect(() => {
-    lastPendingHref = null
-    if (isNavigating) {
-      setBarProgress(100)
-      const doneTimer = setTimeout(() => {
-        setIsNavigating(false)
-        setBarProgress(0)
-      }, 220)
-      return () => clearTimeout(doneTimer)
+    isGlobalHostMounted = true
+    const sync = () => {
+      setExternalLoaders(activeLoaderCount)
+      if (manualNavigationActive) {
+        if (navStartTimeRef.current === 0) {
+          navStartTimeRef.current = Date.now()
+        }
+        setProgress(24)
+        setIsNavigating(true)
+        if (lastPendingHref) {
+          setTargetHref(lastPendingHref)
+        }
+      }
+      if (activeLoaderCount > 0 && !lastPendingHref && typeof window !== 'undefined') {
+        setTargetHref(window.location.pathname + (window.location.search || ''))
+      }
     }
-  }, [pathname, searchParams])
+    sync()
+    loaderListeners.add(sync)
+    return () => {
+      loaderListeners.delete(sync)
+      isGlobalHostMounted = false
+    }
+  }, [])
 
-  // Registrar el enlace de destino clicado para que la ventana central de carga muestre la guía exacta de ese enlace
+  // Cuando cambia realmente la ruta o los query params, garantizamos un tiempo mínimo visible (520ms) para cubrir incluso rutas en caché o filtros rápidos
+  useEffect(() => {
+    if (prevRouteKeyRef.current === currentRouteKey) {
+      return
+    }
+    prevRouteKeyRef.current = currentRouteKey
+    lastPendingHref = null
+    manualNavigationActive = false
+    if (manualSafetyTimer) {
+      clearTimeout(manualSafetyTimer)
+      manualSafetyTimer = null
+    }
+    if (isNavigating) {
+      const elapsed = navStartTimeRef.current > 0 ? Date.now() - navStartTimeRef.current : 0
+      const minTotalMs = 520
+      const remainingMs = Math.max(220, minTotalMs - elapsed)
+
+      const finishProgressTimer = setTimeout(() => {
+        setProgress(100)
+      }, Math.max(40, remainingMs - 160))
+
+      const doneTimer = setTimeout(() => {
+        navStartTimeRef.current = 0
+        setIsNavigating(false)
+        setProgress(20)
+        if (activeLoaderCount === 0) {
+          activeCustomTitle = undefined
+          activeCustomSubtitle = undefined
+        }
+      }, remainingMs)
+
+      return () => {
+        clearTimeout(finishProgressTimer)
+        clearTimeout(doneTimer)
+      }
+    }
+  }, [currentRouteKey, isNavigating])
+
+  // Interceptar clics en TODOS los enlaces (en fase de burbujeo, después de que Next.js Link llama a e.preventDefault() e inicia la navegación)
   useEffect(() => {
     let safetyTimer: ReturnType<typeof setTimeout> | null = null
+    let sameRouteFallbackTimer: ReturnType<typeof setTimeout> | null = null
 
-    const handleDocumentClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
-        return
-      }
-
-      const anchor = (e.target as HTMLElement | null)?.closest('a')
+    const activateForElement = (targetEl: HTMLElement | null) => {
+      const anchor = targetEl?.closest('a')
       if (!anchor) return
 
       const href = anchor.getAttribute('href')
@@ -497,50 +616,101 @@ function NavigationProgressInner() {
         return
       }
 
+      // Cerrar siempre el menú móvil automáticamente al seleccionar cualquier enlace
+      window.dispatchEvent(new CustomEvent('close-mobile-sidebar'))
+
       const currentFull =
         window.location.pathname + (window.location.search ? window.location.search : '')
       if (href === currentFull) return
 
+      navStartTimeRef.current = Date.now()
       lastPendingHref = href
+      setTargetHref(href)
+      setProgress(24)
       setIsNavigating(true)
-      setBarProgress(25)
+
+      if (sameRouteFallbackTimer) clearTimeout(sameRouteFallbackTimer)
+      // Si la transición es manejada localmente por eventos (ej. sub-secciones ya montadas), cerrar suavemente tras completarse
+      sameRouteFallbackTimer = setTimeout(() => {
+        const nowFull =
+          window.location.pathname + (window.location.search ? window.location.search : '')
+        if (activeLoaderCount === 0 && (nowFull === href || Date.now() - navStartTimeRef.current >= 600)) {
+          setProgress(100)
+          setTimeout(() => {
+            if (activeLoaderCount === 0) {
+              navStartTimeRef.current = 0
+              lastPendingHref = null
+              manualNavigationActive = false
+              setIsNavigating(false)
+              setProgress(20)
+            }
+          }, 180)
+        }
+      }, 750)
 
       if (safetyTimer) clearTimeout(safetyTimer)
       safetyTimer = setTimeout(() => {
+        navStartTimeRef.current = 0
         lastPendingHref = null
+        manualNavigationActive = false
         setIsNavigating(false)
-        setBarProgress(0)
+        setProgress(20)
       }, 8000)
     }
 
-    document.addEventListener('click', handleDocumentClick, true)
+    const handleDocumentClick = (e: MouseEvent) => {
+      // Nota: NO filtrar por e.defaultPrevented porque Next.js <Link> llama a e.preventDefault() para hacer client-side routing
+      if (
+        (typeof e.button === 'number' && e.button !== 0) ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey
+      ) {
+        return
+      }
+      activateForElement(e.target as HTMLElement | null)
+    }
+
+    document.addEventListener('click', handleDocumentClick, false)
     return () => {
-      document.removeEventListener('click', handleDocumentClick, true)
+      document.removeEventListener('click', handleDocumentClick, false)
       if (safetyTimer) clearTimeout(safetyTimer)
+      if (sameRouteFallbackTimer) clearTimeout(sameRouteFallbackTimer)
     }
   }, [])
 
-  // Avance progresivo de la barra láser superior mientras está navegando
+  const isVisible = isNavigating || externalLoaders > 0
+
+  // Avance progresivo del porcentaje mientras la pantalla de espera está activa
   useEffect(() => {
-    if (!isNavigating) return
+    if (!isVisible) return
     const interval = setInterval(() => {
-      setBarProgress((prev) => {
-        if (prev >= 92) return prev
-        return prev + (prev < 60 ? 12 : 4)
+      setProgress((prev) => {
+        if (prev >= 96) return 96
+        const step = prev < 60 ? 9 : prev < 85 ? 4 : 1
+        return Math.min(96, prev + step)
       })
     }, 160)
     return () => clearInterval(interval)
-  }, [isNavigating])
+  }, [isVisible])
 
-  if (!isNavigating) return null
+  if (!isVisible) return null
+
+  const effectiveHref =
+    lastPendingHref ||
+    targetHref ||
+    (typeof window !== 'undefined'
+      ? window.location.pathname + (window.location.search || '')
+      : pathname || '/')
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] h-1 bg-transparent pointer-events-none overflow-hidden">
-      <div
-        className="h-full bg-gradient-to-r from-emerald-400 via-purple-500 to-cyan-400 shadow-[0_0_16px_rgba(16,185,129,0.9)] transition-all duration-200 ease-out"
-        style={{ width: `${barProgress}%` }}
-      />
-    </div>
+    <FullScreenDescriptiveLoaderOverlay
+      routeHref={effectiveHref}
+      progress={progress}
+      title={activeCustomTitle}
+      subtitle={activeCustomSubtitle}
+    />
   )
 }
 

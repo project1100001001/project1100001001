@@ -99,7 +99,21 @@ function ArticlesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Artic
           onClickCapture={control.handleClickCapture}
         >
           {loopedItems.map((item, idx) => {
-            const whatsappUrl = getWhatsappUrl(item.sellerWhatsapp, item.sellerName, item.title, locale)
+            const whatsappUrl = getWhatsappUrl(
+              item.sellerWhatsapp,
+              item.sellerName,
+              item.title,
+              locale,
+              {
+                listingId: item.listingId,
+                type: item.type,
+                categoryName: item.categoryName,
+                price: item.price,
+                priceUnit: item.priceUnit,
+                city: item.city,
+                attrs: item.attrs,
+              }
+            )
             const conditionLabel = item.attrs?.condition || 'Usado'
 
             return (

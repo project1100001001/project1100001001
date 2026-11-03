@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { ListingWithRelations } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { getWhatsappUrl, getListingReferenceCode } from '@/lib/useContinuousScroll'
 
 interface ListingCardProps {
   listing: ListingWithRelations
@@ -27,24 +28,22 @@ export default function ListingCard({
   const primaryMedia = listing.listing_media?.sort((a, b) => a.position - b.position)[0]
   const imageUrl = primaryMedia?.url
 
-  // Helper para WhatsApp
-  const formatWhatsappUrl = (phoneRaw: string | null | undefined, businessName: string, title: string) => {
-    if (!phoneRaw) return ''
-    let cleaned = phoneRaw.replace(/\D/g, '')
-    if (cleaned.length === 10) {
-      cleaned = `57${cleaned}`
-    }
-    const msg =
-      locale === 'en'
-        ? `Hello ${businessName}, I am interested in your listing "${title}" on Indie Clasificados.`
-        : `Hola ${businessName}, me interesa tu anuncio "${title}" que vi en el catálogo de Indie Clasificados.`
-    return `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
-  }
-
-  const whatsappUrl = formatWhatsappUrl(
-    listing.seller?.whatsapp || listing.seller?.phone,
+  const referenceCode = getListingReferenceCode(listing.id, listing.attrs)
+  const whatsappUrl = getWhatsappUrl(
+    listing.seller?.whatsapp || listing.seller?.phone || null,
     listing.seller?.business_name || 'Comercio',
-    listing.title
+    listing.title,
+    locale,
+    {
+      listingId: listing.id,
+      referenceCode,
+      type: listing.type,
+      categoryName: listing.category?.name || null,
+      price: listing.price,
+      priceUnit: listing.price_unit,
+      city: listing.city || listing.seller?.city || null,
+      attrs: listing.attrs || null,
+    }
   )
 
   // Type badge styling & label
@@ -129,6 +128,13 @@ export default function ListingCard({
                     {currentType.label}
                   </span>
 
+                  <span
+                    className="rounded-md border border-emerald-200 bg-emerald-50/80 px-1.5 sm:px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/50 dark:text-emerald-300"
+                    title="Referencia del anuncio enviada automáticamente por WhatsApp"
+                  >
+                    📌 {referenceCode}
+                  </span>
+
                   {listing.attrs?.condition && (
                     <span className="rounded-md bg-zinc-100 px-1.5 sm:px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                       {listing.attrs.condition}
@@ -138,6 +144,12 @@ export default function ListingCard({
                   {listing.category && (
                     <span className="rounded-md bg-purple-50 px-1.5 sm:px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 truncate max-w-[130px] sm:max-w-none">
                       🏷️ {listing.category.name}
+                    </span>
+                  )}
+
+                  {listing.attrs?.special_runway_title && (
+                    <span className="rounded-md bg-amber-100 border border-amber-300 px-1.5 sm:px-2 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800 truncate max-w-[180px] sm:max-w-none">
+                      {listing.attrs?.special_runway_badge || '⭐'} {listing.attrs.special_runway_title}
                     </span>
                   )}
 
@@ -305,6 +317,17 @@ export default function ListingCard({
           >
             {currentType.shortLabel}
           </span>
+          <span
+            className="rounded-md border border-emerald-300 bg-emerald-50/90 px-1.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-emerald-900 backdrop-blur-md dark:border-emerald-800 dark:bg-emerald-950/90 dark:text-emerald-200"
+            title="Referencia del producto o servicio"
+          >
+            📌 {referenceCode}
+          </span>
+          {listing.attrs?.special_runway_title && (
+            <span className="rounded-md bg-amber-100/95 border border-amber-300 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-amber-900 backdrop-blur-md truncate max-w-[140px]">
+              {listing.attrs?.special_runway_badge || '⭐'} {listing.attrs.special_runway_title}
+            </span>
+          )}
           {showSellerStatus && listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
             <span
               className={`rounded-md px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium ${statusBadges[listing.status].color}`}

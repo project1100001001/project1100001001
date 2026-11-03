@@ -11,13 +11,19 @@ import ServicesRunway from '@/components/ServicesRunway'
 import ArticlesRunway from '@/components/ArticlesRunway'
 import ProductsRunway from '@/components/ProductsRunway'
 import MerchantsRunway, { type MerchantShowcase } from '@/components/MerchantsRunway'
-import { resolveAdOrderPlacement, getListingFreeTrialStatus } from '@/lib/adPolicies'
+import {
+  resolveAdOrderPlacement,
+  getListingFreeTrialStatus,
+  resolveIndependentRunwayStates,
+  INDEPENDENT_RUNWAY_OVERRIDES_KEY,
+} from '@/lib/adPolicies'
 import {
   type AdPageConfig,
   DEFAULT_AD_PAGE_CONFIG,
   AD_PAGE_CONFIG_STORAGE_KEY,
   sanitizeAdPageConfig,
 } from '@/lib/adPageConfig'
+import { getWhatsappUrl, getListingReferenceCode, trackAdEvent } from '@/lib/useContinuousScroll'
 
 interface HomeClientViewProps {
   categories: Category[]
@@ -55,6 +61,7 @@ export default function HomeClientView({
     sanitizeAdPageConfig(initialAdPageConfig || DEFAULT_AD_PAGE_CONFIG)
   )
   const [viewerRole, setViewerRole] = useState<'guest' | 'buyer' | 'seller' | 'admin'>('guest')
+  const [selectedExclusiveRunwayId, setSelectedExclusiveRunwayId] = useState<string>('all')
 
   // Sincronizar con ajustes administrativos locales o eventos en vivo y detectar rol de sesión
   useEffect(() => {
@@ -264,20 +271,48 @@ export default function HomeClientView({
     return items
   }, [campaignAds, allPublishedListings, adPageConfig])
 
-  // Subconjuntos específicos para las pasarelas respetando los límites administrativos configurados
+  // Subconjuntos específicos para las pasarelas respetando los límites y el control independiente por pasarela
+  const isItemEnabledInMedium = (
+    item: ShowcaseItem,
+    medium: 'vitrina' | 'pasarela' | 'proveedores'
+  ): boolean => {
+    const rawOrderId = item.id.startsWith('ad-') ? item.id.slice(3) : item.listingId
+    let localOverrides: Record<string, any> = {}
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(INDEPENDENT_RUNWAY_OVERRIDES_KEY)
+        if (raw) localOverrides = JSON.parse(raw)
+      } catch {
+        // Ignore
+      }
+    }
+    const states = resolveIndependentRunwayStates(
+      {
+        id: rawOrderId,
+        placement: (item.attrs?.ad_placement as any) || 'pasarela',
+        attrs: item.attrs || null,
+      },
+      localOverrides
+    )
+    return states[medium].enabled
+  }
+
   const heroItems = useMemo(() => {
     const limit = adPageConfig.maxHeroItems || 5
     const granVitrinaOrCombo = showcaseItems.filter(
       (i) =>
-        i.attrs?.ad_placement === 'gran_vitrina' ||
-        i.attrs?.ad_placement === 'combo' ||
-        i.attrs?.ad_placement === 'free_trial_7d' ||
-        i.attrs?.ad_placement === 'free_initial'
+        isItemEnabledInMedium(i, 'vitrina') &&
+        (i.attrs?.ad_placement === 'gran_vitrina' ||
+          i.attrs?.ad_placement === 'combo' ||
+          i.attrs?.ad_placement === 'free_trial_7d' ||
+          i.attrs?.ad_placement === 'free_initial')
     )
     if (granVitrinaOrCombo.length >= limit) {
       return granVitrinaOrCombo.slice(0, limit)
     }
-    const rest = showcaseItems.filter((i) => !granVitrinaOrCombo.includes(i))
+    const rest = showcaseItems.filter(
+      (i) => !granVitrinaOrCombo.includes(i) && isItemEnabledInMedium(i, 'vitrina')
+    )
     return [...granVitrinaOrCombo, ...rest].slice(0, limit)
   }, [showcaseItems, adPageConfig.maxHeroItems])
 
@@ -299,31 +334,30 @@ export default function HomeClientView({
   }
 
   const serviceItems = useMemo(() => {
-    return sortForRunway(showcaseItems.filter((i) => i.type === 'service')).slice(
-      0,
-      adPageConfig.maxServicesItems || 10
-    )
+    return sortForRunway(
+      showcaseItems.filter((i) => i.type === 'service' && isItemEnabledInMedium(i, 'pasarela'))
+    ).slice(0, adPageConfig.maxServicesItems || 10)
   }, [showcaseItems, adPageConfig.maxServicesItems, adPageConfig.prioritizeVerifiedSellers])
 
   const articleItems = useMemo(() => {
-    return sortForRunway(showcaseItems.filter((i) => i.type === 'article')).slice(
-      0,
-      adPageConfig.maxArticlesItems || 20
-    )
+    return sortForRunway(
+      showcaseItems.filter((i) => i.type === 'article' && isItemEnabledInMedium(i, 'pasarela'))
+    ).slice(0, adPageConfig.maxArticlesItems || 20)
   }, [showcaseItems, adPageConfig.maxArticlesItems, adPageConfig.prioritizeVerifiedSellers])
 
   const productItems = useMemo(() => {
-    return sortForRunway(showcaseItems.filter((i) => i.type === 'product')).slice(
-      0,
-      adPageConfig.maxProductsItems || 20
-    )
+    return sortForRunway(
+      showcaseItems.filter((i) => i.type === 'product' && isItemEnabledInMedium(i, 'pasarela'))
+    ).slice(0, adPageConfig.maxProductsItems || 20)
   }, [showcaseItems, adPageConfig.maxProductsItems, adPageConfig.prioritizeVerifiedSellers])
 
-  // Comercios únicos para la Pasarela de Vendedores / Marcas
+  // Comercios únicos para la Pasarela de Proveedores / Vendedores (Incluida en el pago y administrable independientemente)
   const merchantShowcases = useMemo(() => {
     const map = new Map<string, MerchantShowcase>()
 
     sortForRunway(showcaseItems).forEach((item) => {
+      if (!isItemEnabledInMedium(item, 'proveedores')) return
+
       const placement = item.attrs?.ad_placement
       const isPromotedSeller =
         placement === 'pasarela' ||
@@ -440,6 +474,245 @@ export default function HomeClientView({
           scrollSpeed={effectiveScrollSpeed}
         />
       )}
+
+      {/* ========================================================================= */}
+      {/* 5.B PASARELAS ADICIONALES Y CATÁLOGOS EXCLUSIVOS EN VENTANA DE PUBLICIDAD */}
+      {/* ========================================================================= */}
+      {adPageConfig.customRunways &&
+        adPageConfig.customRunways.filter((r) => r.active).length > 0 && (
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+            {/* Filtro de Catálogos Exclusivos en la Ventana de Publicidad (Opciones de configuración visibles SOLO si está logueado) */}
+            {viewerRole !== 'guest' && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                    <span>⭐</span>
+                    <span>
+                      Catálogos Exclusivos de Pasarela (Artículos Identificados Especialmente)
+                    </span>
+                  </span>
+                  {(viewerRole === 'seller' || viewerRole === 'admin') && (
+                    <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-950/60 px-2.5 py-0.5 rounded-full">
+                      {viewerRole === 'admin'
+                        ? '⚙️ Configurable en Control Página Publicidad'
+                        : '🏪 Habilitado según campaña activa'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExclusiveRunwayId('all')}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      selectedExclusiveRunwayId === 'all'
+                        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                        : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800'
+                    }`}
+                  >
+                    <span>🌐</span>
+                    <span>Todas las Pasarelas Exclusivas</span>
+                  </button>
+                  {adPageConfig.customRunways
+                    .filter((r) => r.active && r.hasExclusiveCatalog !== false)
+                    .map((cat) => {
+                      const isCurrent = selectedExclusiveRunwayId === cat.id
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setSelectedExclusiveRunwayId(cat.id)}
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                            isCurrent
+                              ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-400'
+                              : 'bg-white text-amber-900 border border-amber-300 hover:bg-amber-100/60 dark:bg-zinc-900 dark:text-amber-300 dark:border-amber-800'
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span>{cat.title}</span>
+                        </button>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+
+            {adPageConfig.customRunways
+              .filter(
+                (r) =>
+                  r.active &&
+                  (selectedExclusiveRunwayId === 'all' || r.id === selectedExclusiveRunwayId)
+              )
+              .map((customRunway) => {
+                const rawMatched = showcaseItems.filter((item) => {
+                  if (
+                    item.attrs?.special_runway_id === customRunway.id ||
+                    customRunway.assignedListingIds?.includes(item.listingId)
+                  ) {
+                    return true
+                  }
+                  if (customRunway.filterType === 'service') return item.type === 'service'
+                  if (customRunway.filterType === 'article') return item.type === 'article'
+                  if (customRunway.filterType === 'product') return item.type === 'product'
+                  if (customRunway.filterType === 'keyword' && customRunway.filterKeyword?.trim()) {
+                    const kw = customRunway.filterKeyword.trim().toLowerCase()
+                    return (
+                      item.title.toLowerCase().includes(kw) ||
+                      item.description.toLowerCase().includes(kw) ||
+                      item.categoryName.toLowerCase().includes(kw)
+                    )
+                  }
+                  return false
+                })
+
+                const matchedItems = sortForRunway(
+                  rawMatched.length > 0
+                    ? rawMatched
+                    : customRunway.filterType === 'all'
+                    ? showcaseItems
+                    : []
+                ).slice(0, customRunway.maxItems || 12)
+
+                if (matchedItems.length === 0) return null
+
+                const rTitle = customRunway.title
+                const rSubtitle = customRunway.subtitle
+                const rBadge = customRunway.badge
+
+                return (
+                  <section key={customRunway.id} className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                            <span>{rBadge}</span>
+                          </span>
+                          {customRunway.hasExclusiveCatalog !== false && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800">
+                              ⭐ Catálogo Exclusivo
+                            </span>
+                          )}
+                          <h2 className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+                            {customRunway.icon} {rTitle}
+                          </h2>
+                        </div>
+                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          {rSubtitle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {matchedItems.map((item) => {
+                        const refCode = getListingReferenceCode(item.listingId, item.attrs)
+                        const whatsappUrl = getWhatsappUrl(
+                          item.sellerWhatsapp,
+                          item.sellerName,
+                          item.title,
+                          locale,
+                          {
+                            listingId: item.listingId,
+                            referenceCode: refCode,
+                            type: item.type,
+                            categoryName: item.categoryName,
+                            price: item.price,
+                            priceUnit: item.priceUnit,
+                            city: item.city,
+                            attrs: item.attrs,
+                          }
+                        )
+
+                        return (
+                          <div
+                            key={`${customRunway.id}-${item.id}`}
+                            className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-purple-400 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                          >
+                            <div>
+                              <Link
+                                href={`/catalogo/${item.listingId}`}
+                                onClick={() => trackAdEvent(item, 'click')}
+                                className="block relative h-36 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"
+                              >
+                                {item.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.title}
+                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-3xl">
+                                    {item.type === 'service'
+                                      ? '🛠️'
+                                      : item.type === 'article'
+                                      ? '📦'
+                                      : '🛍️'}
+                                  </div>
+                                )}
+                                <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+                                  <span className="rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                                    {rBadge}
+                                  </span>
+                                  <span className="rounded-lg bg-emerald-600/90 px-2 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-xs">
+                                    📌 {refCode}
+                                  </span>
+                                </div>
+                              </Link>
+                              <Link
+                                href={`/catalogo/${item.listingId}`}
+                                onClick={() => trackAdEvent(item, 'click')}
+                              >
+                                <h3 className="mt-2.5 text-xs font-extrabold text-zinc-900 dark:text-zinc-50 line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                                  {item.headline || item.title}
+                                </h3>
+                              </Link>
+                              <p className="mt-0.5 text-[11px] text-zinc-500 line-clamp-1">
+                                🏪 {item.sellerName} {item.city ? `• ${item.city}` : ''}
+                              </p>
+                            </div>
+                            <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-black text-purple-700 dark:text-purple-300">
+                                  {item.price
+                                    ? `$${Number(item.price).toLocaleString('es-CO')} COP`
+                                    : 'Cotizar'}
+                                </span>
+                                <span className="font-mono text-[10px] font-bold text-zinc-400">
+                                  {refCode}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {whatsappUrl ? (
+                                  <a
+                                    href={whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => trackAdEvent(item, 'whatsapp')}
+                                    className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-500 transition-colors"
+                                  >
+                                    <span>💬</span>
+                                    <span>WhatsApp</span>
+                                  </a>
+                                ) : null}
+                                <Link
+                                  href={`/catalogo/${item.listingId}`}
+                                  onClick={() => trackAdEvent(item, 'click')}
+                                  className={`inline-flex items-center justify-center rounded-xl border border-zinc-300 px-2.5 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors ${
+                                    !whatsappUrl ? 'col-span-2' : ''
+                                  }`}
+                                >
+                                  Ver ficha ↗
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })}
+          </div>
+        )}
 
       {/* ========================================================================= */}
       {/* 6. ACCESO RÁPIDO POR CATÁLOGOS: SERVICIOS, USADOS Y NUEVOS               */}

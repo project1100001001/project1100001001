@@ -464,24 +464,115 @@ export function useGpuContinuousScroll({
   }
 }
 
+export interface ListingWhatsappReference {
+  listingId?: string | null
+  referenceCode?: string | null
+  type?: 'product' | 'service' | 'article' | string | null
+  categoryName?: string | null
+  price?: number | null
+  priceUnit?: string | null
+  city?: string | null
+  attrs?: Record<string, any> | null
+}
+
 /**
- * Enlace para contacto directo de WhatsApp
+ * Genera el código único de referencia de un producto o servicio para identificación inmediata
+ */
+export const getListingReferenceCode = (
+  listingId?: string | null,
+  attrs?: Record<string, any> | null
+): string => {
+  const customRef =
+    attrs?.reference_code || attrs?.codigo_referencia || attrs?.sku || attrs?.referencia
+  if (typeof customRef === 'string' && customRef.trim().length > 0) {
+    return customRef.trim().toUpperCase()
+  }
+  if (!listingId) return 'REF-INDIE'
+  const cleanId = String(listingId)
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+  return `REF-${cleanId.slice(0, 8) || 'INDIE'}`
+}
+
+/**
+ * Enlace para contacto directo de WhatsApp transmitiendo automáticamente la ficha de referencia del producto o servicio
  */
 export const getWhatsappUrl = (
   phoneRaw: string | null,
   sellerName: string,
   title: string,
-  locale: string = 'es'
+  locale: string = 'es',
+  ref?: ListingWhatsappReference
 ) => {
   if (!phoneRaw) return ''
   let cleaned = phoneRaw.replace(/\D/g, '')
   if (cleaned.length === 10) {
     cleaned = `57${cleaned}`
   }
-  const msg =
-    locale === 'en'
-      ? `Hello ${sellerName}, I saw your featured publication "${title}" on Indie Clasificados and would like more details.`
-      : `Hola ${sellerName}, vi su publicación destacada "${title}" en la vitrina de Indie Clasificados y me gustaría solicitar información.`
+
+  const refCode =
+    ref?.referenceCode || getListingReferenceCode(ref?.listingId, ref?.attrs)
+
+  const isEn = locale === 'en'
+
+  let typeLabel = isEn ? 'Product (New)' : 'Producto (Nuevo)'
+  if (ref?.type === 'service') {
+    const mod = ref?.attrs?.modalidad ? ` (${ref.attrs.modalidad})` : ''
+    typeLabel = isEn ? `Professional Service${mod}` : `Servicio Profesional${mod}`
+  } else if (ref?.type === 'article') {
+    const condRaw = ref?.attrs?.condition
+    const condMapEs: Record<string, string> = {
+      like_new: 'Como nuevo',
+      good: 'Buen estado',
+      fair: 'Funcional',
+      used: 'Usado',
+    }
+    const condLabel = condRaw ? condMapEs[condRaw] || condRaw : ''
+    typeLabel = isEn
+      ? `Used Article${condLabel ? ` (${condLabel})` : ''}`
+      : `Artículo Usado${condLabel ? ` (${condLabel})` : ''}`
+  }
+
+  const categoryText = ref?.categoryName ? ` • ${ref.categoryName}` : ''
+
+  let priceText = isEn ? 'Quote on request' : 'Cotización a solicitud'
+  if (ref?.price !== undefined && ref?.price !== null) {
+    const formattedNum = Number(ref.price).toLocaleString('es-CO')
+    const unitPart = ref.priceUnit ? ` / ${ref.priceUnit}` : ''
+    priceText = `$ ${formattedNum} COP${unitPart}`
+  }
+
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''
+  const listingUrl = ref?.listingId ? `${origin}/catalogo/${ref.listingId}` : ''
+
+  const lines: string[] = isEn
+    ? [
+        `Hello ${sellerName}, I am contacting you regarding this listing on Indie Clasificados:`,
+        ``,
+        `📌 *Reference:* ${refCode}`,
+        `🛍️ *Item / Service:* ${title}`,
+        `🏷️ *Type:* ${typeLabel}${categoryText}`,
+        `💰 *Price:* ${priceText}`,
+        ...(ref?.city ? [`📍 *City:* ${ref.city}`] : []),
+        ...(listingUrl ? [`🔗 *Listing Link:* ${listingUrl}`] : []),
+        ``,
+        `I would like to talk directly about reference *${refCode}*. Is it currently available?`,
+      ]
+    : [
+        `Hola ${sellerName}, me comunico por este anuncio en Indie Clasificados:`,
+        ``,
+        `📌 *Referencia:* ${refCode}`,
+        `🛍️ *Producto / Servicio:* ${title}`,
+        `🏷️ *Clasificación:* ${typeLabel}${categoryText}`,
+        `💰 *Precio / Tarifa:* ${priceText}`,
+        ...(ref?.city ? [`📍 *Ubicación:* ${ref.city}`] : []),
+        ...(listingUrl ? [`🔗 *Ficha del anuncio:* ${listingUrl}`] : []),
+        ``,
+        `Quedo atento(a) para hablar sobre la referencia *${refCode}*.`,
+      ]
+
+  const msg = lines.join('\n')
   return `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
 }
 

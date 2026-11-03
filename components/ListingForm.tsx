@@ -13,6 +13,16 @@ import {
   PLAN_GRAN_VITRINA_PRICE,
   PLAN_COMBO_PRICE,
 } from '@/lib/adPolicies'
+import {
+  type DynamicRunwayConfig,
+  DEFAULT_AD_PAGE_CONFIG,
+  AD_PAGE_CONFIG_STORAGE_KEY,
+  AD_PAGE_CONFIG_SLOT_ID,
+  sanitizeAdPageConfig,
+  decodeAdPageConfigFromSlots,
+  encodeAdPageConfigToSlot,
+  isSellerAuthorizedForClassification,
+} from '@/lib/adPageConfig'
 
 interface ListingFormProps {
   categories: Category[]
@@ -89,7 +99,7 @@ export default function ListingForm({
   const [city, setCity] = useState('')
   const [stock, setStock] = useState<string>('1')
 
-  // Dynamic attributes (attrs jsonb)
+  // Dynamic attributes (attrs jsonb) & Lista de Clasificación de Pasarela / Catálogo Exclusivo
   const [condition, setCondition] = useState(() => {
     if (initialCondition) return initialCondition
     if (initialTypeParam === 'article') return 'Usado - Buen estado'
@@ -101,6 +111,11 @@ export default function ListingForm({
   const [customAttrs, setCustomAttrs] = useState<{ key: string; value: string }[]>([])
   const [newAttrKey, setNewAttrKey] = useState('')
   const [newAttrVal, setNewAttrVal] = useState('')
+  const [availableRunways, setAvailableRunways] = useState<DynamicRunwayConfig[]>(
+    DEFAULT_AD_PAGE_CONFIG.customRunways
+  )
+  const [specialRunwayId, setSpecialRunwayId] = useState<string>('')
+  const [sellerApprovedBalance, setSellerApprovedBalance] = useState<number>(0)
 
   // Media (listing_media)
   const [listingId, setListingId] = useState<string>(() =>
@@ -237,6 +252,82 @@ export default function ListingForm({
     loadSellerInventory()
   }, [selectedSellerId, supabase, initialInventoryParam, initialEditIdParam, isServiceMode])
 
+  // Cargar la lista administrada de Clasificaciones de Pasarela / Catálogos Exclusivos y verificar pago/saldo del vendedor
+  useEffect(() => {
+    async function loadRunwayClassificationsAndSellerEligibility() {
+      // 1. Leer configuración local si existe
+      try {
+        const localRaw = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+        if (localRaw) {
+          const parsed = sanitizeAdPageConfig(JSON.parse(localRaw))
+          setAvailableRunways(parsed.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+        }
+      } catch {
+        // Ignorar error local
+      }
+
+      // 2. Consultar configuración persistida en ad_slot
+      try {
+        const { data: slotsData } = await supabase
+          .from('ad_slot')
+          .select('*')
+          .eq('id', AD_PAGE_CONFIG_SLOT_ID)
+        if (slotsData && slotsData.length > 0) {
+          const decoded = decodeAdPageConfigFromSlots(slotsData)
+          setAvailableRunways(decoded.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+        }
+      } catch {
+        // Usar configuración local o por defecto
+      }
+
+      // 3. Consultar saldo aprobado o pagos realizados por el vendedor seleccionado
+      if (selectedSellerId) {
+        try {
+          let totalEligibleCop = 0
+          const { data: advData } = await supabase
+            .from('advertiser')
+            .select('id')
+            .eq('seller_id', selectedSellerId)
+
+          if (advData && advData.length > 0) {
+            const advIds = advData.map((a: any) => a.id)
+            const { data: accData } = await supabase
+              .from('ad_account')
+              .select('balance')
+              .in('advertiser_id', advIds)
+
+            if (accData) {
+              totalEligibleCop += accData.reduce(
+                (sum: number, acc: any) => sum + Number(acc.balance || 0),
+                0
+              )
+            }
+          }
+
+          const { data: paidRecharges } = await supabase
+            .from('ad_recharge_request')
+            .select('amount')
+            .eq('seller_id', selectedSellerId)
+            .eq('status', 'approved')
+
+          if (paidRecharges) {
+            const approvedSum = paidRecharges.reduce(
+              (sum: number, r: any) => sum + Number(r.amount || 0),
+              0
+            )
+            totalEligibleCop = Math.max(totalEligibleCop, approvedSum)
+          }
+
+          setSellerApprovedBalance(totalEligibleCop)
+        } catch {
+          // Ignorar error de consulta
+        }
+      }
+    }
+
+    loadRunwayClassificationsAndSellerEligibility()
+  }, [selectedSellerId, supabase])
+
   const applyInventoryItem = (item: ListingWithRelations) => {
     setSelectedInventoryId(item.id)
     setInventoryItemData(item)
@@ -271,6 +362,13 @@ export default function ListingForm({
       if (item.attrs.modality || item.attrs.modalidad) setModality(item.attrs.modality || item.attrs.modalidad)
       if (item.attrs.lead_time) setLeadTime(item.attrs.lead_time)
       if (item.attrs.delivery_method) setDeliveryMethod(item.attrs.delivery_method)
+      if (item.attrs.special_runway_id) {
+        setSpecialRunwayId(String(item.attrs.special_runway_id))
+      } else {
+        setSpecialRunwayId('')
+      }
+    } else {
+      setSpecialRunwayId('')
     }
   }
 
@@ -477,11 +575,27 @@ export default function ListingForm({
         attrsObj[attr.key] = attr.value
       })
 
-      // Incluir metadatos de los 7 días iniciales de publicidad gratis
-      const finalAttrs = buildInitialFreeAdAttrs({
+      const baseMergedAttrs: Record<string, any> = {
         ...(inventoryItemData?.attrs || {}),
         ...attrsObj,
-      })
+      }
+
+      // Asignar o limpiar la Clasificación Especial de Pasarela / Catálogo Exclusivo de la lista
+      const selectedRunwayObj = availableRunways.find((r) => r.id === specialRunwayId)
+      if (specialRunwayId && selectedRunwayObj) {
+        baseMergedAttrs.special_runway_id = selectedRunwayObj.id
+        baseMergedAttrs.special_runway_title = selectedRunwayObj.title
+        baseMergedAttrs.special_runway_badge = `${selectedRunwayObj.icon} ${selectedRunwayObj.badge}`
+        baseMergedAttrs.special_catalog_cost = selectedRunwayObj.campaignCostCop
+      } else {
+        delete baseMergedAttrs.special_runway_id
+        delete baseMergedAttrs.special_runway_title
+        delete baseMergedAttrs.special_runway_badge
+        delete baseMergedAttrs.special_catalog_cost
+      }
+
+      // Incluir metadatos de los 7 días iniciales de publicidad gratis
+      const finalAttrs = buildInitialFreeAdAttrs(baseMergedAttrs)
 
       const numericPrice = priceType === 'fixed' && price ? parseInt(price, 10) : null
       const numericStock = isServiceMode ? null : stock ? parseInt(stock, 10) : null
@@ -563,6 +677,32 @@ export default function ListingForm({
           if (mediaError) {
             console.error('Error guardando fotos:', mediaError)
           }
+        }
+      }
+
+      // Sincronizar también en la lista de pasarelas / catálogos exclusivos si fue clasificado
+      if (listingData?.id) {
+        try {
+          const savedRaw = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+          const baseCfg = savedRaw
+            ? sanitizeAdPageConfig(JSON.parse(savedRaw))
+            : DEFAULT_AD_PAGE_CONFIG
+          const nextRunways = (baseCfg.customRunways || []).map((r) => {
+            const setIds = new Set(r.assignedListingIds || [])
+            if (r.id === specialRunwayId) {
+              setIds.add(listingData.id)
+            } else {
+              setIds.delete(listingData.id)
+            }
+            return { ...r, assignedListingIds: Array.from(setIds) }
+          })
+          const nextCfg = sanitizeAdPageConfig({ ...baseCfg, customRunways: nextRunways })
+          localStorage.setItem(AD_PAGE_CONFIG_STORAGE_KEY, JSON.stringify(nextCfg))
+          await supabase
+            .from('ad_slot')
+            .upsert([encodeAdPageConfigToSlot(nextCfg)], { onConflict: 'id' })
+        } catch {
+          // Ignorar error de sincronización secundaria
         }
       }
 
@@ -1036,6 +1176,171 @@ export default function ListingForm({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* 2.B Clasificación Especial de Pasarela y Catálogo Exclusivo (Lista Administrada) */}
+        <div className="rounded-2xl border-2 border-amber-300/80 bg-gradient-to-r from-amber-50/80 via-white to-purple-50/50 p-4 sm:p-5 shadow-2xs dark:border-amber-800/70 dark:from-amber-950/30 dark:via-zinc-900 dark:to-purple-950/20 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-zinc-950">
+                  ⭐ Identificación Especial de Artículo
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                  Lista Administrada y Habilitada por Pago
+                </span>
+              </div>
+              <label
+                htmlFor="listing-special-runway-classification"
+                className="mt-1.5 block text-sm font-extrabold text-zinc-900 dark:text-zinc-50"
+              >
+                Clasificación de Pasarela y Catálogo Exclusivo (Creación / Edición)
+              </label>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Identifica este artículo en una pasarela especial para integrarlo en su <strong>Catálogo Exclusivo</strong>. Esta lista es creada y administrada en Administración y se habilita al vendedor dependiendo del pago realizado según el costo de campaña establecido:
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <span className="text-[10px] font-bold uppercase text-zinc-500 block">
+                Saldo / Pago verificado del vendedor:
+              </span>
+              <span className="text-sm font-black text-emerald-700 dark:text-emerald-400">
+                ${sellerApprovedBalance.toLocaleString('es-CO')} COP
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <select
+              id="listing-special-runway-classification"
+              value={specialRunwayId}
+              onChange={(e) => {
+                const chosenId = e.target.value
+                if (!chosenId) {
+                  setSpecialRunwayId('')
+                  return
+                }
+                const targetR = availableRunways.find((r) => r.id === chosenId)
+                if (!targetR) return
+                const isAuthorized =
+                  isSellerAuthorizedForClassification(
+                    targetR,
+                    selectedSellerId,
+                    sellerApprovedBalance
+                  ) || inventoryItemData?.attrs?.special_runway_id === chosenId
+
+                if (!isAuthorized) {
+                  setErrorMsg(
+                    `La clasificación de Catálogo Exclusivo "${targetR.title}" requiere habilitación en Administración mediante el pago de campaña establecido ($${(targetR.campaignCostCop || 15000).toLocaleString('es-CO')} COP). Puedes realizar tu recarga en "Mis Campañas" o publicar en el Catálogo General Estándar.`
+                  )
+                  return
+                }
+                setErrorMsg(null)
+                setSpecialRunwayId(chosenId)
+              }}
+              className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-bold text-zinc-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-zinc-800 dark:text-zinc-100 cursor-pointer"
+            >
+              <option value="">
+                📦 Catálogo General Estándar (Sin costo adicional de catálogo exclusivo — $0 COP)
+              </option>
+              {availableRunways.map((r) => {
+                const isAuthorized =
+                  isSellerAuthorizedForClassification(
+                    r,
+                    selectedSellerId,
+                    sellerApprovedBalance
+                  ) || inventoryItemData?.attrs?.special_runway_id === r.id
+                return (
+                  <option key={r.id} value={r.id}>
+                    {r.icon} {r.title} ({r.badge}) — Costo Campaña Catálogo: $
+                    {(r.campaignCostCop || 15000).toLocaleString('es-CO')} COP —{' '}
+                    {isAuthorized
+                      ? '✓ HABILITADO PARA TU VENDEDOR'
+                      : '🔒 Requiere Pago / Habilitación Admin'}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+
+          {/* Tarjetas informativas del estado de habilitación en la lista */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            {availableRunways.map((r) => {
+              const isAuthorized =
+                isSellerAuthorizedForClassification(
+                  r,
+                  selectedSellerId,
+                  sellerApprovedBalance
+                ) || inventoryItemData?.attrs?.special_runway_id === r.id
+              const isSelected = specialRunwayId === r.id
+
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => {
+                    if (isAuthorized) {
+                      setErrorMsg(null)
+                      setSpecialRunwayId(isSelected ? '' : r.id)
+                    } else {
+                      setErrorMsg(
+                        `Para usar el Catálogo Exclusivo "${r.title}", se requiere un pago/saldo de campaña de $${(r.campaignCostCop || 15000).toLocaleString('es-CO')} COP o habilitación en Administración.`
+                      )
+                    }
+                  }}
+                  className={`rounded-xl border p-3 text-xs transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                    isSelected
+                      ? 'border-2 border-amber-500 bg-amber-100/60 dark:border-amber-400 dark:bg-amber-950/50 shadow-xs'
+                      : isAuthorized
+                      ? 'border-emerald-200 bg-white hover:border-emerald-400 dark:border-emerald-900/60 dark:bg-zinc-900'
+                      : 'border-zinc-200 bg-zinc-50/80 opacity-85 dark:border-zinc-800 dark:bg-zinc-900/50'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span>{r.icon}</span>
+                      <span className="font-extrabold text-zinc-900 dark:text-zinc-100 truncate">
+                        {r.title}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-zinc-500 block">
+                      Costo de campaña catálogo:{' '}
+                      <strong className="text-amber-800 dark:text-amber-300">
+                        ${(r.campaignCostCop || 15000).toLocaleString('es-CO')} COP
+                      </strong>
+                    </span>
+                  </div>
+
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                      isSelected
+                        ? 'bg-amber-500 text-zinc-950'
+                        : isAuthorized
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                    }`}
+                  >
+                    {isSelected
+                      ? '✓ Seleccionado'
+                      : isAuthorized
+                      ? '✓ Habilitado'
+                      : '🔒 Pago Requerido'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+            <span>
+              💡 Un nuevo catálogo exclusivo acarrea costos adicionales según la tarifa de campaña establecida en administración.
+            </span>
+            <Link
+              href="/mis-campanas/recargar?tab=recharge"
+              className="font-extrabold text-purple-700 hover:underline dark:text-purple-400"
+            >
+              Ir a Recarga / Pago para Habilitar Catálogo Exclusivo ↗
+            </Link>
           </div>
         </div>
 

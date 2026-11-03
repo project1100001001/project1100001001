@@ -6,6 +6,13 @@ import CatalogFilters from '@/components/CatalogFilters'
 import ListingCard from '@/components/ListingCard'
 import type { Category, ListingWithRelations } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import {
+  DEFAULT_AD_PAGE_CONFIG,
+  AD_PAGE_CONFIG_STORAGE_KEY,
+  sanitizeAdPageConfig,
+  getListingSpecialClassification,
+  type DynamicRunwayConfig,
+} from '@/lib/adPageConfig'
 
 interface CatalogClientViewProps {
   categories: Category[]
@@ -24,6 +31,7 @@ interface CatalogClientViewProps {
     condition?: string
     delivery?: string
     subType?: string
+    exclusiveCatalog?: string
   }
   listings: ListingWithRelations[]
 }
@@ -38,17 +46,52 @@ export default function CatalogClientView({
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [itemsPerPage, setItemsPerPage] = useState<number>(10)
   const [visibleLimit, setVisibleLimit] = useState<number>(10)
+  const [customRunways, setCustomRunways] = useState<DynamicRunwayConfig[]>(
+    DEFAULT_AD_PAGE_CONFIG.customRunways
+  )
 
   useEffect(() => {
-    setVisibleLimit(itemsPerPage === 0 ? listings.length : Math.max(10, itemsPerPage))
-  }, [itemsPerPage, listings.length, currentFilters.type, currentFilters.category, currentFilters.q])
+    try {
+      const raw = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+      if (raw) {
+        const parsed = sanitizeAdPageConfig(JSON.parse(raw))
+        setCustomRunways(parsed.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+      }
+    } catch {
+      // Usar predeterminado
+    }
+  }, [])
+
+  const activeExclusiveCatalogId = currentFilters.exclusiveCatalog || ''
+  const activeExclusiveCatalog = customRunways.find((r) => r.id === activeExclusiveCatalogId) || null
+  const exclusiveCatalogsList = customRunways.filter((r) => r.hasExclusiveCatalog !== false)
+
+  // Filtrar artículos cuando hay un Catálogo Exclusivo activo
+  const filteredListings = activeExclusiveCatalogId
+    ? listings.filter(
+        (l) => getListingSpecialClassification(l, customRunways)?.id === activeExclusiveCatalogId
+      )
+    : listings
+
+  useEffect(() => {
+    setVisibleLimit(itemsPerPage === 0 ? filteredListings.length : Math.max(10, itemsPerPage))
+  }, [
+    itemsPerPage,
+    filteredListings.length,
+    currentFilters.type,
+    currentFilters.category,
+    currentFilters.q,
+    activeExclusiveCatalogId,
+  ])
 
   const visibleListings =
-    itemsPerPage === 0 ? listings : listings.slice(0, Math.max(10, visibleLimit))
+    itemsPerPage === 0
+      ? filteredListings
+      : filteredListings.slice(0, Math.max(10, visibleLimit))
 
   const handleChangeItemsPerPage = (newCount: number) => {
     setItemsPerPage(newCount)
-    setVisibleLimit(newCount === 0 ? listings.length : Math.max(10, newCount))
+    setVisibleLimit(newCount === 0 ? filteredListings.length : Math.max(10, newCount))
   }
 
   const hasActiveFilters = Boolean(
@@ -62,20 +105,25 @@ export default function CatalogClientView({
       currentFilters.leadTime ||
       currentFilters.condition ||
       currentFilters.delivery ||
-      currentFilters.subType
+      currentFilters.subType ||
+      currentFilters.exclusiveCatalog
   )
 
   const isServiceScope = currentFilters.type === 'service'
   const isArticleScope = currentFilters.type === 'article'
   const isProductScope = currentFilters.type === 'product'
 
-  const catalogTitle = isServiceScope
+  const catalogTitle = activeExclusiveCatalog
+    ? `⭐ Catálogo Exclusivo: ${activeExclusiveCatalog.title}`
+    : isServiceScope
     ? (locale === 'en' ? '🛠️ Professional Services Catalog' : '🛠️ Catálogo de Servicios Profesionales')
     : isArticleScope
     ? (locale === 'en' ? '📦 Used Articles Catalog' : '📦 Catálogo de Artículos Usados')
     : (locale === 'en' ? '✨ New Products Catalog' : '✨ Catálogo de Productos Nuevos')
 
-  const catalogSubtitle = isServiceScope
+  const catalogSubtitle = activeExclusiveCatalog
+    ? activeExclusiveCatalog.subtitle
+    : isServiceScope
     ? (locale === 'en'
         ? 'Specialized services, direct quotes and on-site or remote assistance modalities.'
         : 'Servicios especializados, cotizaciones a solicitud y modalidades de atención presencial o virtual.')
@@ -92,13 +140,28 @@ export default function CatalogClientView({
       {/* Catalog Header */}
       <section className="border-b border-zinc-200 bg-white py-8 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-              {catalogTitle}
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {catalogSubtitle}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              {activeExclusiveCatalog && (
+                <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                  {activeExclusiveCatalog.badge} · Catálogo Exclusivo de Pasarela
+                </span>
+              )}
+              <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+                {catalogTitle}
+              </h1>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {catalogSubtitle}
+              </p>
+            </div>
+            {activeExclusiveCatalog && (
+              <Link
+                href={`/catalogo?type=${currentFilters.type || 'product'}`}
+                className="self-start sm:self-center shrink-0 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 shadow-2xs"
+              >
+                ← Volver al Catálogo General
+              </Link>
+            )}
           </div>
 
           {/* Search & Filters Component */}
@@ -139,11 +202,11 @@ export default function CatalogClientView({
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-              {listings.length === 0
+              {filteredListings.length === 0
                 ? `0 ${t.catalog.resultsCount}`
                 : locale === 'en'
-                ? `Showing ${visibleListings.length} of ${listings.length} ${listings.length === 1 ? t.catalog.singleResult : t.catalog.resultsCount}`
-                : `Mostrando ${visibleListings.length} de ${listings.length} ${listings.length === 1 ? t.catalog.singleResult : t.catalog.resultsCount}`}
+                ? `Showing ${visibleListings.length} of ${filteredListings.length} ${filteredListings.length === 1 ? t.catalog.singleResult : t.catalog.resultsCount}`
+                : `Mostrando ${visibleListings.length} de ${filteredListings.length} ${filteredListings.length === 1 ? t.catalog.singleResult : t.catalog.resultsCount}`}
             </span>
           </div>
 
@@ -172,7 +235,7 @@ export default function CatalogClientView({
                 <option value={20}>20 ítems</option>
                 <option value={30}>30 ítems</option>
                 <option value={50}>50 ítems</option>
-                <option value={0}>{locale === 'en' ? `All (${listings.length})` : `Todos (${listings.length})`}</option>
+                <option value={0}>{locale === 'en' ? `All (${filteredListings.length})` : `Todos (${filteredListings.length})`}</option>
               </select>
             </div>
 
@@ -208,7 +271,7 @@ export default function CatalogClientView({
           </div>
         </div>
 
-        {listings.length === 0 ? (
+        {filteredListings.length === 0 ? (
           <div className="my-12 rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 text-3xl dark:bg-zinc-800">
               🔍
@@ -255,31 +318,31 @@ export default function CatalogClientView({
         )}
 
         {/* Control inferior para cargar más ítems si hay más que el límite actual */}
-        {listings.length > visibleListings.length && (
+        {filteredListings.length > visibleListings.length && (
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
             <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
               {locale === 'en'
-                ? `Showing ${visibleListings.length} of ${listings.length} items`
-                : `Mostrando ${visibleListings.length} de ${listings.length} publicaciones disponibles`}
+                ? `Showing ${visibleListings.length} of ${filteredListings.length} items`
+                : `Mostrando ${visibleListings.length} de ${filteredListings.length} publicaciones disponibles`}
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={() =>
                   setVisibleLimit((prev) =>
-                    Math.min(listings.length, prev + (itemsPerPage > 0 ? itemsPerPage : 10))
+                    Math.min(filteredListings.length, prev + (itemsPerPage > 0 ? itemsPerPage : 10))
                   )
                 }
                 className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
               >
-                ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, listings.length - visibleListings.length)} más
+                ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredListings.length - visibleListings.length)} más
               </button>
               <button
                 type="button"
                 onClick={() => handleChangeItemsPerPage(0)}
                 className="rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
               >
-                Ver todos ({listings.length})
+                Ver todos ({filteredListings.length})
               </button>
             </div>
           </div>

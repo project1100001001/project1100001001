@@ -21,8 +21,21 @@ import {
   resolveAdOrderPlacement,
   getListingFreeTrialStatus,
   buildInitialFreeAdAttrs,
+  getAdOrderTimeStatus,
+  resolveIndependentRunwayStates,
+  INDEPENDENT_RUNWAY_OVERRIDES_KEY,
 } from '@/lib/adPolicies'
-import { type AdPageConfig, DEFAULT_AD_PAGE_CONFIG } from '@/lib/adPageConfig'
+import {
+  type AdPageConfig,
+  type DynamicRunwayConfig,
+  type DynamicRunwayReason,
+  DEFAULT_AD_PAGE_CONFIG,
+  AD_PAGE_CONFIG_STORAGE_KEY,
+  sanitizeAdPageConfig,
+  encodeAdPageConfigToSlot,
+  getListingSpecialClassification,
+  isSellerAuthorizedForClassification,
+} from '@/lib/adPageConfig'
 import AdPageAdminConfigWindow from '@/components/AdPageAdminConfigWindow'
 import AdminUsersManagementWindow from '@/components/AdminUsersManagementWindow'
 
@@ -112,13 +125,67 @@ export default function AdminModerationPanel({
   // Listings state
   const [listings, setListings] = useState<ListingWithRelations[]>(initialListings)
   const [activeTab, setActiveTab] = useState<'pending' | 'published' | 'rejected' | 'draft' | 'all'>('pending')
+  const [listingClassificationFilter, setListingClassificationFilter] = useState<string>('all')
 
-  // Ads state
+  // Ads state & Independent Runway Administration
   const [adOrders, setAdOrders] = useState<AdOrderWithRelations[]>(initialAdOrders)
-  const [adActiveTab, setAdActiveTab] = useState<'pending' | 'live' | 'rejected' | 'all'>('pending')
+  const [adActiveTab, setAdActiveTab] = useState<'pending' | 'live' | 'rejected' | 'all'>('all')
+  const [adMediumFilter, setAdMediumFilter] = useState<
+    'all' | 'vitrina' | 'pasarela' | 'proveedores' | string
+  >('all')
   const [rejectingAd, setRejectingAd] = useState<AdOrderWithRelations | null>(null)
   const [adRejectReason, setAdRejectReason] = useState('')
   const [isSyncingPolicies, setIsSyncingPolicies] = useState(false)
+
+  // Configuración viva de pasarelas (incluye customRunways por temporada o expansión de mercado)
+  const [liveAdPageConfig, setLiveAdPageConfig] = useState<AdPageConfig>(() =>
+    sanitizeAdPageConfig(initialAdPageConfig || DEFAULT_AD_PAGE_CONFIG)
+  )
+  const [localRunwayOverrides, setLocalRunwayOverrides] = useState<Record<string, any>>({})
+
+  // Formulario rápido para adicionar nueva pasarela / catálogo exclusivo (por temporada o expansión de mercado)
+  const [showAddRunwayForm, setShowAddRunwayForm] = useState(false)
+  const [newRunwayTitle, setNewRunwayTitle] = useState('')
+  const [newRunwaySubtitle, setNewRunwaySubtitle] = useState('')
+  const [newRunwayBadge, setNewRunwayBadge] = useState('🎄 Especial de Temporada')
+  const [newRunwayIcon, setNewRunwayIcon] = useState('🔥')
+  const [newRunwayReason, setNewRunwayReason] = useState<DynamicRunwayReason>('season')
+  const [newRunwayFilterType, setNewRunwayFilterType] = useState<
+    'all' | 'service' | 'article' | 'product' | 'keyword'
+  >('all')
+  const [newRunwayKeyword, setNewRunwayKeyword] = useState('')
+  const [newRunwayMaxItems, setNewRunwayMaxItems] = useState<number>(12)
+  const [newRunwayDurationDays, setNewRunwayDurationDays] = useState<number>(7)
+  const [newRunwayCampaignCostCop, setNewRunwayCampaignCostCop] = useState<number>(15000)
+  const [newRunwayHasExclusiveCatalog, setNewRunwayHasExclusiveCatalog] = useState<boolean>(true)
+  const [newRunwayAllowAllPaidSellers, setNewRunwayAllowAllPaidSellers] = useState<boolean>(true)
+  const [newRunwayAccent, setNewRunwayAccent] = useState<
+    'purple' | 'amber' | 'emerald' | 'blue' | 'rose'
+  >('purple')
+  const [managingSellersForRunwayId, setManagingSellersForRunwayId] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const savedCfg = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+      if (savedCfg) {
+        setLiveAdPageConfig(sanitizeAdPageConfig(JSON.parse(savedCfg)))
+      }
+      const savedOverrides = localStorage.getItem(INDEPENDENT_RUNWAY_OVERRIDES_KEY)
+      if (savedOverrides) {
+        setLocalRunwayOverrides(JSON.parse(savedOverrides))
+      }
+    } catch {
+      // Ignorar errores de almacenamiento local
+    }
+
+    const handleCfgUpdate = (e: any) => {
+      if (e?.detail) {
+        setLiveAdPageConfig(sanitizeAdPageConfig(e.detail))
+      }
+    }
+    window.addEventListener('ad-page-config-updated', handleCfgUpdate)
+    return () => window.removeEventListener('ad-page-config-updated', handleCfgUpdate)
+  }, [])
 
   // Balances & Wallets state
   const [adAccounts, setAdAccounts] = useState<AdAccountWithRelations[]>(initialAdAccounts)
@@ -169,6 +236,15 @@ export default function AdminModerationPanel({
     if (activeTab === 'rejected' && l.status !== 'rejected') return false
     if (activeTab === 'draft' && l.status !== 'draft') return false
 
+    if (listingClassificationFilter !== 'all') {
+      const spec = getListingSpecialClassification(l, liveAdPageConfig.customRunways)
+      if (listingClassificationFilter === 'none') {
+        if (spec) return false
+      } else if (spec?.id !== listingClassificationFilter) {
+        return false
+      }
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       const matchTitle = l.title.toLowerCase().includes(q)
@@ -186,13 +262,45 @@ export default function AdminModerationPanel({
   const rejectedListingsCount = listings.filter((l) => l.status === 'rejected').length
   const draftListingsCount = listings.filter((l) => l.status === 'draft').length
 
-  // --- Ads filtering ---
+  // --- Ads & Independent Runway Medium helper ---
   const pendingAdStatuses: AdOrderStatus[] = ['submitted', 'in_review']
+
+  const getAdIndependentStates = (ad: AdOrderWithRelations) => {
+    const resolved = resolveAdOrderPlacement(ad)
+    const timeStatus = getAdOrderTimeStatus(ad)
+    return resolveIndependentRunwayStates(
+      {
+        id: ad.id,
+        placement: resolved.placement,
+        startsAt: timeStatus.startsAt,
+        endsAt: timeStatus.endsAt,
+        attrs: ad.listing?.attrs || null,
+        isPaid: true,
+      },
+      localRunwayOverrides
+    )
+  }
 
   const filteredAds = adOrders.filter((ad) => {
     if (adActiveTab === 'pending' && !pendingAdStatuses.includes(ad.status)) return false
     if (adActiveTab === 'live' && ad.status !== 'live' && ad.status !== 'approved') return false
     if (adActiveTab === 'rejected' && ad.status !== 'rejected') return false
+
+    const mediumStates = getAdIndependentStates(ad)
+    if (adMediumFilter === 'vitrina' && !mediumStates.vitrina.enabled) return false
+    if (adMediumFilter === 'pasarela' && !mediumStates.pasarela.enabled) return false
+    if (adMediumFilter === 'proveedores' && !mediumStates.proveedores.enabled) return false
+    if (
+      adMediumFilter !== 'all' &&
+      adMediumFilter !== 'vitrina' &&
+      adMediumFilter !== 'pasarela' &&
+      adMediumFilter !== 'proveedores'
+    ) {
+      const targetCustom = liveAdPageConfig.customRunways.find((r) => r.id === adMediumFilter)
+      const isAssignedInConfig = targetCustom?.assignedListingIds?.includes(ad.listing_id || '')
+      const isEnabledInOverride = mediumStates.customRunways[adMediumFilter]?.enabled
+      if (!isAssignedInConfig && !isEnabledInOverride) return false
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -200,7 +308,8 @@ export default function AdminModerationPanel({
       const matchBody = ad.body?.toLowerCase().includes(q) || false
       const matchPkg = ad.package?.name.toLowerCase().includes(q) || false
       const matchListing = ad.listing?.title.toLowerCase().includes(q) || false
-      return matchHeadline || matchBody || matchPkg || matchListing
+      const matchSeller = ad.listing?.seller?.business_name?.toLowerCase().includes(q) || false
+      return matchHeadline || matchBody || matchPkg || matchListing || matchSeller
     }
 
     return true
@@ -209,6 +318,13 @@ export default function AdminModerationPanel({
   const pendingAdsCount = adOrders.filter((a) => pendingAdStatuses.includes(a.status)).length
   const liveAdsCount = adOrders.filter((a) => a.status === 'live' || a.status === 'approved').length
   const rejectedAdsCount = adOrders.filter((a) => a.status === 'rejected').length
+
+  // Contadores independientes por medio para el panel de administración
+  const vitrinaAdsCount = adOrders.filter((a) => getAdIndependentStates(a).vitrina.enabled).length
+  const pasarelaAdsCount = adOrders.filter((a) => getAdIndependentStates(a).pasarela.enabled).length
+  const proveedoresAdsCount = adOrders.filter(
+    (a) => getAdIndependentStates(a).proveedores.enabled
+  ).length
 
   // --- Pagination & View Mode for Admin Lists (Min 10 initially) ---
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
@@ -223,6 +339,7 @@ export default function AdminModerationPanel({
     section,
     activeTab,
     adActiveTab,
+    adMediumFilter,
     searchQuery,
     filteredListings.length,
     filteredAds.length,
@@ -397,6 +514,383 @@ export default function AdminModerationPanel({
     } finally {
       setProcessingId(null)
     }
+  }
+
+  // Ajustar tiempo restante global de una orden publicitaria (+7d, +1d, -1d)
+  const handleAdjustAdOrderTime = async (adOrderId: string, deltaDays: number) => {
+    setProcessingId(adOrderId)
+    try {
+      const targetAd = adOrders.find((a) => a.id === adOrderId)
+      if (!targetAd) return
+
+      const currentStatus = getAdOrderTimeStatus(targetAd)
+      const baseEndMs = currentStatus.isExpired
+        ? Date.now()
+        : new Date(currentStatus.endsAt).getTime()
+      const nextEndMs = Math.max(
+        Date.now() + 3600 * 1000,
+        baseEndMs + deltaDays * 24 * 60 * 60 * 1000
+      )
+      const nextEndsAt = new Date(nextEndMs).toISOString()
+      const nextStartsAt = targetAd.starts_at || new Date().toISOString()
+
+      const { error } = await supabase
+        .from('ad_order')
+        .update({
+          starts_at: nextStartsAt,
+          ends_at: nextEndsAt,
+          status: targetAd.status === 'ended' ? 'live' : targetAd.status,
+        })
+        .eq('id', adOrderId)
+
+      if (error) {
+        console.warn('Aviso actualizando ends_at en ad_order:', error.message)
+      }
+
+      setAdOrders((prev) =>
+        prev.map((item) =>
+          item.id === adOrderId
+            ? {
+                ...item,
+                starts_at: nextStartsAt,
+                ends_at: nextEndsAt,
+                status: item.status === 'ended' ? 'live' : item.status,
+              }
+            : item
+        )
+      )
+
+      showToast(
+        `Tiempo de vigencia ajustado (${deltaDays > 0 ? `+${deltaDays}` : deltaDays} días). Nueva fecha fin: ${new Date(nextEndsAt).toLocaleDateString('es-CO')}.`
+      )
+    } catch (err: any) {
+      showToast(err.message || 'Error al ajustar tiempo de campaña', 'error')
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  // Administrar de forma independiente el estado y tiempo restante por cada medio (Vitrina, Pasarela, Pasarela de Proveedores o Pasarela Adicional)
+  const handleUpdateIndependentMedium = async (
+    ad: AdOrderWithRelations,
+    mediumKey: 'vitrina' | 'pasarela' | 'proveedores' | string,
+    options: { toggle?: boolean; deltaDays?: number; isCustomRunway?: boolean }
+  ) => {
+    const currentStates = getAdIndependentStates(ad)
+    const existingForAd = localRunwayOverrides[ad.id] || ad.listing?.attrs?.runway_independent_status || {}
+
+    let updatedAdOverride = { ...existingForAd }
+
+    if (options.isCustomRunway) {
+      const prevCustom = currentStates.customRunways[mediumKey] || {
+        enabled: liveAdPageConfig.customRunways
+          .find((r) => r.id === mediumKey)
+          ?.assignedListingIds?.includes(ad.listing_id || ''),
+        endsAt: getAdOrderTimeStatus(ad).endsAt,
+      }
+      const nextEnabled = options.toggle ? !prevCustom.enabled : true
+      const baseMs = Math.max(Date.now(), new Date(prevCustom.endsAt).getTime())
+      const nextEndsAt = options.deltaDays
+        ? new Date(
+            Math.max(Date.now() + 3600 * 1000, baseMs + options.deltaDays * 24 * 60 * 60 * 1000)
+          ).toISOString()
+        : prevCustom.endsAt
+
+      updatedAdOverride = {
+        ...updatedAdOverride,
+        customRunways: {
+          ...(updatedAdOverride.customRunways || {}),
+          [mediumKey]: {
+            enabled: nextEnabled,
+            endsAt: nextEndsAt,
+          },
+        },
+      }
+
+      // También sincronizar assignedListingIds en la pasarela personalizada si tiene listing_id
+      if (ad.listing_id) {
+        const nextRunways = liveAdPageConfig.customRunways.map((r) => {
+          if (r.id !== mediumKey) return r
+          const currentIds = new Set(r.assignedListingIds || [])
+          if (nextEnabled) {
+            currentIds.add(ad.listing_id!)
+          } else {
+            currentIds.delete(ad.listing_id!)
+          }
+          return {
+            ...r,
+            assignedListingIds: Array.from(currentIds),
+          }
+        })
+        await persistLiveAdPageConfig({
+          ...liveAdPageConfig,
+          customRunways: nextRunways,
+        })
+      }
+    } else {
+      const targetState =
+        mediumKey === 'vitrina'
+          ? currentStates.vitrina
+          : mediumKey === 'pasarela'
+          ? currentStates.pasarela
+          : currentStates.proveedores
+
+      const nextEnabled = options.toggle ? !targetState.enabled : targetState.enabled
+      const baseMs = Math.max(Date.now(), new Date(targetState.endsAt).getTime())
+      const nextEndsAt = options.deltaDays
+        ? new Date(
+            Math.max(Date.now() + 3600 * 1000, baseMs + options.deltaDays * 24 * 60 * 60 * 1000)
+          ).toISOString()
+        : targetState.endsAt
+
+      updatedAdOverride = {
+        ...updatedAdOverride,
+        [mediumKey]: {
+          enabled: nextEnabled,
+          endsAt: nextEndsAt,
+        },
+      }
+    }
+
+    const nextOverridesMap = {
+      ...localRunwayOverrides,
+      [ad.id]: updatedAdOverride,
+    }
+    setLocalRunwayOverrides(nextOverridesMap)
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(INDEPENDENT_RUNWAY_OVERRIDES_KEY, JSON.stringify(nextOverridesMap))
+    }
+
+    // Persistir también en listing.attrs en Supabase si la campaña tiene publicación asociada
+    if (ad.listing_id && ad.listing) {
+      const nextAttrs = {
+        ...(ad.listing.attrs || {}),
+        runway_independent_status: updatedAdOverride,
+      }
+      await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', ad.listing_id)
+    }
+
+    const mediumLabels: Record<string, string> = {
+      vitrina: '🏆 Gran Vitrina',
+      pasarela: '✨ Pasarela de Publicaciones',
+      proveedores: '🏪 Pasarela de Proveedores',
+    }
+    const label =
+      mediumLabels[mediumKey] ||
+      liveAdPageConfig.customRunways.find((r) => r.id === mediumKey)?.title ||
+      'Pasarela'
+
+    showToast(`Dato independiente actualizado en ${label}.`)
+  }
+
+  // Persistir configuración de pasarelas (incluyendo nuevas pasarelas por temporada o expansión)
+  const persistLiveAdPageConfig = async (nextCfg: AdPageConfig, notifyText?: string) => {
+    const clean = sanitizeAdPageConfig({
+      ...nextCfg,
+      updatedAt: new Date().toISOString(),
+    })
+    setLiveAdPageConfig(clean)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(AD_PAGE_CONFIG_STORAGE_KEY, JSON.stringify(clean))
+      window.dispatchEvent(new CustomEvent('ad-page-config-updated', { detail: clean }))
+    }
+    try {
+      const encodedSlot = encodeAdPageConfigToSlot(clean)
+      await supabase.from('ad_slot').upsert([encodedSlot], { onConflict: 'id' })
+    } catch {
+      // Ignorar si tabla ad_slot no requiere actualización
+    }
+    if (notifyText) {
+      showToast(notifyText)
+    }
+  }
+
+  // Adicionar nueva pasarela y su clasificación / catálogo exclusivo (por temporada o por expansión de mercado)
+  const handleAddDynamicRunway = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanTitle = newRunwayTitle.trim()
+    if (!cleanTitle) return
+
+    const id = `runway_${Date.now()}_${cleanTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .slice(0, 20)}`
+
+    const newRunway: DynamicRunwayConfig = {
+      id,
+      title: cleanTitle,
+      subtitle:
+        newRunwaySubtitle.trim() ||
+        (newRunwayReason === 'season'
+          ? 'Selección especial de temporada con catálogo exclusivo y servicios destacados'
+          : 'Nueva pasarela y catálogo exclusivo habilitados por expansión de mercado'),
+      badge:
+        newRunwayBadge.trim() ||
+        (newRunwayReason === 'season' ? '🎄 Temporada' : '🚀 Expansión de Mercado'),
+      icon: newRunwayIcon.trim() || '🔥',
+      reason: newRunwayReason,
+      filterType: newRunwayFilterType,
+      filterKeyword: newRunwayKeyword.trim(),
+      maxItems: Math.max(1, Math.min(50, Number(newRunwayMaxItems) || 12)),
+      defaultDurationDays: Math.max(1, Math.min(90, Number(newRunwayDurationDays) || 7)),
+      scrollSpeed: liveAdPageConfig.runwayScrollSpeed || 0.65,
+      active: true,
+      accentColor: newRunwayAccent,
+      assignedListingIds: [],
+      hasExclusiveCatalog: newRunwayHasExclusiveCatalog,
+      campaignCostCop: Math.max(0, Number(newRunwayCampaignCostCop) || 15000),
+      authorizedSellerIds: [],
+      allowAllPaidSellers: newRunwayAllowAllPaidSellers,
+      createdAt: new Date().toISOString(),
+      endsAt: new Date(
+        Date.now() + (Number(newRunwayDurationDays) || 7) * 24 * 60 * 60 * 1000
+      ).toISOString(),
+    }
+
+    const nextConfig: AdPageConfig = {
+      ...liveAdPageConfig,
+      customRunways: [...(liveAdPageConfig.customRunways || []), newRunway],
+    }
+
+    await persistLiveAdPageConfig(
+      nextConfig,
+      `¡Nueva clasificación y catálogo exclusivo "${cleanTitle}" ($${newRunway.campaignCostCop.toLocaleString('es-CO')} COP) adicionada exitosamente!`
+    )
+    setNewRunwayTitle('')
+    setNewRunwaySubtitle('')
+    setNewRunwayKeyword('')
+    setShowAddRunwayForm(false)
+    setAdMediumFilter(id)
+  }
+
+  const handleToggleDynamicRunway = async (runwayId: string) => {
+    const nextRunways = (liveAdPageConfig.customRunways || []).map((r) =>
+      r.id === runwayId ? { ...r, active: !r.active } : r
+    )
+    const target = nextRunways.find((r) => r.id === runwayId)
+    await persistLiveAdPageConfig(
+      { ...liveAdPageConfig, customRunways: nextRunways },
+      `Pasarela / Catálogo "${target?.title}" ${target?.active ? 'activada en portada' : 'pausada'}.`
+    )
+  }
+
+  const handleUpdateRunwayCostAndCatalog = async (
+    runwayId: string,
+    updates: Partial<DynamicRunwayConfig>,
+    notifyMsg?: string
+  ) => {
+    const nextRunways = (liveAdPageConfig.customRunways || []).map((r) =>
+      r.id === runwayId ? { ...r, ...updates } : r
+    )
+    await persistLiveAdPageConfig(
+      { ...liveAdPageConfig, customRunways: nextRunways },
+      notifyMsg || 'Configuración de pasarela y costo de catálogo exclusivo actualizada.'
+    )
+  }
+
+  // Habilitar o deshabilitar a un vendedor específico en la lista de una pasarela / catálogo exclusivo según su pago
+  const handleToggleSellerAuthorizationForRunway = async (runwayId: string, sellerId: string) => {
+    const targetRunway = (liveAdPageConfig.customRunways || []).find((r) => r.id === runwayId)
+    if (!targetRunway) return
+
+    const currentAuthorized = new Set(targetRunway.authorizedSellerIds || [])
+    const isNowAuthorized = !currentAuthorized.has(sellerId)
+    if (isNowAuthorized) {
+      currentAuthorized.add(sellerId)
+    } else {
+      currentAuthorized.delete(sellerId)
+    }
+
+    const sellerName = sellers.find((s) => s.id === sellerId)?.business_name || 'Vendedor'
+    const nextRunways = (liveAdPageConfig.customRunways || []).map((r) =>
+      r.id === runwayId ? { ...r, authorizedSellerIds: Array.from(currentAuthorized) } : r
+    )
+
+    await persistLiveAdPageConfig(
+      { ...liveAdPageConfig, customRunways: nextRunways },
+      isNowAuthorized
+        ? `✓ Vendedor "${sellerName}" habilitado para clasificar artículos en "${targetRunway.title}".`
+        : `Vendedor "${sellerName}" removido de la clasificación "${targetRunway.title}".`
+    )
+  }
+
+  // Clasificar e identificar especialmente un artículo en una pasarela / catálogo exclusivo desde Admin
+  const handleAssignListingSpecialClassification = async (listingId: string, runwayId: string) => {
+    const targetListing = listings.find((l) => l.id === listingId)
+    if (!targetListing) return
+
+    const targetRunway = (liveAdPageConfig.customRunways || []).find((r) => r.id === runwayId)
+    const nextAttrs: Record<string, any> = {
+      ...(targetListing.attrs || {}),
+    }
+
+    if (!runwayId || runwayId === 'none' || !targetRunway) {
+      delete nextAttrs.special_runway_id
+      delete nextAttrs.special_runway_title
+      delete nextAttrs.special_runway_badge
+      delete nextAttrs.special_catalog_cost
+    } else {
+      nextAttrs.special_runway_id = targetRunway.id
+      nextAttrs.special_runway_title = targetRunway.title
+      nextAttrs.special_runway_badge = `${targetRunway.icon} ${targetRunway.badge}`
+      nextAttrs.special_catalog_cost = targetRunway.campaignCostCop
+    }
+
+    try {
+      await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', listingId)
+    } catch {
+      // Continuar con estado en memoria y configuración
+    }
+
+    setListings((prev) =>
+      prev.map((l) => (l.id === listingId ? { ...l, attrs: nextAttrs } : l))
+    )
+    setAdOrders((prev) =>
+      prev.map((a) =>
+        a.listing_id === listingId && a.listing
+          ? { ...a, listing: { ...a.listing, attrs: nextAttrs } }
+          : a
+      )
+    )
+
+    // Sincronizar también en assignedListingIds y habilitar al vendedor en esa clasificación
+    const nextRunways = (liveAdPageConfig.customRunways || []).map((r) => {
+      const assigned = new Set(r.assignedListingIds || [])
+      const authorized = new Set(r.authorizedSellerIds || [])
+      if (r.id === runwayId) {
+        assigned.add(listingId)
+        if (targetListing.seller_id) {
+          authorized.add(targetListing.seller_id)
+        }
+      } else {
+        assigned.delete(listingId)
+      }
+      return {
+        ...r,
+        assignedListingIds: Array.from(assigned),
+        authorizedSellerIds: Array.from(authorized),
+      }
+    })
+
+    await persistLiveAdPageConfig(
+      { ...liveAdPageConfig, customRunways: nextRunways },
+      targetRunway
+        ? `⭐ Artículo identificado en el Catálogo Exclusivo "${targetRunway.title}" y vendedor habilitado.`
+        : 'Artículo devuelto a la clasificación de Catálogo General.'
+    )
+  }
+
+  const handleDeleteDynamicRunway = async (runwayId: string) => {
+    const target = (liveAdPageConfig.customRunways || []).find((r) => r.id === runwayId)
+    const nextRunways = (liveAdPageConfig.customRunways || []).filter((r) => r.id !== runwayId)
+    if (adMediumFilter === runwayId) {
+      setAdMediumFilter('all')
+    }
+    await persistLiveAdPageConfig(
+      { ...liveAdPageConfig, customRunways: nextRunways },
+      `Pasarela "${target?.title || runwayId}" eliminada.`
+    )
   }
 
   const handleConfirmRejectAd = async () => {
@@ -916,11 +1410,11 @@ export default function AdminModerationPanel({
   const sectionHeaderInfo = {
     listings: {
       icon: '📦',
-      title: locale === 'en' ? 'Listings Moderation Queue' : 'Moderación de Anuncios y Publicaciones',
+      title: locale === 'en' ? 'Catalog Articles & Services Moderation' : 'Moderación de Artículos y Servicios (Catálogo)',
       subtitle:
         locale === 'en'
-          ? 'Review, approve, or reject products and services submitted by sellers.'
-          : 'Revisión y aprobación o rechazo de artículos y servicios enviados por vendedores.',
+          ? 'Review, approve, or classify catalog products and services submitted by sellers.'
+          : 'Revisión, aprobación y clasificación en el catálogo de artículos y servicios publicados por los vendedores.',
     },
     ads: {
       icon: '📢',
@@ -928,18 +1422,18 @@ export default function AdminModerationPanel({
       subtitle:
         locale === 'en'
           ? 'Review and approve sponsored advertising campaigns in the catalog.'
-          : 'Revisión y activación de campañas publicitarias patrocinadas en el catálogo.',
+          : 'Revisión y activación de campañas publicitarias patrocinadas.',
     },
     adpage: {
       icon: '⚙️',
       title:
         locale === 'en'
-          ? 'Advertising Page & Showcase Control'
-          : 'Administración de la Página de Publicidad y Vitrinas',
+          ? 'Advertising Page, Runways & Exclusive Catalogs Control'
+          : 'Administración de la Página de Publicidad, Pasarelas y Nuevos Catálogos',
       subtitle:
         locale === 'en'
-          ? 'Control publication limits per runway, visualization speed, active sections, and extensible settings.'
-          : 'Controla la cantidad de publicaciones por pasarela, velocidad de visualización, secciones activas y futuras configuraciones.',
+          ? 'Create and manage advertising page runways, exclusive catalogs, campaign costs, enabled sellers, and display speeds.'
+          : 'Crea y administra pasarelas en la página de publicidad, nuevos catálogos exclusivos, costos de campaña, vendedores habilitados y tiempos de exhibición.',
     },
     balances: {
       icon: '💳',
@@ -1009,6 +1503,8 @@ export default function AdminModerationPanel({
           initialConfig={initialAdPageConfig}
           listings={listings}
           adOrders={adOrders}
+          sellers={sellers}
+          adAccounts={adAccounts}
           locale={locale}
           onNotify={showToast}
         />
@@ -1084,6 +1580,30 @@ export default function AdminModerationPanel({
             </span>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filtro por Catálogo Exclusivo / Clasificación de Pasarela */}
+              <div className="flex items-center gap-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/80 px-2.5 py-1 shadow-2xs">
+                <label
+                  htmlFor="admin-listings-classification-filter"
+                  className="text-[11px] font-bold text-amber-800 dark:text-amber-300 whitespace-nowrap"
+                >
+                  ⭐ Catálogo Exclusivo:
+                </label>
+                <select
+                  id="admin-listings-classification-filter"
+                  value={listingClassificationFilter}
+                  onChange={(e) => setListingClassificationFilter(e.target.value)}
+                  className="rounded-lg bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-800 px-2 py-1 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:border-amber-500 focus:outline-none cursor-pointer shadow-2xs"
+                >
+                  <option value="all">Todas las clasificaciones</option>
+                  <option value="none">Solo Catálogo Estándar</option>
+                  {(liveAdPageConfig.customRunways || []).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.icon} {r.title} (${r.campaignCostCop.toLocaleString('es-CO')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Selector de Cantidad de Ítems a Cargar (Mínimo 10 inicialmente) */}
               <div className="flex items-center gap-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 shadow-2xs">
                 <label
@@ -1161,11 +1681,15 @@ export default function AdminModerationPanel({
                 const isPending = pendingListingStatuses.includes(listing.status)
                 const isProcessing = processingId === listing.id
                 const freeTrial = getListingFreeTrialStatus(listing)
+                const specialClassification = getListingSpecialClassification(
+                  listing,
+                  liveAdPageConfig.customRunways
+                )
 
                 return (
                   <div
                     key={listing.id}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 space-y-3"
                   >
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
                       <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-4 min-w-0`}>
@@ -1190,6 +1714,12 @@ export default function AdminModerationPanel({
                                 {listing.category.name}
                               </span>
                             )}
+                            {specialClassification && (
+                              <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 dark:bg-amber-950/70 dark:border-amber-700 dark:text-amber-200 flex items-center gap-1">
+                                <span>{specialClassification.icon}</span>
+                                <span>Catálogo Exclusivo: {specialClassification.title}</span>
+                              </span>
+                            )}
                             <span
                               className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                                 listing.status === 'published'
@@ -1209,7 +1739,7 @@ export default function AdminModerationPanel({
                                 ? 'Rechazado'
                                 : 'Borrador'}
                             </span>
-                            {freeTrial.isInFreePeriod ? (
+                            {freeTrial.isFreeTrialActive ? (
                               <span className="rounded-md bg-emerald-50 border border-emerald-300 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300">
                                 🎁 Publicidad Gratis ({freeTrial.daysRemaining}d restantes de {FREE_INITIAL_AD_DAYS}d)
                               </span>
@@ -1291,6 +1821,40 @@ export default function AdminModerationPanel({
                         )}
                       </div>
                     </div>
+
+                    {/* Barra de Identificación Especial en Catálogo Exclusivo y Pasarela Administrada */}
+                    <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-extrabold text-zinc-600 dark:text-zinc-300 flex items-center gap-1">
+                          <span>🏷️</span>
+                          <span>Clasificación de Pasarela y Catálogo Exclusivo:</span>
+                        </span>
+                        <select
+                          value={specialClassification?.id || 'none'}
+                          onChange={(e) =>
+                            handleAssignListingSpecialClassification(listing.id, e.target.value)
+                          }
+                          className="rounded-lg border border-amber-300 bg-amber-50/70 px-2.5 py-1 text-xs font-bold text-zinc-900 focus:border-amber-500 focus:outline-none dark:border-amber-800 dark:bg-zinc-800 dark:text-zinc-100 cursor-pointer"
+                        >
+                          <option value="none">📦 Catálogo General Estándar (Sin clasificación especial)</option>
+                          {(liveAdPageConfig.customRunways || []).map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.icon} {r.title} — Costo Campaña: ${r.campaignCostCop.toLocaleString('es-CO')} COP
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {specialClassification && (
+                        <Link
+                          href={`/catalogo?type=${listing.type}&exclusive_catalog=${specialClassification.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
+                        >
+                          <span>Ver en Catálogo Exclusivo</span>
+                          <span>↗</span>
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -1337,19 +1901,34 @@ export default function AdminModerationPanel({
           <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/60 p-5 shadow-xs dark:border-purple-900/60 dark:from-purple-950/30 dark:via-zinc-900 dark:to-zinc-900">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-purple-200/70 dark:border-purple-900/50">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-lg bg-purple-600 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">
                     Política Oficial Activa
                   </span>
+                  <span className="rounded-lg bg-indigo-100 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-800 dark:bg-indigo-950 dark:border-indigo-800 dark:text-indigo-300">
+                    🏪 Todo Pago Incluye Publicación en Pasarela de Proveedores
+                  </span>
                   <h3 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-50">
-                    Configuración de Políticas y Tarifas de Publicidad
+                    Administración de Campañas, Medios Independientes y Tarifas
                   </h3>
                 </div>
                 <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                  Todo producto o servicio creado recibe <strong>{FREE_INITIAL_AD_DAYS} días iniciales de publicidad gratis ($0 COP)</strong>. Finalizado el periodo inicial, aplican los planes individuales o en combo por ciclos de 7 días:
+                  Todo producto o servicio creado recibe <strong>{FREE_INITIAL_AD_DAYS} días iniciales de publicidad gratis ($0 COP)</strong>. Los planes pagos ($10.000, $20.000 y $25.000) <strong>incluyen siempre la publicación destacada del proveedor en la Pasarela de Proveedores</strong> y son administrables de forma independiente por medio:
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRunwayForm((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
+                >
+                  <span>➕</span>
+                  <span>
+                    {showAddRunwayForm
+                      ? 'Cerrar Creador de Pasarela'
+                      : 'Adicionar Pasarela (Temporada / Expansión)'}
+                  </span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1363,7 +1942,7 @@ export default function AdminModerationPanel({
                   className="inline-flex items-center gap-2 rounded-xl border border-purple-300 bg-white px-3.5 py-2 text-xs font-bold text-purple-800 shadow-2xs hover:bg-purple-50 dark:border-purple-800 dark:bg-zinc-800 dark:text-purple-200 transition-colors cursor-pointer"
                 >
                   <span>⚙️</span>
-                  <span>Controlar Cantidad y Página de Publicidad</span>
+                  <span>Controlar Capacidad y Pasarelas</span>
                 </button>
                 <button
                   type="button"
@@ -1375,7 +1954,7 @@ export default function AdminModerationPanel({
                   <span>
                     {isSyncingPolicies
                       ? 'Sincronizando Tarifas...'
-                      : 'Sincronizar Tarifas Oficiales en BD'}
+                      : 'Sincronizar Tarifas en BD'}
                   </span>
                 </button>
               </div>
@@ -1396,7 +1975,7 @@ export default function AdminModerationPanel({
                   GRATIS ($0 COP)
                 </div>
                 <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
-                  Se activa automáticamente al crear/publicar cualquier producto o servicio nuevo.
+                  Se activa automáticamente al publicar cualquier producto o servicio nuevo, incluyendo presencia inicial del comercio.
                 </p>
               </div>
 
@@ -1411,13 +1990,13 @@ export default function AdminModerationPanel({
                   </span>
                 </div>
                 <div className="mt-1 text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                  ✨ Pasarela
+                  ✨ Pasarela + 🏪 Pasarela Proveedores
                 </div>
                 <div className="text-base font-black text-zinc-900 dark:text-zinc-50">
                   $10.000 COP
                 </div>
                 <p className="mt-0.5 text-[11px] text-zinc-500">
-                  Aparición en Carruseles de Pasarela (Productos y Servicios).
+                  Exhibición en Pasarela de rubro + <strong className="text-indigo-600 dark:text-indigo-400">incluye publicación del proveedor en la Pasarela de Proveedores</strong>.
                 </p>
               </div>
 
@@ -1432,17 +2011,17 @@ export default function AdminModerationPanel({
                   </span>
                 </div>
                 <div className="mt-1 text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                  🏆 Gran Vitrina
+                  🏆 Gran Vitrina + 🏪 Pasarela Proveedores
                 </div>
                 <div className="text-base font-black text-zinc-900 dark:text-zinc-50">
                   $20.000 COP
                 </div>
                 <p className="mt-0.5 text-[11px] text-zinc-500">
-                  Exposición principal en la Gran Vitrina rotativa superior.
+                  Exposición en la Gran Vitrina superior + <strong className="text-indigo-600 dark:text-indigo-400">incluye publicación del proveedor en la Pasarela de Proveedores</strong>.
                 </p>
               </div>
 
-              {/* Regla 4: Combo las dos */}
+              {/* Regla 4: Combo las dos + Proveedor */}
               <div className="rounded-xl border-2 border-purple-500 bg-purple-50/60 p-3.5 dark:border-purple-500/80 dark:bg-purple-950/40">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-800 dark:text-purple-300">
@@ -1453,25 +2032,618 @@ export default function AdminModerationPanel({
                   </span>
                 </div>
                 <div className="mt-1 text-xs font-bold text-purple-950 dark:text-purple-100">
-                  🔥 Las Dos (Vitrina + Pasarela)
+                  🔥 Vitrina + Pasarela + 🏪 Proveedores
                 </div>
                 <div className="text-base font-black text-purple-700 dark:text-purple-300">
                   $25.000 COP
                 </div>
                 <p className="mt-0.5 text-[11px] text-zinc-600 dark:text-zinc-300">
-                  Presencia simultánea en Gran Vitrina + Pasarela por 7 días.
+                  Presencia simultánea en Gran Vitrina + Pasarela de rubro + <strong className="text-purple-800 dark:text-purple-200">publicación destacada en Pasarela de Proveedores</strong>.
                 </p>
               </div>
             </div>
+
+            {/* Formulario Desplegable para Adicionar Nueva Pasarela (Por Temporada o Expansión de Mercado) */}
+            {showAddRunwayForm && (
+              <form
+                onSubmit={handleAddDynamicRunway}
+                className="mt-5 rounded-2xl border-2 border-emerald-300 bg-white p-5 shadow-md dark:border-emerald-800 dark:bg-zinc-900 space-y-4 animate-in fade-in duration-200"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+                  <div>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      ➕ Expansión y Temporadas
+                    </span>
+                    <h4 className="mt-1 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                      Adicionar Nueva Pasarela Administrable (Por Temporada o Expansión de Mercado)
+                    </h4>
+                    <p className="text-xs text-zinc-500">
+                      Crea una nueva pasarela independiente que se integrará tanto en la portada como en los controles individuales de cada campaña.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Nombre de la Nueva Pasarela *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newRunwayTitle}
+                      onChange={(e) => setNewRunwayTitle(e.target.value)}
+                      placeholder="Ej. Especial de Temporada Navideña / Expansión: Agro e Industria"
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Motivo de Apertura *
+                    </label>
+                    <select
+                      value={newRunwayReason}
+                      onChange={(e) => {
+                        const val = e.target.value as DynamicRunwayReason
+                        setNewRunwayReason(val)
+                        if (val === 'season') {
+                          setNewRunwayBadge('🎄 Especial de Temporada')
+                          setNewRunwayIcon('🎄')
+                        } else if (val === 'market_expansion') {
+                          setNewRunwayBadge('🚀 Expansión de Mercado')
+                          setNewRunwayIcon('🚀')
+                        } else {
+                          setNewRunwayBadge('⭐ Pasarela Especial')
+                          setNewRunwayIcon('⭐')
+                        }
+                      }}
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="season">📅 Por Temporada Comercial</option>
+                      <option value="market_expansion">🚀 Por Expansión de Mercado / Nuevo Rubro</option>
+                      <option value="special">⭐ Campaña / Evento Especial</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Etiqueta / Insignia (Badge)
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={newRunwayIcon}
+                        onChange={(e) => setNewRunwayIcon(e.target.value)}
+                        className="w-11 rounded-xl border border-zinc-300 bg-white px-2 py-2 text-center text-xs dark:border-zinc-700 dark:bg-zinc-800"
+                        title="Ícono"
+                      />
+                      <input
+                        type="text"
+                        value={newRunwayBadge}
+                        onChange={(e) => setNewRunwayBadge(e.target.value)}
+                        placeholder="Ej. 🔥 Temporada"
+                        className="flex-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Descripción / Subtítulo de la Pasarela
+                    </label>
+                    <input
+                      type="text"
+                      value={newRunwaySubtitle}
+                      onChange={(e) => setNewRunwaySubtitle(e.target.value)}
+                      placeholder="Ej. Oportunidades seleccionadas para la temporada o nuevo sector en crecimiento"
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Criterio de Contenido
+                    </label>
+                    <select
+                      value={newRunwayFilterType}
+                      onChange={(e) => setNewRunwayFilterType(e.target.value as any)}
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="all">Publicaciones Asignadas + Destacadas</option>
+                      <option value="service">Solo Servicios Profesionales</option>
+                      <option value="article">Solo Artículos Usados</option>
+                      <option value="product">Solo Productos Nuevos</option>
+                      <option value="keyword">Filtrar por Palabra Clave / Rubro</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Cupo Máx.
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={newRunwayMaxItems}
+                        onChange={(e) => setNewRunwayMaxItems(Number(e.target.value) || 12)}
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Vigencia (Días)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={newRunwayDurationDays}
+                        onChange={(e) => setNewRunwayDurationDays(Number(e.target.value) || 7)}
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bloque de Costo Adicional del Nuevo Catálogo Exclusivo y Habilitación de Vendedores */}
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs items-center">
+                  <div>
+                    <label className="block font-extrabold text-amber-900 dark:text-amber-300 mb-1">
+                      💰 Costo de Campaña / Nuevo Catálogo Exclusivo (COP) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={newRunwayCampaignCostCop}
+                      onChange={(e) => setNewRunwayCampaignCostCop(Number(e.target.value) || 0)}
+                      className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-zinc-900 dark:border-amber-800 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                    <span className="mt-1 block text-[10px] text-amber-800 dark:text-amber-400">
+                      Costo adicional que acarrea la creación y uso de este catálogo exclusivo.
+                    </span>
+                  </div>
+
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newRunwayHasExclusiveCatalog}
+                      onChange={(e) => setNewRunwayHasExclusiveCatalog(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600"
+                    />
+                    <span>
+                      <strong className="block text-zinc-900 dark:text-zinc-100">
+                        ⭐ Habilitar en Lista de Clasificación y Catálogo Exclusivo
+                      </strong>
+                      <span className="text-[11px] text-zinc-500">
+                        Aparecerá en la lista al crear/editar artículos y tendrá vista de catálogo propio.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newRunwayAllowAllPaidSellers}
+                      onChange={(e) => setNewRunwayAllowAllPaidSellers(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                    />
+                    <span>
+                      <strong className="block text-zinc-900 dark:text-zinc-100">
+                        ✓ Habilitar automáticamente según pago realizado
+                      </strong>
+                      <span className="text-[11px] text-zinc-500">
+                        Habilita automáticamente al vendedor cuyo pago/saldo cubra el costo (${newRunwayCampaignCostCop.toLocaleString('es-CO')} COP).
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {newRunwayFilterType === 'keyword' && (
+                  <div className="text-xs">
+                    <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Palabra Clave o Categoría del Rubro en Expansión / Temporada *
+                    </label>
+                    <input
+                      type="text"
+                      value={newRunwayKeyword}
+                      onChange={(e) => setNewRunwayKeyword(e.target.value)}
+                      placeholder="Ej. tecnología, navidad, gastronomía, mascotas, maquinaria..."
+                      className="w-full sm:w-96 rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRunwayForm(false)}
+                    className="rounded-xl border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-500 transition-colors cursor-pointer"
+                  >
+                    ✓ Crear Clasificación, Catálogo Exclusivo y Pasarela
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
-          {/* Tabs for Ads */}
+          {/* ======================================================================== */}
+          {/* SELECTOR Y VISTA INDEPENDIENTE POR CADA MEDIO (VITRINA, PASARELA,        */}
+          {/* PASARELA DE PROVEEDORES Y PASARELAS ADICIONALES DE TEMPORADA/EXPANSIÓN)  */}
+          {/* ======================================================================== */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
+                  <span>📡</span>
+                  <span>Visualización y Administración Independiente por Medio / Pasarela</span>
+                </h4>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Selecciona un medio para filtrar sus publicaciones activas, ver su cupo independiente y administrar el tiempo restante en cada pasarela por separado.
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-purple-700 dark:text-purple-400">
+                Medio seleccionado:{' '}
+                <strong>
+                  {adMediumFilter === 'all'
+                    ? '🌐 Todos los Medios'
+                    : adMediumFilter === 'vitrina'
+                    ? '🏆 Gran Vitrina Principal'
+                    : adMediumFilter === 'pasarela'
+                    ? '✨ Pasarela de Publicaciones'
+                    : adMediumFilter === 'proveedores'
+                    ? '🏪 Pasarela de Proveedores'
+                    : liveAdPageConfig.customRunways.find((r) => r.id === adMediumFilter)?.title ||
+                      'Pasarela Adicional'}
+                </strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Medio 0: Todos */}
+              <button
+                type="button"
+                onClick={() => setAdMediumFilter('all')}
+                className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                  adMediumFilter === 'all'
+                    ? 'border-2 border-zinc-900 bg-zinc-900/5 dark:border-white dark:bg-white/10 shadow-xs'
+                    : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                    🌐 Todos los Medios
+                  </span>
+                  <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-black text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                    {adOrders.length} órdenes
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Vista consolidada de todas las campañas con sus tiempos por medio.
+                </p>
+              </button>
+
+              {/* Medio 1: Gran Vitrina */}
+              <button
+                type="button"
+                onClick={() => setAdMediumFilter('vitrina')}
+                className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                  adMediumFilter === 'vitrina'
+                    ? 'border-2 border-purple-600 bg-purple-50/70 dark:border-purple-500 dark:bg-purple-950/30 shadow-xs'
+                    : 'border-zinc-200 hover:border-purple-300 dark:border-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-purple-900 dark:text-purple-200">
+                    🏆 1. Gran Vitrina
+                  </span>
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                    {vitrinaAdsCount} / {liveAdPageConfig.maxHeroItems} cupos
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Dato independiente de publicaciones en el recuadro estático superior.
+                </p>
+              </button>
+
+              {/* Medio 2: Pasarela de Publicaciones */}
+              <button
+                type="button"
+                onClick={() => setAdMediumFilter('pasarela')}
+                className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                  adMediumFilter === 'pasarela'
+                    ? 'border-2 border-blue-600 bg-blue-50/70 dark:border-blue-500 dark:bg-blue-950/30 shadow-xs'
+                    : 'border-zinc-200 hover:border-blue-300 dark:border-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-blue-900 dark:text-blue-200">
+                    ✨ 2. Pasarela Rubros
+                  </span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                    {pasarelaAdsCount} activas
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Dato independiente en carruseles de Servicios ({liveAdPageConfig.maxServicesItems}), Usados ({liveAdPageConfig.maxArticlesItems}) y Nuevos ({liveAdPageConfig.maxProductsItems}).
+                </p>
+              </button>
+
+              {/* Medio 3: Pasarela de Proveedores */}
+              <button
+                type="button"
+                onClick={() => setAdMediumFilter('proveedores')}
+                className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                  adMediumFilter === 'proveedores'
+                    ? 'border-2 border-indigo-600 bg-indigo-50/70 dark:border-indigo-500 dark:bg-indigo-950/30 shadow-xs'
+                    : 'border-zinc-200 hover:border-indigo-300 dark:border-zinc-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                    🏪 3. Pasarela Proveedores
+                  </span>
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-black text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                    {proveedoresAdsCount} / {liveAdPageConfig.maxMerchantsItems} cupos
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Dato independiente de comercios/proveedores (incluido con el pago del plan).
+                </p>
+              </button>
+            </div>
+
+            {/* Pasarelas Adicionales y Lista de Clasificaciones para Catálogos Exclusivos (Temporada o Expansión de Mercado) */}
+            {liveAdPageConfig.customRunways && liveAdPageConfig.customRunways.length > 0 && (
+              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      🔥 Lista Administrada de Clasificaciones de Pasarela y Catálogos Exclusivos
+                    </span>
+                    <p className="text-[10px] text-zinc-500">
+                      Cada clasificación crea un Catálogo Exclusivo con su costo de campaña y habilitación de vendedores según el pago realizado.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRunwayForm(true)}
+                    className="text-[11px] font-bold text-emerald-600 hover:underline dark:text-emerald-400 cursor-pointer"
+                  >
+                    + Adicionar otra pasarela / catálogo exclusivo
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {liveAdPageConfig.customRunways.map((customR) => {
+                    const isSelected = adMediumFilter === customR.id
+                    const assignedCount = adOrders.filter((a) => {
+                      const st = getAdIndependentStates(a)
+                      return (
+                        customR.assignedListingIds?.includes(a.listing_id || '') ||
+                        st.customRunways[customR.id]?.enabled
+                      )
+                    }).length
+                    const classifiedListingsCount = listings.filter(
+                      (l) =>
+                        getListingSpecialClassification(l, liveAdPageConfig.customRunways)?.id ===
+                        customR.id
+                    ).length
+                    const authorizedSellersCount = (customR.authorizedSellerIds || []).length
+                    const isManagingSellers = managingSellersForRunwayId === customR.id
+
+                    return (
+                      <div
+                        key={customR.id}
+                        className={`rounded-xl border p-3.5 transition-all flex flex-col justify-between gap-2.5 ${
+                          isSelected
+                            ? 'border-2 border-emerald-600 bg-emerald-50/60 dark:border-emerald-500 dark:bg-emerald-950/30'
+                            : 'border-zinc-200 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-800/40'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAdMediumFilter(customR.id)}
+                              className="text-left text-xs font-extrabold text-zinc-900 dark:text-zinc-100 hover:underline cursor-pointer flex items-center gap-1.5"
+                            >
+                              <span>{customR.icon}</span>
+                              <span className="line-clamp-1">{customR.title}</span>
+                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                                  customR.reason === 'season'
+                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                }`}
+                              >
+                                {customR.reason === 'season' ? 'Temporada' : 'Expansión'}
+                              </span>
+                              <Link
+                                href={`/catalogo?type=product&exclusive_catalog=${customR.id}`}
+                                className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-900 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300"
+                              >
+                                ⭐ Catálogo Exclusivo ({classifiedListingsCount}) ↗
+                              </Link>
+                            </div>
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-1">
+                            {customR.subtitle}
+                          </p>
+                        </div>
+
+                        {/* Costo Adicional Establecido en Administración y Habilitación de Vendedores */}
+                        <div className="rounded-lg border border-amber-200/80 bg-white/90 p-2.5 dark:border-amber-900/50 dark:bg-zinc-900/80 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-amber-900 dark:text-amber-300">
+                              💰 Costo Campaña Catálogo:
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-bold text-zinc-500">$</span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={1000}
+                                value={customR.campaignCostCop ?? 15000}
+                                onChange={(e) =>
+                                  handleUpdateRunwayCostAndCatalog(
+                                    customR.id,
+                                    { campaignCostCop: Math.max(0, Number(e.target.value) || 0) }
+                                  )
+                                }
+                                className="w-20 rounded border border-zinc-300 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-black text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                              />
+                              <span className="font-bold text-zinc-500">COP</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setManagingSellersForRunwayId(
+                                  isManagingSellers ? null : customR.id
+                                )
+                              }
+                              className="rounded-lg bg-purple-100 px-2 py-1 text-[10px] font-extrabold text-purple-900 hover:bg-purple-200 dark:bg-purple-950 dark:text-purple-200 cursor-pointer"
+                            >
+                              👥 Vendedores Habilitados ({authorizedSellersCount}) {isManagingSellers ? '▲' : '▼'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Panel Desplegable para Administrar y Habilitar Vendedores según Pago Realizado */}
+                        {isManagingSellers && (
+                          <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-2.5 dark:border-purple-900/60 dark:bg-purple-950/20 space-y-2 text-[10px]">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-extrabold text-purple-900 dark:text-purple-200">
+                                Habilitar vendedores para usar la clasificación &quot;{customR.title}&quot; según su pago:
+                              </span>
+                              <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-emerald-800 dark:text-emerald-300">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(customR.allowAllPaidSellers)}
+                                  onChange={(e) =>
+                                    handleUpdateRunwayCostAndCatalog(
+                                      customR.id,
+                                      { allowAllPaidSellers: e.target.checked },
+                                      e.target.checked
+                                        ? 'Auto-habilitación por saldo/pago activada.'
+                                        : 'Solo vendedores habilitados manualmente podrán usar esta lista.'
+                                    )
+                                  }
+                                  className="h-3.5 w-3.5 rounded text-emerald-600"
+                                />
+                                <span>Auto-habilitar si saldo/pago &ge; ${(customR.campaignCostCop || 15000).toLocaleString('es-CO')}</span>
+                              </label>
+                            </div>
+
+                            <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                              {sellers.map((s) => {
+                                const isAuth = (customR.authorizedSellerIds || []).includes(s.id)
+                                const sellerAcc = adAccounts.find(
+                                  (acc) => acc.advertiser?.seller_id === s.id
+                                )
+                                const sellerBalance = Number(sellerAcc?.balance || 0)
+                                const hasPaidOrder = adOrders.some(
+                                  (o) =>
+                                    o.listing?.seller_id === s.id &&
+                                    (o.status === 'live' || o.status === 'approved') &&
+                                    Number(o.price_paid || 0) > 0
+                                )
+
+                                return (
+                                  <div
+                                    key={s.id}
+                                    className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800"
+                                  >
+                                    <div className="min-w-0">
+                                      <span className="font-bold text-zinc-900 dark:text-zinc-100 truncate block">
+                                        🏪 {s.business_name} ({s.city || 'Colombia'})
+                                      </span>
+                                      <span className="text-[9px] text-zinc-500">
+                                        Saldo aprobado: <strong>${sellerBalance.toLocaleString('es-CO')} COP</strong>{' '}
+                                        {hasPaidOrder ? '• ✓ Con campaña pagada' : ''}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleToggleSellerAuthorizationForRunway(customR.id, s.id)
+                                      }
+                                      className={`shrink-0 rounded-lg px-2.5 py-1 font-extrabold cursor-pointer ${
+                                        isAuth
+                                          ? 'bg-emerald-600 text-white'
+                                          : 'bg-zinc-200 text-zinc-800 hover:bg-emerald-100 dark:bg-zinc-800 dark:text-zinc-200'
+                                      }`}
+                                    >
+                                      {isAuth ? '✓ Habilitado en Lista' : '+ Habilitar por Pago'}
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-between gap-2 text-[10px]">
+                          <span className="font-bold text-zinc-600 dark:text-zinc-300">
+                            📊 {assignedCount} / {customR.maxItems} cupos • ⏱️ {customR.defaultDurationDays}d
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDynamicRunway(customR.id)}
+                              className={`rounded-lg px-2 py-0.5 font-extrabold cursor-pointer ${
+                                customR.active
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              {customR.active ? 'Activa en Portada' : 'Oculta'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDynamicRunway(customR.id)}
+                              title="Eliminar pasarela"
+                              className="rounded-lg px-1.5 py-0.5 text-zinc-400 hover:bg-red-100 hover:text-red-600 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tabs for Ads Status */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
             <div className="flex flex-wrap items-center gap-2">
               {[
                 {
+                  id: 'all',
+                  label: 'Todas las Campañas',
+                  count: adOrders.length,
+                  color: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200',
+                },
+                {
                   id: 'pending',
-                  label: 'Campañas Pendientes (submitted)',
+                  label: 'Pendientes de Aprobación (submitted)',
                   count: pendingAdsCount,
                   color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
                 },
@@ -1487,19 +2659,13 @@ export default function AdminModerationPanel({
                   count: rejectedAdsCount,
                   color: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
                 },
-                {
-                  id: 'all',
-                  label: 'Todas',
-                  count: adOrders.length,
-                  color: 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200',
-                },
               ].map((tab) => {
                 const isActive = adActiveTab === tab.id
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setAdActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
                       isActive
                         ? 'bg-purple-600 text-white shadow-sm'
                         : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700'
@@ -1578,36 +2744,53 @@ export default function AdminModerationPanel({
             </div>
           </div>
 
-          {/* Ads List */}
+          {/* Ads List with Remaining Time & Independent Per-Runway Controls */}
           {filteredAds.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
               <span className="text-4xl">{adActiveTab === 'pending' ? '🚀' : '🔍'}</span>
               <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50">
                 {adActiveTab === 'pending'
                   ? 'No hay campañas publicitarias pendientes de revisión'
-                  : 'No se encontraron campañas en esta sección'}
+                  : 'No se encontraron campañas en el medio o filtro seleccionado'}
               </h3>
               <p className="mt-1 text-xs text-zinc-500">
-                {adActiveTab === 'pending'
-                  ? 'Todas las solicitudes de publicidad han sido atendidas.'
+                {adMediumFilter !== 'all'
+                  ? 'Puedes cambiar a "Todos los Medios" para activar o asignar publicaciones a esta pasarela.'
                   : 'Prueba cambiando de pestaña o limpiando la búsqueda.'}
               </p>
+              {adMediumFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setAdMediumFilter('all')}
+                  className="mt-4 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-500 cursor-pointer"
+                >
+                  Ver todas las campañas para asignar a este medio
+                </button>
+              )}
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3 sm:space-y-4'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
               {visibleAds.map((ad) => {
                 const isPending = pendingAdStatuses.includes(ad.status)
                 const isProcessing = processingId === ad.id
-                const placement = resolveAdOrderPlacement(ad)
+                const resolvedPlacement = resolveAdOrderPlacement(ad)
+                const placementType = resolvedPlacement.placement
+                const timeStatus = getAdOrderTimeStatus(ad)
+                const mediumStates = getAdIndependentStates(ad)
+                const sellerName = ad.listing?.seller?.business_name || 'Proveedor Verificado'
+                const specialClassification = getListingSpecialClassification(
+                  ad.listing,
+                  liveAdPageConfig.customRunways
+                )
 
                 return (
                   <div
                     key={ad.id}
-                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900"
+                    className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 space-y-4"
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
-                      <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row' : 'flex-row'} items-start gap-3 sm:gap-4 min-w-0`}>
-                        <div className={`relative ${viewMode === 'grid' ? 'w-full aspect-[4/3] sm:h-20 sm:w-32' : 'h-16 w-20 sm:h-20 sm:w-32'} shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700`}>
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row items-start gap-3.5 min-w-0 flex-1">
+                        <div className="relative h-20 w-28 sm:h-24 sm:w-36 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
                           {ad.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={ad.image_url} alt="" className="h-full w-full object-cover" />
@@ -1618,20 +2801,26 @@ export default function AdminModerationPanel({
                           )}
                         </div>
 
-                        <div className="space-y-1.5 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950 dark:text-purple-300 uppercase tracking-wider">
-                              {ad.package?.name || 'Paquete'}
+                              {ad.package?.name || resolvedPlacement.planLabelEs}
                             </span>
                             <span className="rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300">
-                              {placement === 'combo'
-                                ? '🔥 Ubicación: Combo (Gran Vitrina + Pasarela)'
-                                : placement === 'gran_vitrina'
-                                ? '🏆 Ubicación: Gran Vitrina ($20.000)'
-                                : '✨ Ubicación: Pasarela ($10.000)'}
+                              {placementType === 'combo'
+                                ? '🔥 Plan Combo: Gran Vitrina + Pasarela + Pasarela Proveedores'
+                                : placementType === 'gran_vitrina'
+                                ? '🏆 Plan Gran Vitrina + Pasarela Proveedores ($20.000)'
+                                : '✨ Plan Pasarela + Pasarela Proveedores ($10.000)'}
                             </span>
+                            {specialClassification && (
+                              <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 dark:bg-amber-950/70 dark:border-amber-700 dark:text-amber-200 flex items-center gap-1">
+                                <span>{specialClassification.icon}</span>
+                                <span>Catálogo Exclusivo: {specialClassification.title} (${specialClassification.campaignCostCop.toLocaleString('es-CO')})</span>
+                              </span>
+                            )}
                             <span
-                              className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                              className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                                 ad.status === 'live' || ad.status === 'approved'
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                                   : isPending
@@ -1642,19 +2831,19 @@ export default function AdminModerationPanel({
                               }`}
                             >
                               {ad.status === 'live'
-                                ? 'En vivo (live)'
+                                ? '● En vivo (live)'
                                 : isPending
-                                ? 'En revisión'
+                                ? '⏳ En revisión'
                                 : ad.status === 'rejected'
-                                ? 'Rechazado'
+                                ? '✕ Rechazado'
                                 : ad.status}
                             </span>
-                            <span className="text-[11px] font-extrabold text-zinc-900 dark:text-zinc-100">
-                              ${Number(ad.price_paid).toLocaleString('es-CO')} COP
+                            <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">
+                              ${Number(ad.price_paid).toLocaleString('es-CO')} COP (Incluye Proveedor en Pasarela)
                             </span>
                           </div>
 
-                          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50 truncate">
+                          <h3 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 truncate">
                             {ad.headline}
                           </h3>
 
@@ -1664,26 +2853,52 @@ export default function AdminModerationPanel({
                             </p>
                           )}
 
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
                             {ad.listing && (
                               <span>
-                                Producto Vinculado:{' '}
+                                📦 Publicación:{' '}
                                 <Link
                                   href={`/catalogo/${ad.listing.id}`}
-                                  className="underline font-medium text-purple-600 dark:text-purple-400"
+                                  className="underline font-bold text-purple-600 dark:text-purple-400"
                                 >
                                   {ad.listing.title}
                                 </Link>
                               </span>
                             )}
-                            {(ad.target_city || ad.target_category) && (
-                              <span>
-                                Segmentación: {[ad.target_city, ad.target_category].filter(Boolean).join(', ')}
+                            {ad.listing && (
+                              <span className="inline-flex items-center gap-1">
+                                <span>🏷️ Clasificación:</span>
+                                <select
+                                  value={specialClassification?.id || 'none'}
+                                  onChange={(e) =>
+                                    handleAssignListingSpecialClassification(
+                                      ad.listing!.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold text-amber-900 dark:border-amber-800 dark:bg-zinc-800 dark:text-amber-300 cursor-pointer"
+                                >
+                                  <option value="none">Catálogo General</option>
+                                  {(liveAdPageConfig.customRunways || []).map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.icon} {r.title} (${r.campaignCostCop.toLocaleString('es-CO')})
+                                    </option>
+                                  ))}
+                                </select>
                               </span>
                             )}
                             <span>
-                              Enviado: {new Date(ad.created_at).toLocaleDateString('es-CO')}
+                              🏪 Proveedor:{' '}
+                              <strong className="text-zinc-800 dark:text-zinc-200">
+                                {sellerName}
+                              </strong>
                             </span>
+                            {(ad.target_city || ad.target_category) && (
+                              <span>
+                                📍 Segmentación:{' '}
+                                {[ad.target_city, ad.target_category].filter(Boolean).join(', ')}
+                              </span>
+                            )}
                           </div>
 
                           {ad.status === 'rejected' && ad.reject_reason && (
@@ -1694,34 +2909,400 @@ export default function AdminModerationPanel({
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-zinc-100 dark:border-zinc-800 shrink-0">
-                        {ad.status !== 'live' && (
-                          <button
-                            type="button"
-                            disabled={isProcessing}
-                            onClick={() => handleApproveAd(ad.id)}
-                            className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors"
-                          >
-                            <span>🚀</span>
-                            <span>{isProcessing ? 'Procesando...' : 'Aprobar y Activar (Live)'}</span>
-                          </button>
-                        )}
+                      {/* Bloque Derecho: Reloj de Tiempo Restante Global + Acciones Aprobar/Rechazar */}
+                      <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-between gap-3 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-zinc-100 dark:border-zinc-800">
+                        {/* Reloj de Tiempo Restante de la Publicación */}
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50/90 px-3.5 py-2.5 dark:border-zinc-800 dark:bg-zinc-800/60 min-w-[230px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500">
+                              ⏱️ Tiempo Restante Publicación
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                                isPending
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  : timeStatus.isExpired
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              }`}
+                            >
+                              {isPending
+                                ? `${timeStatus.daysRemaining}d listos al aprobar`
+                                : timeStatus.isExpired
+                                ? 'Finalizado (0d 0h)'
+                                : `⏳ ${timeStatus.daysRemaining}d ${timeStatus.hoursRemaining}h restantes`}
+                            </span>
+                          </div>
 
-                        {ad.status !== 'rejected' && (
-                          <button
-                            type="button"
-                            disabled={isProcessing}
-                            onClick={() => {
-                              setRejectingAd(ad)
-                              setAdRejectReason('')
-                            }}
-                            className="flex items-center gap-1.5 rounded-xl border border-red-300 px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40 transition-colors"
-                          >
-                            <span>✕</span>
-                            <span>Rechazar</span>
-                          </button>
-                        )}
+                          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                timeStatus.isExpired
+                                  ? 'bg-red-500'
+                                  : isPending
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                              }`}
+                              style={{
+                                width: `${
+                                  isPending
+                                    ? 100
+                                    : Math.max(8, 100 - timeStatus.progressPercent)
+                                }%`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-zinc-500">
+                            <span>
+                              Vence: <strong>{new Date(timeStatus.endsAt).toLocaleDateString('es-CO')}</strong>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => handleAdjustAdOrderTime(ad.id, -1)}
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 cursor-pointer"
+                                title="Restar 1 día"
+                              >
+                                -1d
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => handleAdjustAdOrderTime(ad.id, 1)}
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 cursor-pointer"
+                                title="Sumar 1 día"
+                              >
+                                +1d
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isProcessing}
+                                onClick={() => handleAdjustAdOrderTime(ad.id, 7)}
+                                className="rounded bg-purple-600 px-1.5 py-0.5 font-bold text-white hover:bg-purple-500 cursor-pointer"
+                                title="Extender +7 días"
+                              >
+                                +7d
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {ad.status !== 'live' && (
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => handleApproveAd(ad.id)}
+                              className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors cursor-pointer"
+                            >
+                              <span>🚀</span>
+                              <span>{isProcessing ? 'Procesando...' : 'Aprobar y Activar (Live)'}</span>
+                            </button>
+                          )}
+
+                          {ad.status !== 'rejected' && (
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={() => {
+                                setRejectingAd(ad)
+                                setAdRejectReason('')
+                              }}
+                              className="flex items-center gap-1.5 rounded-xl border border-red-300 px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                            >
+                              <span>✕</span>
+                              <span>Rechazar</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    </div>
+
+                    {/* ==================================================================== */}
+                    {/* PANEL DE DATO INDEPENDIENTE Y ADMINISTRABLE POR CADA PASARELA        */}
+                    {/* (1. Gran Vitrina | 2. Pasarela Rubro | 3. Pasarela de Proveedores)   */}
+                    {/* ==================================================================== */}
+                    <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+                          🎛️ Estado y Tiempo Restante Independiente por cada Pasarela (Administrable Individualmente)
+                        </span>
+                        <span className="text-[10px] text-zinc-500">
+                          Ajusta días o activa/pausa cada medio de manera independiente
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        {/* 1. Dato Independiente: Gran Vitrina */}
+                        <div
+                          className={`rounded-xl border p-3 text-xs transition-all ${
+                            mediumStates.vitrina.enabled
+                              ? 'border-purple-200 bg-purple-50/50 dark:border-purple-900/60 dark:bg-purple-950/20'
+                              : 'border-zinc-200 bg-zinc-50/60 opacity-75 dark:border-zinc-800 dark:bg-zinc-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <span>🏆</span>
+                              <span>1. Gran Vitrina</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateIndependentMedium(ad, 'vitrina', { toggle: true })
+                              }
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold cursor-pointer ${
+                                mediumStates.vitrina.enabled
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              {mediumStates.vitrina.enabled ? '✓ Activa' : 'Pausada'}
+                            </button>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-[11px]">
+                            <span className="text-zinc-600 dark:text-zinc-400">
+                              Tiempo restante:{' '}
+                              <strong className="text-purple-700 dark:text-purple-300">
+                                {mediumStates.vitrina.enabled
+                                  ? `${mediumStates.vitrina.daysRemaining}d ${mediumStates.vitrina.hoursRemaining}h`
+                                  : '0d (Inactiva)'}
+                              </strong>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'vitrina', { deltaDays: -1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                -1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'vitrina', { deltaDays: 1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                +1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'vitrina', { deltaDays: 7 })
+                                }
+                                className="rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-purple-500 cursor-pointer"
+                              >
+                                +7d
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Dato Independiente: Pasarela de Publicaciones */}
+                        <div
+                          className={`rounded-xl border p-3 text-xs transition-all ${
+                            mediumStates.pasarela.enabled
+                              ? 'border-blue-200 bg-blue-50/50 dark:border-blue-900/60 dark:bg-blue-950/20'
+                              : 'border-zinc-200 bg-zinc-50/60 opacity-75 dark:border-zinc-800 dark:bg-zinc-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <span>✨</span>
+                              <span>2. Pasarela Publicación</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateIndependentMedium(ad, 'pasarela', { toggle: true })
+                              }
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold cursor-pointer ${
+                                mediumStates.pasarela.enabled
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              {mediumStates.pasarela.enabled ? '✓ Activa' : 'Pausada'}
+                            </button>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-[11px]">
+                            <span className="text-zinc-600 dark:text-zinc-400">
+                              Tiempo restante:{' '}
+                              <strong className="text-blue-700 dark:text-blue-300">
+                                {mediumStates.pasarela.enabled
+                                  ? `${mediumStates.pasarela.daysRemaining}d ${mediumStates.pasarela.hoursRemaining}h`
+                                  : '0d (Inactiva)'}
+                              </strong>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'pasarela', { deltaDays: -1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                -1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'pasarela', { deltaDays: 1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                +1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'pasarela', { deltaDays: 7 })
+                                }
+                                className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-blue-500 cursor-pointer"
+                              >
+                                +7d
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Dato Independiente: Pasarela de Proveedores (Incluida en el Pago) */}
+                        <div
+                          className={`rounded-xl border p-3 text-xs transition-all ${
+                            mediumStates.proveedores.enabled
+                              ? 'border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/60 dark:bg-indigo-950/20'
+                              : 'border-zinc-200 bg-zinc-50/60 opacity-75 dark:border-zinc-800 dark:bg-zinc-800/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <span>🏪</span>
+                              <span>3. Pasarela Proveedores</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateIndependentMedium(ad, 'proveedores', { toggle: true })
+                              }
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold cursor-pointer ${
+                                mediumStates.proveedores.enabled
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              {mediumStates.proveedores.enabled
+                                ? '✓ Proveedor Activo'
+                                : 'Proveedor Pausado'}
+                            </button>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between text-[11px]">
+                            <span className="text-zinc-600 dark:text-zinc-400">
+                              Tiempo restante:{' '}
+                              <strong className="text-indigo-700 dark:text-indigo-300">
+                                {mediumStates.proveedores.enabled
+                                  ? `${mediumStates.proveedores.daysRemaining}d ${mediumStates.proveedores.hoursRemaining}h`
+                                  : '0d (Inactivo)'}
+                              </strong>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'proveedores', { deltaDays: -1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                -1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'proveedores', { deltaDays: 1 })
+                                }
+                                className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-[10px] font-bold hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 cursor-pointer"
+                              >
+                                +1d
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateIndependentMedium(ad, 'proveedores', { deltaDays: 7 })
+                                }
+                                className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-indigo-500 cursor-pointer"
+                              >
+                                +7d
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. Asignación Independiente a Pasarelas Adicionales (Temporada o Expansión de Mercado) */}
+                      {liveAdPageConfig.customRunways && liveAdPageConfig.customRunways.length > 0 && (
+                        <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="font-bold text-zinc-500">
+                            🔥 Pasarelas de Temporada / Expansión:
+                          </span>
+                          {liveAdPageConfig.customRunways.map((customR) => {
+                            const customState = mediumStates.customRunways[customR.id]
+                            const isAssigned =
+                              customState?.enabled ??
+                              Boolean(customR.assignedListingIds?.includes(ad.listing_id || ''))
+                            const daysLeft = customState?.daysRemaining ?? timeStatus.daysRemaining
+
+                            return (
+                              <div
+                                key={customR.id}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 ${
+                                  isAssigned
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
+                                    : 'border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-400'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateIndependentMedium(ad, customR.id, {
+                                      toggle: true,
+                                      isCustomRunway: true,
+                                    })
+                                  }
+                                  className="font-bold cursor-pointer flex items-center gap-1"
+                                >
+                                  <span>{customR.icon}</span>
+                                  <span>{customR.title}:</span>
+                                  <span className="underline">
+                                    {isAssigned ? `Activa (${daysLeft}d)` : 'Incluir'}
+                                  </span>
+                                </button>
+                                {isAssigned && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateIndependentMedium(ad, customR.id, {
+                                        deltaDays: 7,
+                                        isCustomRunway: true,
+                                      })
+                                    }
+                                    className="rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-black text-white hover:bg-emerald-500 cursor-pointer"
+                                    title="Sumar 7 días en esta pasarela"
+                                  >
+                                    +7d
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

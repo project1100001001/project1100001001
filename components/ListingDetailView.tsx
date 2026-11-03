@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { ListingWithRelations, Review } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
 import { getPublicListingSpecs, getListingFreeTrialStatus } from '@/lib/adPolicies'
+import { getWhatsappUrl, getListingReferenceCode } from '@/lib/useContinuousScroll'
 import ReviewsSection from './ReviewsSection'
 
 interface ListingDetailViewProps {
@@ -29,14 +30,25 @@ export default function ListingDetailView({
       ? `$ ${listing.price.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')}`
       : t.listingDetail.quoteOnRequest
 
-  // Format seller whatsapp link
-  const sellerPhone = listing.seller?.whatsapp || listing.seller?.phone
-  const cleanPhone = sellerPhone ? sellerPhone.replace(/\D/g, '') : null
-  const whatsappUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-        `${t.listingDetail.chatGreetingPrefix} "${listing.title}" ${t.listingDetail.chatGreetingSuffix}`
-      )}`
-    : null
+  // Format seller whatsapp link with full product/service reference sheet
+  const referenceCode = getListingReferenceCode(listing.id, listing.attrs)
+  const sellerPhone = listing.seller?.whatsapp || listing.seller?.phone || null
+  const whatsappUrl = getWhatsappUrl(
+    sellerPhone,
+    listing.seller?.business_name || t.common.seller,
+    listing.title,
+    locale,
+    {
+      listingId: listing.id,
+      referenceCode,
+      type: listing.type,
+      categoryName: listing.category?.name || null,
+      price: listing.price,
+      priceUnit: listing.price_unit,
+      city: listing.city || listing.seller?.city || null,
+      attrs: listing.attrs || null,
+    }
+  )
 
   const [contacting, setContacting] = useState(false)
 
@@ -379,11 +391,23 @@ export default function ListingDetailView({
         {/* Right Column: Listing Details, Seller Contact & Seller-Only Advertising Panel (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6">
-            {/* Badges: Type and Category */}
+            {/* Badges: Type, Reference Code and Category */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
                 <span>{typeInfo.icon}</span>
                 <span>{typeInfo.label}</span>
+              </span>
+
+              <span
+                className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 font-mono text-xs font-bold text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/50 dark:text-emerald-300"
+                title={
+                  locale === 'en'
+                    ? 'Automatic product/service reference code sent on WhatsApp'
+                    : 'Código de referencia del producto o servicio que se transmite automáticamente por WhatsApp'
+                }
+              >
+                <span>📌</span>
+                <span>{referenceCode}</span>
               </span>
 
               {listing.category && (
@@ -468,14 +492,25 @@ export default function ListingDetailView({
               {/* Action Buttons */}
               <div className="pt-2 space-y-2.5">
                 {whatsappUrl ? (
-                  <button
-                    type="button"
-                    onClick={handleWhatsAppContact}
-                    disabled={contacting}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-75"
-                  >
-                    <span>{contacting ? t.common.loading : `💬 ${t.listingDetail.contactWhatsApp}`}</span>
-                  </button>
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={handleWhatsAppContact}
+                      disabled={contacting}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-75 cursor-pointer"
+                    >
+                      <span>
+                        {contacting
+                          ? t.common.loading
+                          : `💬 ${t.listingDetail.contactWhatsApp} (${referenceCode})`}
+                      </span>
+                    </button>
+                    <p className="text-[11px] text-center text-zinc-500 dark:text-zinc-400">
+                      {locale === 'en'
+                        ? `Automatically sends reference ${referenceCode}, title, price & link to WhatsApp`
+                        : `Envía automáticamente la referencia ${referenceCode}, título, precio y ficha al WhatsApp del vendedor`}
+                    </p>
+                  </div>
                 ) : (
                   <button
                     disabled

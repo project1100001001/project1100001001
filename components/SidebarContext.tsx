@@ -42,6 +42,12 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setMounted(true)
     }
+
+    const handleAutoCloseMobile = () => setIsOpen(false)
+    window.addEventListener('close-mobile-sidebar', handleAutoCloseMobile)
+    return () => {
+      window.removeEventListener('close-mobile-sidebar', handleAutoCloseMobile)
+    }
   }, [])
 
   const setCollapsed = (val: boolean) => {
@@ -57,9 +63,9 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setCollapsed(!isCollapsed)
   }
 
-  const toggle = () => setIsOpen((prev) => !prev)
-  const open = () => setIsOpen(true)
-  const close = () => setIsOpen(false)
+  const toggle = React.useCallback(() => setIsOpen((prev) => !prev), [])
+  const open = React.useCallback(() => setIsOpen(true), [])
+  const close = React.useCallback(() => setIsOpen(false), [])
 
   return (
     <SidebarContext.Provider

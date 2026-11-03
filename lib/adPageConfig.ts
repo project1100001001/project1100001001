@@ -9,6 +9,32 @@ export interface CustomAdminSetting {
   description?: string
 }
 
+export type DynamicRunwayReason = 'season' | 'market_expansion' | 'special'
+
+export interface DynamicRunwayConfig {
+  id: string
+  title: string
+  subtitle: string
+  badge: string
+  icon: string
+  reason: DynamicRunwayReason
+  filterType: 'all' | 'service' | 'article' | 'product' | 'keyword'
+  filterKeyword?: string
+  maxItems: number
+  defaultDurationDays: number
+  scrollSpeed: number
+  active: boolean
+  accentColor: 'purple' | 'amber' | 'emerald' | 'blue' | 'rose'
+  assignedListingIds: string[]
+  // Clasificación Especial de Pasarela, Catálogo Exclusivo y Habilitación de Vendedores según Pago:
+  hasExclusiveCatalog: boolean
+  campaignCostCop: number
+  authorizedSellerIds: string[]
+  allowAllPaidSellers?: boolean
+  createdAt: string
+  endsAt?: string
+}
+
 export type AdPagePriorityMode =
   | 'all_with_priority'
   | 'only_campaigns_and_free_trial'
@@ -22,7 +48,7 @@ export interface AdPageConfig {
   maxServicesItems: number // Pasarela de Servicios Profesionales
   maxArticlesItems: number // Pasarela de Artículos Usados
   maxProductsItems: number // Pasarela de Productos Nuevos
-  maxMerchantsItems: number // Pasarela de Marcas y Comercios
+  maxMerchantsItems: number // Pasarela de Marcas y Comercios (Proveedores)
   maxTotalListingsFetched: number // Límite máximo de publicaciones consultadas en BD para portada
   maxPhotosPerItem: number // Máximo de imágenes cargadas por publicación en la vitrina
 
@@ -43,10 +69,11 @@ export interface AdPageConfig {
   priorityMode: AdPagePriorityMode
   prioritizeVerifiedSellers: boolean
 
-  // 4. Personalización y parámetros extensibles para futuras configuraciones
+  // 4. Personalización, Pasarelas Adicionales (Temporada / Expansión de Mercado) y parámetros extensibles
   performancePreset: AdPagePerformancePreset
   seasonalAnnouncementActive: boolean
   seasonalAnnouncementText: string
+  customRunways: DynamicRunwayConfig[]
   customSettings: CustomAdminSetting[]
   updatedAt?: string
 }
@@ -81,6 +108,50 @@ export const DEFAULT_AD_PAGE_CONFIG: AdPageConfig = {
   performancePreset: 'balanced',
   seasonalAnnouncementActive: false,
   seasonalAnnouncementText: '',
+  customRunways: [
+    {
+      id: 'runway_temporada_especial',
+      title: 'Especial de Temporada & Ofertas Destacadas',
+      subtitle: 'Pasarela y catálogo exclusivo estacional para campañas de temporada y fechas especiales',
+      badge: '🎄 Temporada Activa',
+      icon: '🔥',
+      reason: 'season',
+      filterType: 'all',
+      filterKeyword: '',
+      maxItems: 12,
+      defaultDurationDays: 7,
+      scrollSpeed: 0.65,
+      active: false,
+      accentColor: 'rose',
+      assignedListingIds: [],
+      hasExclusiveCatalog: true,
+      campaignCostCop: 15000,
+      authorizedSellerIds: [],
+      allowAllPaidSellers: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+    {
+      id: 'runway_expansion_mercado',
+      title: 'Expansión de Mercado: Nuevos Rubros y Emprendimientos',
+      subtitle: 'Pasarela y catálogo exclusivo dedicado a nuevos sectores comerciales en expansión dentro de la plataforma',
+      badge: '🚀 Expansión de Mercado',
+      icon: '🚀',
+      reason: 'market_expansion',
+      filterType: 'all',
+      filterKeyword: '',
+      maxItems: 12,
+      defaultDurationDays: 7,
+      scrollSpeed: 0.65,
+      active: false,
+      accentColor: 'emerald',
+      assignedListingIds: [],
+      hasExclusiveCatalog: true,
+      campaignCostCop: 15000,
+      authorizedSellerIds: [],
+      allowAllPaidSellers: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   customSettings: [
     {
       key: 'lazy_load_secondary_runways',
@@ -290,11 +361,142 @@ export function sanitizeAdPageConfig(raw?: Partial<AdPageConfig> | null): AdPage
       typeof raw.seasonalAnnouncementText === 'string'
         ? raw.seasonalAnnouncementText
         : DEFAULT_AD_PAGE_CONFIG.seasonalAnnouncementText,
+    customRunways: Array.isArray(raw.customRunways)
+      ? raw.customRunways.map((r: any, idx: number) => ({
+          id: String(r?.id || `custom_runway_${idx}`),
+          title: String(r?.title || 'Pasarela Adicional'),
+          subtitle: String(r?.subtitle || 'Pasarela de temporada o expansión de mercado'),
+          badge: String(r?.badge || '🔥 Destacado'),
+          icon: String(r?.icon || '🔥'),
+          reason:
+            r?.reason === 'season' || r?.reason === 'market_expansion' || r?.reason === 'special'
+              ? r.reason
+              : 'season',
+          filterType:
+            r?.filterType === 'service' ||
+            r?.filterType === 'article' ||
+            r?.filterType === 'product' ||
+            r?.filterType === 'keyword'
+              ? r.filterType
+              : 'all',
+          filterKeyword: String(r?.filterKeyword || ''),
+          maxItems: Math.round(clamp(r?.maxItems, 1, 50, 12)),
+          defaultDurationDays: Math.round(clamp(r?.defaultDurationDays, 1, 90, 7)),
+          scrollSpeed: Number(clamp(r?.scrollSpeed, 0.2, 1.8, 0.65).toFixed(2)),
+          active: Boolean(r?.active),
+          accentColor:
+            r?.accentColor === 'amber' ||
+            r?.accentColor === 'emerald' ||
+            r?.accentColor === 'blue' ||
+            r?.accentColor === 'rose'
+              ? r.accentColor
+              : 'purple',
+          assignedListingIds: Array.isArray(r?.assignedListingIds)
+            ? r.assignedListingIds.map(String)
+            : [],
+          hasExclusiveCatalog:
+            typeof r?.hasExclusiveCatalog === 'boolean' ? r.hasExclusiveCatalog : true,
+          campaignCostCop: Math.round(clamp(r?.campaignCostCop, 0, 5000000, 15000)),
+          authorizedSellerIds: Array.isArray(r?.authorizedSellerIds)
+            ? r.authorizedSellerIds.map(String)
+            : [],
+          allowAllPaidSellers: Boolean(r?.allowAllPaidSellers),
+          createdAt: String(r?.createdAt || new Date().toISOString()),
+          endsAt: r?.endsAt ? String(r.endsAt) : undefined,
+        }))
+      : DEFAULT_AD_PAGE_CONFIG.customRunways,
     customSettings: Array.isArray(raw.customSettings)
       ? raw.customSettings
       : DEFAULT_AD_PAGE_CONFIG.customSettings,
     updatedAt: raw.updatedAt || new Date().toISOString(),
   }
+}
+
+/**
+ * Verifica si un vendedor está habilitado para clasificar un artículo o campaña en una
+ * Pasarela / Catálogo Exclusivo de la lista administrada, ya sea por habilitación explícita
+ * en Administración o por contar con el pago/saldo de campaña requerido.
+ */
+export function isSellerAuthorizedForClassification(
+  runway: DynamicRunwayConfig,
+  sellerId?: string | null,
+  sellerApprovedBalanceOrPaymentCop?: number
+): boolean {
+  if (!sellerId) return false
+  if (Array.isArray(runway.authorizedSellerIds) && runway.authorizedSellerIds.includes(sellerId)) {
+    return true
+  }
+  const requiredCost = Number(runway.campaignCostCop ?? 15000)
+  if (requiredCost <= 0) return true
+  if (
+    runway.allowAllPaidSellers &&
+    Number(sellerApprovedBalanceOrPaymentCop || 0) >= requiredCost
+  ) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Obtiene la clasificación especial de pasarela / catálogo exclusivo de un artículo o anuncio
+ */
+export function getListingSpecialClassification(
+  listing?: { id?: string; attrs?: Record<string, any> | null } | null,
+  customRunways?: DynamicRunwayConfig[] | null
+): {
+  id: string
+  title: string
+  badge: string
+  icon: string
+  campaignCostCop: number
+  hasExclusiveCatalog: boolean
+} | null {
+  if (!listing) return null
+  const attrs = listing.attrs || {}
+  const runwayList = customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways
+
+  const attrRunwayId = attrs.special_runway_id ? String(attrs.special_runway_id) : ''
+  if (attrRunwayId) {
+    const matched = runwayList.find((r) => r.id === attrRunwayId)
+    if (matched) {
+      return {
+        id: matched.id,
+        title: matched.title,
+        badge: matched.badge,
+        icon: matched.icon,
+        campaignCostCop: matched.campaignCostCop,
+        hasExclusiveCatalog: matched.hasExclusiveCatalog,
+      }
+    }
+    if (attrs.special_runway_title) {
+      return {
+        id: attrRunwayId,
+        title: String(attrs.special_runway_title),
+        badge: String(attrs.special_runway_badge || '⭐ Catálogo Exclusivo'),
+        icon: '⭐',
+        campaignCostCop: Number(attrs.special_catalog_cost || 15000),
+        hasExclusiveCatalog: true,
+      }
+    }
+  }
+
+  if (listing.id) {
+    const assignedMatch = runwayList.find(
+      (r) => Array.isArray(r.assignedListingIds) && r.assignedListingIds.includes(listing.id!)
+    )
+    if (assignedMatch) {
+      return {
+        id: assignedMatch.id,
+        title: assignedMatch.title,
+        badge: assignedMatch.badge,
+        icon: assignedMatch.icon,
+        campaignCostCop: assignedMatch.campaignCostCop,
+        hasExclusiveCatalog: assignedMatch.hasExclusiveCatalog,
+      }
+    }
+  }
+
+  return null
 }
 
 /**
@@ -354,12 +556,17 @@ export function calculateVisualizationPerformance(config: AdPageConfig): {
   labelEs: string
   labelEn: string
 } {
+  const customRunwaysCards = (config.customRunways || [])
+    .filter((r) => r.active)
+    .reduce((acc, r) => acc + (r.maxItems || 10), 0)
+
   const totalMaxCardsRendered =
     (config.showHeroRunway ? config.maxHeroItems : 0) +
     (config.showServicesRunway ? config.maxServicesItems : 0) +
     (config.showArticlesRunway ? config.maxArticlesItems : 0) +
     (config.showProductsRunway ? config.maxProductsItems : 0) +
-    (config.showMerchantsRunway ? config.maxMerchantsItems : 0)
+    (config.showMerchantsRunway ? config.maxMerchantsItems : 0) +
+    customRunwaysCards
 
   // Peso ponderado considerando tarjetas + fotos por item
   const weight = totalMaxCardsRendered * (1 + config.maxPhotosPerItem * 0.08)

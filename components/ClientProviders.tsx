@@ -10,8 +10,8 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   return (
     <LanguageProvider>
       <ThemeProvider>
+        <GlobalNavigationLoader />
         <SidebarProvider>
-          <GlobalNavigationLoader />
           {children}
         </SidebarProvider>
       </ThemeProvider>

@@ -99,7 +99,21 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
           onClickCapture={control.handleClickCapture}
         >
           {loopedItems.map((item, idx) => {
-            const whatsappUrl = getWhatsappUrl(item.sellerWhatsapp, item.sellerName, item.title, locale)
+            const whatsappUrl = getWhatsappUrl(
+              item.sellerWhatsapp,
+              item.sellerName,
+              item.title,
+              locale,
+              {
+                listingId: item.listingId,
+                type: item.type,
+                categoryName: item.categoryName,
+                price: item.price,
+                priceUnit: item.priceUnit,
+                city: item.city,
+                attrs: item.attrs,
+              }
+            )
 
             return (
               <div

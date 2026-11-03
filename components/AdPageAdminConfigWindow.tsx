@@ -3,11 +3,18 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { ListingWithRelations, AdOrderWithRelations } from '@/lib/types'
+import type {
+  ListingWithRelations,
+  AdOrderWithRelations,
+  SellerProfileWithUser,
+  AdAccountWithUser,
+} from '@/lib/types'
 import {
   type AdPageConfig,
   type CustomAdminSetting,
   type AdPagePerformancePreset,
+  type DynamicRunwayConfig,
+  type DynamicRunwayReason,
   DEFAULT_AD_PAGE_CONFIG,
   AD_PAGE_PRESETS,
   AD_PAGE_CONFIG_STORAGE_KEY,
@@ -16,10 +23,15 @@ import {
   calculateVisualizationPerformance,
 } from '@/lib/adPageConfig'
 
+const formatPrice = (amount: number) =>
+  `$${Number(amount || 0).toLocaleString('es-CO')} COP`
+
 interface AdPageAdminConfigWindowProps {
   initialConfig: AdPageConfig
   listings: ListingWithRelations[]
   adOrders: AdOrderWithRelations[]
+  sellers?: SellerProfileWithUser[]
+  adAccounts?: AdAccountWithUser[]
   locale: string
   onNotify?: (text: string, type?: 'success' | 'error') => void
 }
@@ -28,13 +40,15 @@ export default function AdPageAdminConfigWindow({
   initialConfig,
   listings,
   adOrders,
+  sellers = [],
+  adAccounts = [],
   locale,
   onNotify,
 }: AdPageAdminConfigWindowProps) {
   const supabase = createClient()
   const [config, setConfig] = useState<AdPageConfig>(() => sanitizeAdPageConfig(initialConfig))
   const [activeSubTab, setActiveSubTab] = useState<
-    'capacity' | 'sections' | 'behavior' | 'extensible'
+    'capacity' | 'runways' | 'sections' | 'behavior' | 'extensible'
   >('capacity')
   const [isSaving, setIsSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -45,6 +59,23 @@ export default function AdPageAdminConfigWindow({
   const [newSettingType, setNewSettingType] = useState<'boolean' | 'number' | 'text'>('boolean')
   const [newSettingValue, setNewSettingValue] = useState<string>('true')
   const [newSettingDesc, setNewSettingDesc] = useState('')
+
+  // Estado para adicionar nuevas pasarelas en la página de publicidad (con su catálogo exclusivo)
+  const [newRunwayTitle, setNewRunwayTitle] = useState('')
+  const [newRunwaySubtitle, setNewRunwaySubtitle] = useState('')
+  const [newRunwayBadge, setNewRunwayBadge] = useState('🎄 Especial de Temporada')
+  const [newRunwayIcon, setNewRunwayIcon] = useState('🔥')
+  const [newRunwayReason, setNewRunwayReason] = useState<DynamicRunwayReason>('season')
+  const [newRunwayFilterType, setNewRunwayFilterType] = useState<
+    'all' | 'service' | 'article' | 'product' | 'keyword'
+  >('all')
+  const [newRunwayKeyword, setNewRunwayKeyword] = useState('')
+  const [newRunwayMaxItems, setNewRunwayMaxItems] = useState<number>(12)
+  const [newRunwayDurationDays, setNewRunwayDurationDays] = useState<number>(7)
+  const [newRunwayCampaignCostCop, setNewRunwayCampaignCostCop] = useState<number>(15000)
+  const [newRunwayHasExclusiveCatalog, setNewRunwayHasExclusiveCatalog] = useState<boolean>(true)
+  const [expandedRunwaySellersId, setExpandedRunwaySellersId] = useState<string | null>(null)
+  const [assignListingSelection, setAssignListingSelection] = useState<Record<string, string>>({})
 
   // Sincronizar con configuración guardada en localStorage si es más reciente
   useEffect(() => {
@@ -57,6 +88,13 @@ export default function AdPageAdminConfigWindow({
     } catch {
       // Ignorar errores de lectura local
     }
+    const handleCfgEvent = (e: any) => {
+      if (e?.detail) {
+        setConfig(sanitizeAdPageConfig(e.detail))
+      }
+    }
+    window.addEventListener('ad-page-config-updated', handleCfgEvent)
+    return () => window.removeEventListener('ad-page-config-updated', handleCfgEvent)
   }, [])
 
   // Estadísticas reales del inventario publicado actualmente
@@ -254,6 +292,129 @@ export default function AdPageAdminConfigWindow({
     setNewSettingDesc('')
     if (onNotify) {
       onNotify(`Parámetro "${cleanLabel}" agregado al módulo de configuración.`)
+    }
+  }
+
+  const handleAddCustomRunway = (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanTitle = newRunwayTitle.trim()
+    if (!cleanTitle) return
+
+    const id = `runway_${Date.now()}_${cleanTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .slice(0, 20)}`
+
+    const newRunway: DynamicRunwayConfig = {
+      id,
+      title: cleanTitle,
+      subtitle:
+        newRunwaySubtitle.trim() ||
+        (newRunwayReason === 'season'
+          ? 'Pasarela especial de temporada con ofertas y servicios destacados'
+          : 'Pasarela habilitada por expansión de mercado y nuevos rubros'),
+      badge:
+        newRunwayBadge.trim() ||
+        (newRunwayReason === 'season' ? '🎄 Temporada' : '🚀 Expansión de Mercado'),
+      icon: newRunwayIcon.trim() || '🔥',
+      reason: newRunwayReason,
+      filterType: newRunwayFilterType,
+      filterKeyword: newRunwayKeyword.trim(),
+      maxItems: Math.max(1, Math.min(50, Number(newRunwayMaxItems) || 12)),
+      defaultDurationDays: Math.max(1, Math.min(90, Number(newRunwayDurationDays) || 7)),
+      scrollSpeed: config.runwayScrollSpeed || 0.65,
+      active: true,
+      accentColor: newRunwayReason === 'season' ? 'rose' : 'emerald',
+      assignedListingIds: [],
+      hasExclusiveCatalog: newRunwayHasExclusiveCatalog,
+      campaignCostCop: Math.max(0, Number(newRunwayCampaignCostCop) || 15000),
+      authorizedSellerIds: [],
+      allowAllPaidSellers: true,
+      createdAt: new Date().toISOString(),
+      endsAt: new Date(
+        Date.now() + (Number(newRunwayDurationDays) || 7) * 24 * 60 * 60 * 1000
+      ).toISOString(),
+    }
+
+    updateField('customRunways', [...(config.customRunways || []), newRunway])
+    setNewRunwayTitle('')
+    setNewRunwaySubtitle('')
+    setNewRunwayKeyword('')
+    if (onNotify) {
+      onNotify(
+        `Pasarela "${cleanTitle}" y su catálogo exclusivo creados. Pulsa "Guardar Configuración" para aplicar.`
+      )
+    }
+  }
+
+  const handleUpdateCustomRunway = (
+    runwayId: string,
+    patch: Partial<DynamicRunwayConfig>
+  ) => {
+    const nextList = (config.customRunways || []).map((r) =>
+      r.id === runwayId ? { ...r, ...patch } : r
+    )
+    updateField('customRunways', nextList)
+  }
+
+  const handleDeleteCustomRunway = (runwayId: string) => {
+    const nextList = (config.customRunways || []).filter((r) => r.id !== runwayId)
+    updateField('customRunways', nextList)
+  }
+
+  const handleToggleRunwaySeller = (runwayId: string, sellerUserId: string) => {
+    const runway = (config.customRunways || []).find((r) => r.id === runwayId)
+    if (!runway) return
+    const current = Array.isArray(runway.authorizedSellerIds) ? runway.authorizedSellerIds : []
+    const nextIds = current.includes(sellerUserId)
+      ? current.filter((id) => id !== sellerUserId)
+      : [...current, sellerUserId]
+    handleUpdateCustomRunway(runwayId, { authorizedSellerIds: nextIds })
+  }
+
+  const handleAssignListingToRunway = async (runwayId: string, listingId: string) => {
+    if (!listingId) return
+    const runway = (config.customRunways || []).find((r) => r.id === runwayId)
+    if (!runway) return
+    const current = Array.isArray(runway.assignedListingIds) ? runway.assignedListingIds : []
+    if (!current.includes(listingId)) {
+      handleUpdateCustomRunway(runwayId, {
+        assignedListingIds: [...current, listingId],
+      })
+    }
+    const targetListing = listings.find((l) => l.id === listingId)
+    if (targetListing) {
+      const nextAttrs = {
+        ...((targetListing.attrs as Record<string, any>) || {}),
+        special_runway_id: runway.id,
+        special_runway_title: runway.title,
+      }
+      await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', listingId)
+    }
+    setAssignListingSelection((prev) => ({ ...prev, [runwayId]: '' }))
+    if (onNotify) {
+      onNotify(
+        `Artículo clasificado en la pasarela "${runway.title}" y su Catálogo Exclusivo. Recuerda pulsar "Guardar Configuración".`
+      )
+    }
+  }
+
+  const handleRemoveListingFromRunway = async (runwayId: string, listingId: string) => {
+    const runway = (config.customRunways || []).find((r) => r.id === runwayId)
+    if (!runway) return
+    const current = Array.isArray(runway.assignedListingIds) ? runway.assignedListingIds : []
+    handleUpdateCustomRunway(runwayId, {
+      assignedListingIds: current.filter((id) => id !== listingId),
+    })
+    const targetListing = listings.find((l) => l.id === listingId)
+    if (
+      targetListing &&
+      (targetListing.attrs as Record<string, any>)?.special_runway_id === runwayId
+    ) {
+      const nextAttrs = { ...((targetListing.attrs as Record<string, any>) || {}) }
+      delete nextAttrs.special_runway_id
+      delete nextAttrs.special_runway_title
+      await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', listingId)
     }
   }
 
@@ -478,25 +639,31 @@ export default function AdPageAdminConfigWindow({
           {
             id: 'capacity',
             icon: '🔢',
-            label: '1. Cantidad de Publicaciones por Pasarela',
+            label: '1. Cupos por Pasarela y Nuevos Catálogos',
             badge: `${perfMetrics.totalMaxCardsRendered} máx`,
+          },
+          {
+            id: 'runways',
+            icon: '🏪',
+            label: '2. Nuevas Pasarelas y Catálogos Exclusivos',
+            badge: `${(config.customRunways || []).length} pasarelas`,
           },
           {
             id: 'sections',
             icon: '👁️',
-            label: '2. Visibilidad de Secciones y Avisos',
+            label: '3. Visibilidad de Secciones y Avisos',
             badge: '7 bloques',
           },
           {
             id: 'behavior',
             icon: '⚡',
-            label: '3. Velocidad de Rotación y Prioridad',
+            label: '4. Velocidad de Rotación y Prioridad',
             badge: `${config.heroRotationSeconds}s / ${config.runwayScrollSpeed}x`,
           },
           {
             id: 'extensible',
             icon: '🧩',
-            label: '4. Más Configuraciones (Extensible)',
+            label: '5. Más Configuraciones (Extensible)',
             badge: `${config.customSettings.length} reglas`,
           },
         ].map((tab) => {
@@ -598,9 +765,9 @@ export default function AdPageAdminConfigWindow({
               {
                 key: 'maxMerchantsItems' as const,
                 icon: '🏪',
-                title: '5. Pasarela de Marcas y Comercios Locales',
+                title: '5. Pasarela de Proveedores / Marcas y Comercios (Incluida en el Pago)',
                 subtitle:
-                  'Cantidad máxima de negocios y vendedores destacados en la pasarela inferior.',
+                  'Cantidad máxima de proveedores destacados en su pasarela independiente (incluida al pagar cualquier plan).',
                 min: 1,
                 max: 30,
                 recommended: 10,
@@ -816,6 +983,521 @@ export default function AdPageAdminConfigWindow({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* SECCIÓN 7 / TAB PASARELAS: ADICIONAR Y ADMINISTRAR NUEVAS PASARELAS   */}
+      {/* EN LA PÁGINA DE PUBLICIDAD Y SUS CATÁLOGOS EXCLUSIVOS                 */}
+      {/* ===================================================================== */}
+      {(activeSubTab === 'capacity' || activeSubTab === 'runways') && (
+        <div className="rounded-2xl border-2 border-purple-200 bg-white p-6 shadow-xs dark:border-purple-900/60 dark:bg-zinc-900 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                  ➕ Pasarelas de la Página de Publicidad + Catálogos Exclusivos
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  💰 Control de Costo de Campaña y Vendedores Habilitados
+                </span>
+              </div>
+              <h3 className="mt-1.5 text-base font-extrabold text-zinc-900 dark:text-zinc-50">
+                Adicionar y Administrar Pasarelas en la Página de Publicidad y Nuevos Catálogos Exclusivos
+              </h3>
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                Crea nuevas pasarelas en la Página de Publicidad (por temporada o expansión de mercado). Cada nueva pasarela habilita su propio <strong>Catálogo Exclusivo</strong>, su <strong>lista de clasificación</strong> para artículos y campañas, su <strong>costo adicional de campaña ($ COP)</strong> y la <strong>habilitación de vendedores según el pago realizado</strong>.
+              </p>
+            </div>
+          </div>
+
+          {/* Lista de Pasarelas Adicionales Existentes en la Página de Publicidad */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {(config.customRunways || []).map((customR) => {
+              const assignedIds = Array.isArray(customR.assignedListingIds)
+                ? customR.assignedListingIds
+                : []
+              const classifiedListings = listings.filter(
+                (l) =>
+                  assignedIds.includes(l.id) ||
+                  (l.attrs as Record<string, any>)?.special_runway_id === customR.id
+              )
+              const availableListingsToAssign = listings.filter(
+                (l) =>
+                  l.status === 'published' &&
+                  !classifiedListings.some((cl) => cl.id === l.id)
+              )
+
+              return (
+                <div
+                  key={customR.id}
+                  className={`rounded-2xl border p-4 transition-all space-y-3.5 ${
+                    customR.active
+                      ? 'border-emerald-300 bg-emerald-50/30 dark:border-emerald-800/70 dark:bg-emerald-950/20'
+                      : 'border-zinc-200 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-800/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-lg shadow-2xs dark:bg-zinc-800">
+                        {customR.icon}
+                      </span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                            {customR.title}
+                          </h4>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                              customR.reason === 'season'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            }`}
+                          >
+                            {customR.reason === 'season'
+                              ? '🎄 Por Temporada'
+                              : customR.reason === 'market_expansion'
+                              ? '🚀 Expansión de Mercado'
+                              : '⭐ Especial'}
+                          </span>
+                          {customR.hasExclusiveCatalog !== false && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-black uppercase text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                              ✨ Catálogo Exclusivo
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">{customR.subtitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={customR.active}
+                          onChange={(e) =>
+                            handleUpdateCustomRunway(customR.id, { active: e.target.checked })
+                          }
+                          className="h-4 w-4 rounded border-zinc-300 text-emerald-600"
+                        />
+                        <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                          {customR.active ? 'Activa en Publicidad' : 'Oculta'}
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomRunway(customR.id)}
+                        className="rounded-lg p-1 text-zinc-400 hover:bg-red-100 hover:text-red-600 cursor-pointer"
+                        title="Eliminar pasarela"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Controles de Cupo, Vigencia y Costo Adicional de Campaña ($ COP) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-zinc-200/70 dark:border-zinc-800 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-zinc-500 block">
+                        Cupo Máx. en Pasarela:
+                      </span>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={customR.maxItems}
+                          onChange={(e) =>
+                            handleUpdateCustomRunway(customR.id, {
+                              maxItems: Math.max(1, Math.min(50, Number(e.target.value) || 12)),
+                            })
+                          }
+                          className="w-16 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs font-extrabold dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        <span className="text-[11px] text-zinc-500">artículos</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold text-zinc-500 block">
+                        Vigencia Independiente:
+                      </span>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          max={90}
+                          value={customR.defaultDurationDays}
+                          onChange={(e) =>
+                            handleUpdateCustomRunway(customR.id, {
+                              defaultDurationDays: Math.max(
+                                1,
+                                Math.min(90, Number(e.target.value) || 7)
+                              ),
+                            })
+                          }
+                          className="w-16 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs font-extrabold dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        <span className="text-[11px] text-zinc-500">días</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 block">
+                        Costo Campaña Catálogo ($ COP):
+                      </span>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          value={customR.campaignCostCop ?? 15000}
+                          onChange={(e) =>
+                            handleUpdateCustomRunway(customR.id, {
+                              campaignCostCop: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          className="w-24 rounded-lg border border-purple-300 bg-white px-2 py-1 text-xs font-extrabold text-purple-900 dark:border-purple-700 dark:bg-zinc-800 dark:text-purple-200"
+                        />
+                        <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                          COP
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barra de Catálogo Exclusivo y Habilitación de Vendedores según Pago */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200/70 dark:border-zinc-800 text-[11px]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-purple-800 dark:text-purple-300">
+                        <input
+                          type="checkbox"
+                          checked={customR.hasExclusiveCatalog !== false}
+                          onChange={(e) =>
+                            handleUpdateCustomRunway(customR.id, {
+                              hasExclusiveCatalog: e.target.checked,
+                            })
+                          }
+                          className="h-3.5 w-3.5 rounded border-purple-300 text-purple-600"
+                        />
+                        <span>Habilitar Catálogo Exclusivo</span>
+                      </label>
+                      {customR.hasExclusiveCatalog !== false && (
+                        <Link
+                          href={`/catalogo?runway=${encodeURIComponent(customR.id)}`}
+                          className="rounded-lg bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800 hover:bg-purple-200 dark:bg-purple-950/70 dark:text-purple-300"
+                        >
+                          👁️ Ver Catálogo Exclusivo ↗
+                        </Link>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedRunwaySellersId(
+                          expandedRunwaySellersId === customR.id ? null : customR.id
+                        )
+                      }
+                      className="rounded-lg border border-purple-300 bg-white px-2.5 py-1 text-[10px] font-extrabold text-purple-800 hover:bg-purple-50 dark:border-purple-800 dark:bg-zinc-800 dark:text-purple-200 cursor-pointer"
+                    >
+                      👥 Vendedores Habilitados ({(customR.authorizedSellerIds || []).length})
+                      {customR.allowAllPaidSellers !== false ? ' + Pagos Activos' : ''}
+                    </button>
+                  </div>
+
+                  {/* Panel Desplegable: Vendedores Habilitados según Pago Realizado */}
+                  {expandedRunwaySellersId === customR.id && (
+                    <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3 dark:border-purple-900/50 dark:bg-purple-950/20 space-y-2.5 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-extrabold text-purple-900 dark:text-purple-200">
+                          🔐 Habilitación de Vendedores para esta Pasarela y Catálogo Exclusivo
+                        </span>
+                        <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                          <input
+                            type="checkbox"
+                            checked={customR.allowAllPaidSellers !== false}
+                            onChange={(e) =>
+                              handleUpdateCustomRunway(customR.id, {
+                                allowAllPaidSellers: e.target.checked,
+                              })
+                            }
+                            className="h-3.5 w-3.5 rounded border-emerald-400 text-emerald-600"
+                          />
+                          <span>Auto-habilitar vendedores con pago/saldo activo</span>
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                        Selecciona los vendedores que clasifican para usar esta lista en la creación/edición de artículos y campañas según el pago de campaña ({formatPrice(customR.campaignCostCop ?? 15000)}).
+                      </p>
+                      <div className="max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                        {sellers.map((s) => {
+                          const isChecked = (customR.authorizedSellerIds || []).includes(
+                            s.user_id
+                          )
+                          const acc = adAccounts.find((a) => a.user_id === s.user_id)
+                          const hasBalanceOrPaid =
+                            (acc && Number(acc.balance_cents) > 0) ||
+                            adOrders.some(
+                              (o) =>
+                                o.seller_id === s.user_id &&
+                                (o.payment_status === 'paid' ||
+                                  o.status === 'live' ||
+                                  o.status === 'approved')
+                            )
+                          return (
+                            <label
+                              key={s.user_id}
+                              className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer ${
+                                isChecked
+                                  ? 'border-purple-400 bg-purple-100/70 font-bold text-purple-950 dark:border-purple-700 dark:bg-purple-900/40 dark:text-purple-100'
+                                  : 'border-zinc-200 bg-white text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 truncate">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() =>
+                                    handleToggleRunwaySeller(customR.id, s.user_id)
+                                  }
+                                  className="h-3.5 w-3.5 rounded border-zinc-300 text-purple-600"
+                                />
+                                <span className="truncate">{s.business_name}</span>
+                              </div>
+                              {hasBalanceOrPaid && (
+                                <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                  💳 Pago/Saldo
+                                </span>
+                              )}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clasificación Directa de Artículos en esta Pasarela / Catálogo Exclusivo */}
+                  <div className="pt-2 border-t border-zinc-200/70 dark:border-zinc-800 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold text-zinc-700 dark:text-zinc-300">
+                        🏷️ Artículos Clasificados en este Catálogo ({classifiedListings.length} / {customR.maxItems})
+                      </span>
+                    </div>
+
+                    {classifiedListings.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {classifiedListings.map((item) => (
+                          <span
+                            key={item.id}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-white px-2 py-1 text-[11px] font-bold text-zinc-800 dark:border-purple-800/60 dark:bg-zinc-800 dark:text-zinc-200"
+                          >
+                            <span className="truncate max-w-[170px]">{item.title}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveListingFromRunway(customR.id, item.id)
+                              }
+                              className="text-zinc-400 hover:text-red-600 cursor-pointer"
+                              title="Quitar de esta pasarela"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <select
+                        value={assignListingSelection[customR.id] || ''}
+                        onChange={(e) =>
+                          setAssignListingSelection((prev) => ({
+                            ...prev,
+                            [customR.id]: e.target.value,
+                          }))
+                        }
+                        className="flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-[11px] text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                      >
+                        <option value="">
+                          + Clasificar artículo publicado en &quot;{customR.title}&quot;...
+                        </option>
+                        {availableListingsToAssign.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.title} — {item.seller_profile?.business_name || 'Comercio'}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAssignListingToRunway(
+                            customR.id,
+                            assignListingSelection[customR.id] || ''
+                          )
+                        }
+                        disabled={!assignListingSelection[customR.id]}
+                        className="rounded-lg bg-purple-600 px-3 py-1.5 text-[11px] font-extrabold text-white hover:bg-purple-500 disabled:opacity-40 cursor-pointer shrink-0"
+                      >
+                        Asignar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Formulario para Crear una Nueva Pasarela en la Página de Publicidad + Catálogo Exclusivo */}
+          <form
+            onSubmit={handleAddCustomRunway}
+            className="rounded-2xl border border-dashed border-purple-300 bg-purple-50/40 p-4 dark:border-purple-800/60 dark:bg-purple-950/20 space-y-3"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-extrabold text-purple-900 dark:text-purple-200">
+                ➕ Crear Nueva Pasarela en la Página de Publicidad y su Catálogo Exclusivo
+              </div>
+              <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300">
+                Habilita automáticamente la lista de clasificación en Artículos y Campañas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Título de la Nueva Pasarela / Catálogo Exclusivo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newRunwayTitle}
+                  onChange={(e) => setNewRunwayTitle(e.target.value)}
+                  placeholder="Ej. Especial de Temporada Escolar / Expansión: Repuestos y Motos"
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Motivo de Creación *
+                </label>
+                <select
+                  value={newRunwayReason}
+                  onChange={(e) => {
+                    const val = e.target.value as DynamicRunwayReason
+                    setNewRunwayReason(val)
+                    setNewRunwayBadge(
+                      val === 'season' ? '🎄 Temporada' : '🚀 Expansión de Mercado'
+                    )
+                    setNewRunwayIcon(val === 'season' ? '🎄' : '🚀')
+                  }}
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                >
+                  <option value="season">📅 Por Temporada</option>
+                  <option value="market_expansion">🚀 Por Expansión de Mercado</option>
+                  <option value="special">⭐ Especial</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Cupo Máx.
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={newRunwayMaxItems}
+                    onChange={(e) => setNewRunwayMaxItems(Number(e.target.value) || 12)}
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Días Vigencia
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={newRunwayDurationDays}
+                    onChange={(e) => setNewRunwayDurationDays(Number(e.target.value) || 7)}
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Subtítulo descriptivo
+                </label>
+                <input
+                  type="text"
+                  value={newRunwaySubtitle}
+                  onChange={(e) => setNewRunwaySubtitle(e.target.value)}
+                  placeholder="Breve descripción de lo que incluye esta pasarela y su catálogo exclusivo..."
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-purple-800 dark:text-purple-300 mb-1">
+                  Costo de Campaña Nuevo Catálogo ($ COP) *
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={newRunwayCampaignCostCop}
+                  onChange={(e) =>
+                    setNewRunwayCampaignCostCop(Math.max(0, Number(e.target.value) || 0))
+                  }
+                  className="w-full rounded-xl border border-purple-300 bg-white px-3 py-2 text-xs font-extrabold text-purple-900 dark:border-purple-700 dark:bg-zinc-800 dark:text-purple-100"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Filtro Base de Rubro
+                </label>
+                <select
+                  value={newRunwayFilterType}
+                  onChange={(e) => setNewRunwayFilterType(e.target.value as any)}
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                >
+                  <option value="all">Todas las asignadas + clasificadas</option>
+                  <option value="service">Servicios Profesionales</option>
+                  <option value="article">Artículos Usados</option>
+                  <option value="product">Productos Nuevos</option>
+                  <option value="keyword">Por Palabra Clave</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-3 flex items-center">
+                <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-purple-900 dark:text-purple-200">
+                  <input
+                    type="checkbox"
+                    checked={newRunwayHasExclusiveCatalog}
+                    onChange={(e) => setNewRunwayHasExclusiveCatalog(e.target.checked)}
+                    className="h-4 w-4 rounded border-purple-300 text-purple-600"
+                  />
+                  <span>
+                    ✨ Habilitar Catálogo Exclusivo propio para esta pasarela y agregarla a la lista de clasificación de vendedores habilitados
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
+                >
+                  + Adicionar Pasarela y Catálogo
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       )}
 

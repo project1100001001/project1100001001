@@ -101,7 +101,7 @@ export default function Navbar() {
                   Indie Clasificados
                 </span>
                 <span className="hidden sm:block text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">
-                  Pymes y Emprendedores
+                  Economía en Circulación
                 </span>
               </div>
             </Link>

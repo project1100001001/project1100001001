@@ -12,13 +12,15 @@ import {
   SERVICE_SELLER_PROFILES,
   USED_SELLER_PROFILES,
   NEW_SELLER_PROFILES,
+  ALL_TEST_PROFILES,
   TestProfile,
 } from '@/lib/testProfiles'
+import AvantGardeLoader from '@/components/AvantGardeLoader'
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '/catalogo'
+  const redirectTo = searchParams.get('redirectTo') || searchParams.get('next') || '/bienvenida'
   const { t, locale } = useTranslation()
 
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -61,12 +63,22 @@ function LoginForm() {
         throw error
       }
 
-      setSuccessMsg(locale === 'en' ? 'Login successful! Redirecting...' : '¡Inicio de sesión exitoso! Redirigiendo...')
-      router.push(redirectTo)
-      router.refresh()
+      const knownProfile = [ADMIN_PROFILE, ...ALL_TEST_PROFILES].find(
+        (p) => p.email.toLowerCase() === targetEmail.trim().toLowerCase()
+      )
+      const targetUrl =
+        redirectTo === '/bienvenida' && knownProfile
+          ? `/bienvenida?role=${knownProfile.role}&name=${encodeURIComponent(
+              knownProfile.businessName || knownProfile.name
+            )}`
+          : redirectTo
+
+      setSuccessMsg(
+        locale === 'en' ? 'Login successful! Opening welcome guide...' : '¡Inicio de sesión exitoso! Abriendo bienvenida...'
+      )
+      router.push(targetUrl)
     } catch (err: any) {
       setErrorMsg(err.message || (locale === 'en' ? 'Login error' : 'Error al iniciar sesión'))
-    } finally {
       setLoading(false)
     }
   }
@@ -95,18 +107,17 @@ function LoginForm() {
 
         if (data.session) {
           setSuccessMsg(locale === 'en' ? 'Account created and logged in!' : '¡Cuenta creada e inicio de sesión exitoso!')
-          router.push(redirectTo)
-          router.refresh()
+          router.push(`/bienvenida?role=buyer&name=${encodeURIComponent(fullName || email.split('@')[0])}`)
         } else {
           setSuccessMsg(
             locale === 'en'
               ? 'Registration complete! Check email confirmation or run sql/004_seed_test_users.sql.'
               : '¡Registro completado! Si Supabase exige confirmación de correo, puedes desactivarlo o ejecutar sql/004_seed_test_users.sql.'
           )
+          setLoading(false)
         }
       } catch (err: any) {
         setErrorMsg(err.message || (locale === 'en' ? 'Registration error' : 'Error al registrarse'))
-      } finally {
         setLoading(false)
       }
     }
@@ -119,11 +130,20 @@ function LoginForm() {
     executeLogin(testEmail, testPass)
   }
 
+  if (loading) {
+    return (
+      <AvantGardeLoader
+        title="Iniciando Sesión en Indie Clasificados"
+        subtitle="Abriendo tu ventana liviana de bienvenida y guía rápida según tu perfil..."
+      />
+    )
+  }
+
   return (
     <div className="w-full max-w-lg space-y-6 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <div className="text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 font-bold text-white text-xl">
-          M
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 text-2xl shadow-xs">
+          🛠️
         </span>
         <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {mode === 'login' ? t.auth.loginTitle : t.auth.signupTitle}

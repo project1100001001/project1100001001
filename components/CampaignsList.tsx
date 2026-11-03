@@ -5,6 +5,13 @@ import Link from 'next/link'
 import type { AdOrderWithRelations, AdOrderStatus } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
 import { resolveAdOrderPlacement, FREE_INITIAL_AD_DAYS } from '@/lib/adPolicies'
+import {
+  DEFAULT_AD_PAGE_CONFIG,
+  AD_PAGE_CONFIG_STORAGE_KEY,
+  sanitizeAdPageConfig,
+  getListingSpecialClassification,
+  type DynamicRunwayConfig,
+} from '@/lib/adPageConfig'
 
 interface CampaignsListProps {
   initialOrders: AdOrderWithRelations[]
@@ -25,6 +32,21 @@ export default function CampaignsList({
   const [visibleLimit, setVisibleLimit] = useState<number>(10)
   const [selectedAnalyticsOrder, setSelectedAnalyticsOrder] =
     useState<AdOrderWithRelations | null>(null)
+  const [customRunways, setCustomRunways] = useState<DynamicRunwayConfig[]>(
+    DEFAULT_AD_PAGE_CONFIG.customRunways
+  )
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+      if (raw) {
+        const parsed = sanitizeAdPageConfig(JSON.parse(raw))
+        setCustomRunways(parsed.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+      }
+    } catch {
+      // Usar predeterminado
+    }
+  }, [])
 
   const statusBadges: Record<
     AdOrderStatus,
@@ -238,25 +260,25 @@ export default function CampaignsList({
           </div>
           <div className="rounded-xl bg-white/90 border border-zinc-200 px-3 py-2 dark:bg-zinc-800/70 dark:border-zinc-700">
             <span className="text-[10px] font-extrabold uppercase text-blue-700 dark:text-blue-400 block">
-              ✨ Individual Pasarela
+              ✨ Individual Pasarela + Proveedor
             </span>
             <span className="font-black text-zinc-900 dark:text-zinc-50">$10.000 COP</span>
-            <span className="block text-[10px] text-zinc-500">Ciclo de 7 días</span>
+            <span className="block text-[10px] text-zinc-500">7 días + Incluye Pasarela de Proveedores</span>
           </div>
           <div className="rounded-xl bg-white/90 border border-zinc-200 px-3 py-2 dark:bg-zinc-800/70 dark:border-zinc-700">
             <span className="text-[10px] font-extrabold uppercase text-purple-700 dark:text-purple-400 block">
-              🏆 Individual Gran Vitrina
+              🏆 Individual Gran Vitrina + Proveedor
             </span>
             <span className="font-black text-zinc-900 dark:text-zinc-50">$20.000 COP</span>
-            <span className="block text-[10px] text-zinc-500">Ciclo de 7 días</span>
+            <span className="block text-[10px] text-zinc-500">7 días + Incluye Pasarela de Proveedores</span>
           </div>
           <div className="rounded-xl bg-purple-100/80 border border-purple-300 px-3 py-2 dark:bg-purple-950/60 dark:border-purple-700">
             <span className="text-[10px] font-extrabold uppercase text-purple-900 dark:text-purple-300 block">
-              🔥 Plan en Combo (Las dos)
+              🔥 Plan Combo + Proveedor
             </span>
             <span className="font-black text-purple-700 dark:text-purple-300">$25.000 COP</span>
             <span className="block text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">
-              Vitrina + Pasarela (Ahorras $5.000)
+              Vitrina + Pasarela + Pasarela Proveedores
             </span>
           </div>
         </div>
@@ -494,12 +516,25 @@ export default function CampaignsList({
                           {order.headline}
                         </h4>
                         {order.listing && (
-                          <Link
-                            href={`/catalogo/${order.listing.id}`}
-                            className="mt-0.5 text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 hover:underline block truncate"
-                          >
-                            🔗 {order.listing.title}
-                          </Link>
+                          <div className="mt-0.5 space-y-1">
+                            <Link
+                              href={`/catalogo/${order.listing.id}`}
+                              className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 hover:underline block truncate"
+                            >
+                              🔗 {order.listing.title}
+                            </Link>
+                            {(() => {
+                              const specialClass = getListingSpecialClassification(
+                                order.listing as any,
+                                customRunways
+                              )
+                              return specialClass ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                  ⭐ Catálogo Exclusivo: {specialClass.titleEs}
+                                </span>
+                              ) : null
+                            })()}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -722,14 +757,27 @@ export default function CampaignsList({
                                   </div>
                                 )}
                                 {order.listing && (
-                                  <div className="mt-1 text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 truncate">
-                                    <span>🔗 Publicación:</span>
-                                    <Link
-                                      href={`/catalogo/${order.listing.id}`}
-                                      className="underline hover:text-purple-700 truncate"
-                                    >
-                                      {order.listing.title}
-                                    </Link>
+                                  <div className="mt-1 space-y-1">
+                                    <div className="text-[11px] text-purple-600 dark:text-purple-400 flex items-center gap-1 truncate">
+                                      <span>🔗 Publicación:</span>
+                                      <Link
+                                        href={`/catalogo/${order.listing.id}`}
+                                        className="underline hover:text-purple-700 truncate"
+                                      >
+                                        {order.listing.title}
+                                      </Link>
+                                    </div>
+                                    {(() => {
+                                      const specialClass = getListingSpecialClassification(
+                                        order.listing as any,
+                                        customRunways
+                                      )
+                                      return specialClass ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                          ⭐ Catálogo Exclusivo: {specialClass.titleEs}
+                                        </span>
+                                      ) : null
+                                    })()}
                                   </div>
                                 )}
                               </div>

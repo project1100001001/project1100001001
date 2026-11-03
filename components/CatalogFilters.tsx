@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useTransition, useMemo } from 'react'
 import type { Category } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
+import { triggerGlobalNavigationLoader } from './AvantGardeLoader'
 
 interface CatalogFiltersProps {
   categories: Category[]
@@ -146,8 +147,10 @@ export default function CatalogFilters({
     params.delete('condition')
     params.delete('subType')
 
+    const nextUrl = `/catalogo?${params.toString()}`
+    triggerGlobalNavigationLoader(nextUrl)
     startTransition(() => {
-      router.push(`/catalogo?${params.toString()}`)
+      router.push(nextUrl)
     })
   }
 
@@ -169,8 +172,10 @@ export default function CatalogFilters({
 
     const params = new URLSearchParams()
     params.set('type', selectedType || 'service')
+    const nextUrl = `/catalogo?${params.toString()}`
+    triggerGlobalNavigationLoader(nextUrl)
     startTransition(() => {
-      router.push(`/catalogo?${params.toString()}`)
+      router.push(nextUrl)
     })
   }
 

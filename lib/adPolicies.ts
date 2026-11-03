@@ -41,26 +41,26 @@ export const OFFICIAL_AD_PLANS: OfficialAdPlan[] = [
     categoryType: 'individual',
     placement: 'pasarela',
     name: 'Plan Individual: Pasarela',
-    nameEs: 'Plan Individual: Pasarela',
-    nameEn: 'Individual Plan: Runway',
-    subtitleEs: 'Exhibición en Pasarela de Rubro + Pasarela de Vendedores',
-    subtitleEn: 'Category & Sellers Runway Placement',
+    nameEs: 'Plan Individual: Pasarela (+ Pasarela de Proveedores)',
+    nameEn: 'Individual Plan: Runway (+ Providers Runway)',
+    subtitleEs: 'Exhibición en Pasarela de Rubro + Incluye Publicación en Pasarela de Proveedores',
+    subtitleEn: 'Category Runway + Includes Provider Publication in Providers Runway',
     descriptionEs:
-      'Destaca tu producto o servicio en la Pasarela especializada de tu rubro (Productos Nuevos, Artículos Usados o Servicios) y posiciona tu negocio en la Pasarela de Vendedores / Comercios.',
+      'Destaca tu producto o servicio en la Pasarela especializada de tu rubro (Productos Nuevos, Artículos Usados o Servicios). El pago incluye la publicación destacada de tu perfil como proveedor en la Pasarela de Proveedores.',
     descriptionEn:
-      'Feature your product or service in your category Runway (New Products, Used Articles, or Services) and highlight your business in the Sellers / Merchants Runway.',
+      'Feature your product or service in your category Runway (New Products, Used Articles, or Services). Payment includes featured publication of your business in the Providers Runway.',
     featuresEs: [
-      'Presencia prioritaria en Pasarela de tu rubro y Pasarela de Vendedores',
-      'Botón directo de contacto por WhatsApp',
-      'Vigencia de 7 días de exhibición patrocinada',
+      'Presencia prioritaria en la Pasarela de tu rubro (Servicios, Usados o Nuevos)',
+      '🏪 Incluye publicación del proveedor en la Pasarela de Proveedores',
+      'Botón directo de contacto por WhatsApp y vigencia de 7 días administrables',
     ],
     featuresEn: [
-      'Priority presence in your category Runway & Sellers Runway',
-      'Direct WhatsApp contact button',
-      '7 days of sponsored showcase validity',
+      'Priority presence in your category Runway',
+      '🏪 Includes provider publication in the Providers Runway',
+      'Direct WhatsApp contact button & 7 days validity',
     ],
-    badgeEs: 'Plan Individual',
-    badgeEn: 'Individual Plan',
+    badgeEs: 'Plan Individual + Proveedor',
+    badgeEn: 'Individual Plan + Provider',
     slot_id: 'search.top',
     duration_days: 7,
     price: PLAN_PASARELA_PRICE,
@@ -73,26 +73,26 @@ export const OFFICIAL_AD_PLANS: OfficialAdPlan[] = [
     categoryType: 'individual',
     placement: 'gran_vitrina',
     name: 'Plan Individual: Gran Vitrina',
-    nameEs: 'Plan Individual: Gran Vitrina',
-    nameEn: 'Individual Plan: Grand Showcase',
-    subtitleEs: 'Exhibición Estelar en Portada Principal',
-    subtitleEn: 'Main Hero Showcase Placement',
+    nameEs: 'Plan Individual: Gran Vitrina (+ Pasarela de Proveedores)',
+    nameEn: 'Individual Plan: Grand Showcase (+ Providers Runway)',
+    subtitleEs: 'Exhibición Estelar en Gran Vitrina + Incluye Publicación en Pasarela de Proveedores',
+    subtitleEn: 'Main Hero Showcase + Includes Provider Publication in Providers Runway',
     descriptionEs:
-      'Posiciona tu producto o servicio en la Gran Vitrina Principal (Hero Runway) en la parte superior de la portada con galería y ficha técnica.',
+      'Posiciona tu producto o servicio en la Gran Vitrina Principal (Hero Runway) en la parte superior de la portada. Además, el pago incluye la publicación destacada de tu negocio en la Pasarela de Proveedores.',
     descriptionEn:
-      'Position your product or service in the Grand Showcase (Hero Runway) at the top of the home page with photo gallery and specs.',
+      'Position your product or service in the Grand Showcase (Hero Runway) at the top of the home page. Payment also includes featured publication of your business in the Providers Runway.',
     featuresEs: [
-      'Ubicación privilegiada en la Gran Vitrina Principal',
-      'Galería interactiva, precio y botón de WhatsApp',
-      'Vigencia de 7 días de máxima visibilidad',
+      'Ubicación privilegiada en la Gran Vitrina Principal con galería y ficha técnica',
+      '🏪 Incluye publicación del proveedor en la Pasarela de Proveedores',
+      'Vigencia de 7 días de máxima visibilidad administrables por medio',
     ],
     featuresEn: [
-      'Prime placement in the Grand Hero Showcase',
-      'Interactive gallery, price & WhatsApp button',
+      'Prime placement in the Grand Hero Showcase with gallery & specs',
+      '🏪 Includes provider publication in the Providers Runway',
       '7 days of maximum storefront visibility',
     ],
-    badgeEs: 'Plan Individual',
-    badgeEn: 'Individual Plan',
+    badgeEs: 'Plan Individual + Proveedor',
+    badgeEn: 'Individual Plan + Provider',
     slot_id: 'home.carousel',
     duration_days: 7,
     price: PLAN_GRAN_VITRINA_PRICE,
@@ -105,26 +105,26 @@ export const OFFICIAL_AD_PLANS: OfficialAdPlan[] = [
     categoryType: 'combo',
     placement: 'combo',
     name: 'Plan en Combo: Gran Vitrina + Pasarela',
-    nameEs: 'Plan en Combo: Gran Vitrina + Pasarela',
-    nameEn: 'Combo Plan: Grand Showcase + Runway',
-    subtitleEs: 'Las dos ubicaciones por $25.000 COP (Ahorras $5.000)',
-    subtitleEn: 'Both placements for $25,000 COP (Save $5,000)',
+    nameEs: 'Plan en Combo: Gran Vitrina + Pasarela + Pasarela de Proveedores',
+    nameEn: 'Combo Plan: Showcase + Runway + Providers Runway',
+    subtitleEs: 'Triple presencia (Vitrina + Pasarela + Proveedores) por $25.000 COP (Ahorras $5.000)',
+    subtitleEn: 'Triple placement (Showcase + Runway + Providers) for $25,000 COP (Save $5,000)',
     descriptionEs:
-      'Combina las dos ubicaciones: aparece simultáneamente en la Gran Vitrina Principal y en la Pasarela de tu categoría a precio especial de combo.',
+      'Combina todas las ubicaciones: aparece simultáneamente en la Gran Vitrina Principal, en la Pasarela de tu rubro y el pago incluye la publicación destacada de tu marca en la Pasarela de Proveedores a precio especial de combo.',
     descriptionEn:
-      'Combine both placements: appear simultaneously in the Grand Showcase and in your category Runway at a special combo price.',
+      'Combine all placements: appear simultaneously in the Grand Showcase, your category Runway, and includes your business in the Providers Runway at a special combo price.',
     featuresEs: [
-      'Incluye Gran Vitrina Principal ($20.000) + Pasarela ($10.000)',
-      'Ahorro inmediato de $5.000 COP en el paquete',
-      'Doble exposición simultánea durante 7 días',
+      'Incluye Gran Vitrina Principal ($20.000) + Pasarela de Rubro ($10.000)',
+      '🏪 Incluye publicación destacada del proveedor en la Pasarela de Proveedores',
+      'Ahorro inmediato de $5.000 COP con triple exposición durante 7 días',
     ],
     featuresEn: [
-      'Includes Grand Showcase ($20,000) + Runway ($10,000)',
-      'Instant savings of $5,000 COP on the bundle',
-      'Double simultaneous exposure for 7 days',
+      'Includes Grand Showcase ($20,000) + Category Runway ($10,000)',
+      '🏪 Includes featured provider publication in the Providers Runway',
+      'Instant savings of $5,000 COP with triple exposure for 7 days',
     ],
-    badgeEs: '🔥 Plan en Combo (Las dos)',
-    badgeEn: '🔥 Combo Plan (Both)',
+    badgeEs: '🔥 Combo Total + Proveedor',
+    badgeEn: '🔥 Full Combo + Provider',
     savingsCop: PLAN_COMBO_SAVINGS,
     slot_id: 'category.banner',
     duration_days: 7,
@@ -306,6 +306,195 @@ export function buildInitialFreeAdAttrs(existingAttrs: Record<string, any> = {})
   }
 }
 
+export interface AdOrderTimeStatus {
+  daysRemaining: number
+  hoursRemaining: number
+  isExpired: boolean
+  startsAt: string
+  endsAt: string
+  progressPercent: number
+}
+
+/**
+ * Calcula el tiempo restante exacto de una orden publicitaria (ad_order)
+ */
+export function getAdOrderTimeStatus(order: {
+  starts_at?: string | null
+  ends_at?: string | null
+  submitted_at?: string | null
+  created_at?: string | null
+  status?: string | null
+  package?: { duration_days?: number | null } | null
+}): AdOrderTimeStatus {
+  const durationDays = Number(order.package?.duration_days || FREE_INITIAL_AD_DAYS)
+  const totalDurationMs = durationDays * 24 * 60 * 60 * 1000
+
+  const baseStartStr =
+    order.starts_at || order.submitted_at || order.created_at || new Date().toISOString()
+  const parsedStart = new Date(baseStartStr).getTime()
+  const startMs = isNaN(parsedStart) ? Date.now() : parsedStart
+
+  let endMs = startMs + totalDurationMs
+  if (order.ends_at) {
+    const parsedEnd = new Date(order.ends_at).getTime()
+    if (!isNaN(parsedEnd)) {
+      endMs = parsedEnd
+    }
+  }
+
+  // Si aún está en revisión (submitted / in_review), su reloj completo de 7 días está íntegro para iniciar
+  if (order.status === 'submitted' || order.status === 'in_review') {
+    return {
+      daysRemaining: durationDays,
+      hoursRemaining: 0,
+      isExpired: false,
+      startsAt: new Date(startMs).toISOString(),
+      endsAt: new Date(Date.now() + totalDurationMs).toISOString(),
+      progressPercent: 0,
+    }
+  }
+
+  const nowMs = Date.now()
+  const diffMs = endMs - nowMs
+
+  if (diffMs <= 0 || order.status === 'ended' || order.status === 'cancelled') {
+    return {
+      daysRemaining: 0,
+      hoursRemaining: 0,
+      isExpired: true,
+      startsAt: new Date(startMs).toISOString(),
+      endsAt: new Date(endMs).toISOString(),
+      progressPercent: 100,
+    }
+  }
+
+  const daysRemaining = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const hoursRemaining = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const effectiveDays = daysRemaining === 0 && hoursRemaining > 0 ? 0 : daysRemaining
+  const elapsedMs = Math.max(0, totalDurationMs - diffMs)
+  const progressPercent = Math.min(100, Math.max(5, Math.round((elapsedMs / totalDurationMs) * 100)))
+
+  return {
+    daysRemaining: effectiveDays,
+    hoursRemaining,
+    isExpired: false,
+    startsAt: new Date(startMs).toISOString(),
+    endsAt: new Date(endMs).toISOString(),
+    progressPercent,
+  }
+}
+
+export interface IndependentMediumItemState {
+  enabled: boolean
+  endsAt: string
+  daysRemaining: number
+  hoursRemaining: number
+  isExpired: boolean
+}
+
+export interface PublicationRunwayStates {
+  vitrina: IndependentMediumItemState
+  pasarela: IndependentMediumItemState
+  proveedores: IndependentMediumItemState
+  customRunways: Record<string, IndependentMediumItemState>
+}
+
+export const INDEPENDENT_RUNWAY_OVERRIDES_KEY = 'ic_independent_runway_overrides_v1'
+
+/**
+ * Calcula el dato independiente y administrable para cada pasarela (Gran Vitrina, Pasarela de Publicación,
+ * Pasarela de Proveedores y Pasarelas Adicionales de Temporada/Expansión)
+ */
+export function resolveIndependentRunwayStates(
+  orderOrListing: {
+    id: string
+    placement?: AdPlacementType
+    startsAt?: string
+    endsAt?: string
+    attrs?: Record<string, any> | null
+    isPaid?: boolean
+  },
+  localOverrides?: Record<string, any>
+): PublicationRunwayStates {
+  const baseEndsAt =
+    orderOrListing.endsAt ||
+    new Date(Date.now() + FREE_INITIAL_AD_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const placement = orderOrListing.placement || 'pasarela'
+  const attrsOverrides = orderOrListing.attrs?.runway_independent_status || {}
+  const itemOverrides = {
+    ...attrsOverrides,
+    ...(localOverrides?.[orderOrListing.id] || {}),
+  }
+
+  const computeState = (
+    mediumKey: string,
+    defaultEnabled: boolean
+  ): IndependentMediumItemState => {
+    const custom = itemOverrides[mediumKey]
+    const enabled = custom?.enabled !== undefined ? Boolean(custom.enabled) : defaultEnabled
+    const targetEndsAt = custom?.endsAt || baseEndsAt
+    const endMs = new Date(targetEndsAt).getTime()
+    const validEndMs = isNaN(endMs)
+      ? Date.now() + FREE_INITIAL_AD_DAYS * 24 * 60 * 60 * 1000
+      : endMs
+    const diffMs = validEndMs - Date.now()
+
+    if (diffMs <= 0) {
+      return {
+        enabled: false,
+        endsAt: new Date(validEndMs).toISOString(),
+        daysRemaining: 0,
+        hoursRemaining: 0,
+        isExpired: true,
+      }
+    }
+
+    const daysRemaining = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const hoursRemaining = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+    return {
+      enabled,
+      endsAt: new Date(validEndMs).toISOString(),
+      daysRemaining,
+      hoursRemaining,
+      isExpired: false,
+    }
+  }
+
+  const defaultVitrina =
+    placement === 'gran_vitrina' || placement === 'combo' || placement === 'free_initial'
+  const defaultPasarela =
+    placement === 'pasarela' || placement === 'combo' || placement === 'free_initial'
+  // El pago de cualquier plan incluye la publicación del proveedor en la Pasarela de Proveedores
+  const defaultProveedores = true
+
+  const customRunwaysMap: Record<string, IndependentMediumItemState> = {}
+  if (itemOverrides.customRunways && typeof itemOverrides.customRunways === 'object') {
+    for (const [rId, rVal] of Object.entries(itemOverrides.customRunways as Record<string, any>)) {
+      const endMs = new Date(rVal?.endsAt || baseEndsAt).getTime()
+      const validEndMs = isNaN(endMs)
+        ? Date.now() + FREE_INITIAL_AD_DAYS * 24 * 60 * 60 * 1000
+        : endMs
+      const diffMs = validEndMs - Date.now()
+      customRunwaysMap[rId] = {
+        enabled: diffMs > 0 && Boolean(rVal?.enabled),
+        endsAt: new Date(validEndMs).toISOString(),
+        daysRemaining: diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0,
+        hoursRemaining:
+          diffMs > 0 ? Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) : 0,
+        isExpired: diffMs <= 0,
+      }
+    }
+  }
+
+  return {
+    vitrina: computeState('vitrina', defaultVitrina),
+    pasarela: computeState('pasarela', defaultPasarela),
+    proveedores: computeState('proveedores', defaultProveedores),
+    customRunways: customRunwaysMap,
+  }
+}
+
 /**
  * Claves internas exclusivas del vendedor / administración publicitaria que NUNCA
  * deben mostrarse a compradores sin registro ni a perfiles de comprador.
@@ -316,6 +505,11 @@ export const INTERNAL_LISTING_ATTR_KEYS = new Set([
   'free_ad_ends_at',
   'ad_policy',
   'ad_placement',
+  'runway_independent_status',
+  'custom_runways',
+  'special_runway_id',
+  'special_runway_badge',
+  'special_catalog_cost',
   'price_history',
   'campaign_id',
   'campaign_plan',
@@ -324,6 +518,7 @@ export const INTERNAL_LISTING_ATTR_KEYS = new Set([
 ])
 
 const PUBLIC_ATTR_LABELS_ES: Record<string, string> = {
+  special_runway_title: 'Catálogo Exclusivo / Pasarela',
   condition: 'Condición / Estado',
   condicion: 'Condición / Estado',
   delivery_method: 'Método de Entrega',
@@ -346,6 +541,7 @@ const PUBLIC_ATTR_LABELS_ES: Record<string, string> = {
 }
 
 const PUBLIC_ATTR_LABELS_EN: Record<string, string> = {
+  special_runway_title: 'Exclusive Catalog / Runway',
   condition: 'Condition',
   condicion: 'Condition',
   delivery_method: 'Delivery Method',

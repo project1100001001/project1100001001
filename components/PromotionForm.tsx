@@ -23,6 +23,16 @@ import {
   PLAN_COMBO_PRICE,
   PLAN_COMBO_SAVINGS,
 } from '@/lib/adPolicies'
+import {
+  type DynamicRunwayConfig,
+  DEFAULT_AD_PAGE_CONFIG,
+  AD_PAGE_CONFIG_STORAGE_KEY,
+  AD_PAGE_CONFIG_SLOT_ID,
+  sanitizeAdPageConfig,
+  decodeAdPageConfigFromSlots,
+  encodeAdPageConfigToSlot,
+  getListingSpecialClassification,
+} from '@/lib/adPageConfig'
 
 interface PromotionFormProps {
   userId: string
@@ -92,6 +102,13 @@ export default function PromotionForm({
   )
   const selectedListing = publishedListings.find((l) => l.id === selectedListingId)
 
+  // Lista administrada de Clasificaciones de Pasarela y Catálogos Exclusivos
+  const [availableRunways, setAvailableRunways] = useState<DynamicRunwayConfig[]>(
+    DEFAULT_AD_PAGE_CONFIG.customRunways
+  )
+  const [selectedSpecialRunwayId, setSelectedSpecialRunwayId] = useState<string>('')
+  const selectedSpecialRunway = availableRunways.find((r) => r.id === selectedSpecialRunwayId)
+
   const [headline, setHeadline] = useState('')
   const [body, setBody] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -127,6 +144,33 @@ export default function PromotionForm({
     }
   }, [tabFromUrl])
 
+  useEffect(() => {
+    async function loadRunwayClassifications() {
+      try {
+        const localRaw = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+        if (localRaw) {
+          const parsed = sanitizeAdPageConfig(JSON.parse(localRaw))
+          setAvailableRunways(parsed.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+        }
+      } catch {
+        // Ignorar error local
+      }
+      try {
+        const { data: slotsData } = await supabase
+          .from('ad_slot')
+          .select('*')
+          .eq('id', AD_PAGE_CONFIG_SLOT_ID)
+        if (slotsData && slotsData.length > 0) {
+          const decoded = decodeAdPageConfigFromSlots(slotsData)
+          setAvailableRunways(decoded.customRunways || DEFAULT_AD_PAGE_CONFIG.customRunways)
+        }
+      } catch {
+        // Usar configuración local
+      }
+    }
+    loadRunwayClassifications()
+  }, [supabase])
+
   // Auto-fill ad creative content when listing changes
   useEffect(() => {
     if (selectedListing) {
@@ -141,6 +185,11 @@ export default function PromotionForm({
       }
       if (!imageUrl && (selectedListing as any).listing_media?.[0]?.url) {
         setImageUrl((selectedListing as any).listing_media[0].url)
+      }
+      if (selectedListing.attrs?.special_runway_id) {
+        setSelectedSpecialRunwayId(String(selectedListing.attrs.special_runway_id))
+      } else {
+        setSelectedSpecialRunwayId('')
       }
     }
   }, [selectedListing])
@@ -393,6 +442,10 @@ export default function PromotionForm({
     }
   }
 
+  // Costo adicional por Catálogo Exclusivo (según la clasificación seleccionada en la lista administrada)
+  const extraCatalogCost = selectedSpecialRunway ? Number(selectedSpecialRunway.campaignCostCop || 0) : 0
+  const totalCampaignPrice = (selectedCampaignPackage?.price || 0) + extraCatalogCost
+
   // Submit Campaign Order (with approved balance)
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -418,10 +471,10 @@ export default function PromotionForm({
       return
     }
 
-    // Strict balance check
-    if (currentBalance < selectedCampaignPackage.price) {
+    // Strict balance check (Plan Base + Costo Adicional de Catálogo Exclusivo si aplica)
+    if (currentBalance < totalCampaignPrice) {
       setOrderErrorMsg(
-        `Saldo insuficiente. Cuentas con $${currentBalance.toLocaleString('es-CO')} COP y el paquete cuesta $${selectedCampaignPackage.price.toLocaleString('es-CO')} COP. Por favor recarga saldo en el Paso 1 y espera la aprobación del administrador.`
+        `Saldo insuficiente. Cuentas con $${currentBalance.toLocaleString('es-CO')} COP y el costo total de la campaña es $${totalCampaignPrice.toLocaleString('es-CO')} COP (Plan $${selectedCampaignPackage.price.toLocaleString('es-CO')}${extraCatalogCost > 0 ? ` + Catálogo Exclusivo $${extraCatalogCost.toLocaleString('es-CO')}` : ''}). Por favor recarga saldo en el Paso 1 y espera la aprobación del administrador.`
       )
       return
     }
@@ -446,11 +499,13 @@ export default function PromotionForm({
           image_url: imageUrl.trim(),
           cta_label: 'Ver más',
           target_city: targetCity.trim() || null,
-          target_category: targetCategory.trim() || null,
+          target_category: selectedSpecialRunway
+            ? `${targetCategory.trim() ? `${targetCategory.trim()} | ` : ''}Catálogo: ${selectedSpecialRunway.titleEs}`
+            : targetCategory.trim() || null,
           status: 'submitted',
           starts_at: startsAt,
           ends_at: endsAt,
-          price_paid: selectedCampaignPackage.price,
+          price_paid: totalCampaignPrice,
           submitted_at: startsAt,
           clicks_count: 0,
           impressions_count: 0,
@@ -463,8 +518,54 @@ export default function PromotionForm({
         throw orderErr
       }
 
+      // 1.B Si seleccionó una Clasificación Especial de Pasarela / Catálogo Exclusivo, actualizar identificación del artículo y habilitar vendedor
+      if (selectedListingId && selectedListing) {
+        try {
+          const currentAttrs = { ...(selectedListing.attrs || {}) }
+          if (selectedSpecialRunway) {
+            currentAttrs.special_runway_id = selectedSpecialRunway.id
+            currentAttrs.special_runway_title = selectedSpecialRunway.titleEs
+            currentAttrs.special_runway_badge = selectedSpecialRunway.badgeEs
+            currentAttrs.special_catalog_cost = Number(selectedSpecialRunway.campaignCostCop || 0)
+          } else {
+            delete currentAttrs.special_runway_id
+            delete currentAttrs.special_runway_title
+            delete currentAttrs.special_runway_badge
+            delete currentAttrs.special_catalog_cost
+          }
+          await supabase
+            .from('listing')
+            .update({ attrs: currentAttrs })
+            .eq('id', selectedListingId)
+
+          // Sincronizar también en la lista de pasarelas/catálogos exclusivos (habilitar vendedor por pago realizado y asignar artículo)
+          const rawConfig = localStorage.getItem(AD_PAGE_CONFIG_STORAGE_KEY)
+          const baseConfig = rawConfig
+            ? sanitizeAdPageConfig(JSON.parse(rawConfig))
+            : DEFAULT_AD_PAGE_CONFIG
+          const nextCustomRunways = baseConfig.customRunways.map((r) => {
+            const withoutListing = r.assignedListingIds.filter((id) => id !== selectedListingId)
+            if (selectedSpecialRunway && r.id === selectedSpecialRunway.id) {
+              const nextSellers = r.authorizedSellerIds.includes(seller.id)
+                ? r.authorizedSellerIds
+                : [...r.authorizedSellerIds, seller.id]
+              return {
+                ...r,
+                authorizedSellerIds: nextSellers,
+                assignedListingIds: [...withoutListing, selectedListingId],
+              }
+            }
+            return { ...r, assignedListingIds: withoutListing }
+          })
+          const nextConfig = { ...baseConfig, customRunways: nextCustomRunways }
+          localStorage.setItem(AD_PAGE_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig))
+        } catch (syncErr) {
+          console.warn('Aviso sincronizando clasificación de catálogo exclusivo:', syncErr)
+        }
+      }
+
       // 2. Deduct balance from ad_account
-      const newBalance = Math.max(0, currentBalance - selectedCampaignPackage.price)
+      const newBalance = Math.max(0, currentBalance - totalCampaignPrice)
       const { error: accUpdErr } = await supabase
         .from('ad_account')
         .update({ balance: newBalance })
@@ -481,7 +582,7 @@ export default function PromotionForm({
         await supabase.from('wallet_transaction').insert({
           ad_account_id: adAccount.id,
           kind: 'spend',
-          amount: selectedCampaignPackage.price,
+          amount: totalCampaignPrice,
           balance_after: newBalance,
           ref_type: 'ad_order',
           ref_id: orderData.id,
@@ -617,11 +718,14 @@ export default function PromotionForm({
               {locale === 'en' ? 'Individual Plan' : 'Plan Individual'}
             </span>
             <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
-              Pasarela
+              Pasarela + 🏪 Proveedor
             </div>
             <div className="mt-1 text-base font-black text-blue-600 dark:text-blue-400">
               ${PLAN_PASARELA_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-400">COP</span>
             </div>
+            <p className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+              Incluye publicación del proveedor en la Pasarela de Proveedores.
+            </p>
           </div>
 
           {/* Plan Individual: Gran Vitrina */}
@@ -630,14 +734,17 @@ export default function PromotionForm({
               {locale === 'en' ? 'Individual Plan' : 'Plan Individual'}
             </span>
             <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
-              Gran Vitrina
+              Gran Vitrina + 🏪 Proveedor
             </div>
             <div className="mt-1 text-base font-black text-purple-600 dark:text-purple-400">
               ${PLAN_GRAN_VITRINA_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-400">COP</span>
             </div>
+            <p className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+              Incluye publicación del proveedor en la Pasarela de Proveedores.
+            </p>
           </div>
 
-          {/* Plan en Combo: Las dos */}
+          {/* Plan en Combo: Las dos + Proveedor */}
           <div className="rounded-2xl border-2 border-amber-400/80 bg-amber-50/60 p-3.5 dark:border-amber-700 dark:bg-amber-950/30">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
@@ -648,11 +755,14 @@ export default function PromotionForm({
               </span>
             </div>
             <div className="mt-1 font-extrabold text-zinc-900 dark:text-zinc-50">
-              {locale === 'en' ? 'Both (Showcase + Runway)' : 'Las dos (Gran Vitrina + Pasarela)'}
+              {locale === 'en' ? 'Showcase + Runway + Provider' : 'Vitrina + Pasarela + 🏪 Proveedor'}
             </div>
             <div className="mt-1 text-base font-black text-amber-700 dark:text-amber-400">
               ${PLAN_COMBO_PRICE.toLocaleString('es-CO')} <span className="text-[10px] font-bold text-zinc-500">COP</span>
             </div>
+            <p className="mt-0.5 text-[10px] text-amber-900/80 dark:text-amber-200/80">
+              Incluye publicación destacada en la Pasarela de Proveedores.
+            </p>
           </div>
         </div>
       </div>
@@ -1314,6 +1424,45 @@ export default function PromotionForm({
                 </div>
               </div>
 
+              {/* 2.B Clasificación Especial de Pasarela y Catálogo Exclusivo (Lista Administrada) */}
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/40 p-4 dark:border-amber-900/60 dark:bg-amber-950/20 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                      ⭐ 2.B Clasificación de Pasarela y Catálogo Exclusivo (Lista Administrada)
+                    </label>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                      Identifica especialmente el artículo en esta campaña para integrarlo en un <strong>Catálogo Exclusivo</strong> y en su pasarela correspondiente. Un nuevo catálogo conlleva el costo adicional de campaña establecido en administración.
+                    </p>
+                  </div>
+                  {selectedSpecialRunway && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/80 dark:bg-amber-900/70 px-2.5 py-1 text-[10px] font-black text-amber-900 dark:text-amber-200">
+                      +${Number(selectedSpecialRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP (Catálogo Exclusivo)
+                    </span>
+                  )}
+                </div>
+
+                <select
+                  value={selectedSpecialRunwayId}
+                  onChange={(e) => setSelectedSpecialRunwayId(e.target.value)}
+                  className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-zinc-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  <option value="">
+                    — Sin Catálogo Exclusivo adicional (Solo Catálogo General) — $0 COP extra —
+                  </option>
+                  {availableRunways.map((r) => {
+                    const costCop = Number(r.campaignCostCop || 0)
+                    const isExplicitlyAuthorized = (r.authorizedSellerIds || []).includes(seller.id)
+                    return (
+                      <option key={r.id} value={r.id}>
+                        ⭐ {r.titleEs} ({r.badgeEs}) — Costo adicional de catálogo: +${costCop.toLocaleString('es-CO')} COP{' '}
+                        {isExplicitlyAuthorized ? '[✓ Vendedor Habilitado en Admin]' : '[Se habilita al pagar campaña]'}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+
               {/* 3. Creatividad del Anuncio (Headline & Body) */}
               <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800 space-y-4">
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
@@ -1413,9 +1562,16 @@ export default function PromotionForm({
                         <img src={imageUrl} alt="Vista previa del anuncio" className="h-full w-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="inline-block rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-black text-purple-700 uppercase tracking-wider dark:bg-purple-950 dark:text-purple-300">
-                          Patrocinado
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="inline-block rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-black text-purple-700 uppercase tracking-wider dark:bg-purple-950 dark:text-purple-300">
+                            Patrocinado
+                          </span>
+                          {selectedSpecialRunway && (
+                            <span className="inline-block rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 uppercase tracking-wider dark:bg-amber-950 dark:text-amber-300">
+                              ⭐ {selectedSpecialRunway.badgeEs}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
                           {headline || 'Titular de tu anuncio'}
                         </div>
@@ -1459,15 +1615,22 @@ export default function PromotionForm({
 
               {/* Botón de Enviar Campaña */}
               <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-xs text-zinc-500">
-                  Costo: <strong>${Number(selectedCampaignPackage.price).toLocaleString('es-CO')} COP</strong> (se descontará de tu saldo de ${currentBalance.toLocaleString('es-CO')}).
+                <div className="text-xs text-zinc-500 space-y-0.5">
+                  <div>
+                    Costo Total: <strong>${Number(totalCampaignPrice).toLocaleString('es-CO')} COP</strong> (se descontará de tu saldo de ${currentBalance.toLocaleString('es-CO')}).
+                  </div>
+                  {extraCatalogCost > 0 && selectedSpecialRunway && (
+                    <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                      Incluye Plan Base (${Number(selectedCampaignPackage.price).toLocaleString('es-CO')}) + Catálogo Exclusivo &ldquo;{selectedSpecialRunway.titleEs}&rdquo; (+${extraCatalogCost.toLocaleString('es-CO')} COP)
+                    </div>
+                  )}
                 </div>
 
                 <div className="w-full sm:w-auto">
 
                   <button
                     type="submit"
-                    disabled={submittingOrder || uploadingImage || currentBalance < selectedCampaignPackage.price}
+                    disabled={submittingOrder || uploadingImage || currentBalance < totalCampaignPrice}
                     className="w-full sm:w-auto rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                   >
                     {submittingOrder ? (

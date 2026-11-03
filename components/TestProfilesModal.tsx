@@ -12,6 +12,7 @@ import {
   NEW_SELLER_PROFILES,
   TestProfile,
 } from '@/lib/testProfiles'
+import { triggerGlobalNavigationLoader } from './AvantGardeLoader'
 
 interface TestProfilesModalProps {
   isOpen: boolean
@@ -76,13 +77,23 @@ export default function TestProfilesModal({ isOpen, onClose }: TestProfilesModal
     }
   }, [isOpen, onClose])
 
-  // Iniciar sesión con un perfil específico
+  // Iniciar sesión con un perfil específico y abrir la ventana liviana de bienvenida
   const handleLogin = async (profile: TestProfile) => {
     setLoading(true)
     setStatusMsg({
       text: `Iniciando sesión como ${profile.businessName || profile.name}...`,
       type: 'info',
     })
+
+    const welcomeUrl = `/bienvenida?role=${profile.role}&name=${encodeURIComponent(
+      profile.businessName || profile.name
+    )}`
+
+    triggerGlobalNavigationLoader(
+      welcomeUrl,
+      `Bienvenido, ${profile.businessName || profile.name}`,
+      'Cargando tu resumen ejecutivo ligero y herramientas según tu perfil...'
+    )
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -103,15 +114,12 @@ export default function TestProfilesModal({ isOpen, onClose }: TestProfilesModal
       }
 
       setStatusMsg({
-        text: `¡Sesión iniciada con éxito como ${profile.businessName || profile.name}!`,
+        text: `¡Sesión iniciada como ${profile.businessName || profile.name}! Abriendo bienvenida...`,
         type: 'success',
       })
 
-      setTimeout(() => {
-        onClose()
-        router.refresh()
-        window.location.reload()
-      }, 400)
+      onClose()
+      router.push(welcomeUrl)
     } catch (err: any) {
       setStatusMsg({
         text: err?.message || 'Error al conectar perfil',

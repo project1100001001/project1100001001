@@ -21,25 +21,27 @@ const ThemeContext = createContext<ThemeContextType>({
 const STORAGE_KEY = 'marketplace_theme'
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'system'
+  const [theme, setThemeState] = useState<Theme>('system')
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
+  const [initialized, setInitialized] = useState(false)
+
+  // Cargar preferencia guardada al montar en el cliente (evita mismatch de hidratación SSR)
+  useEffect(() => {
+    let initialTheme: Theme = 'system'
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
       if (saved === 'light' || saved === 'dark' || saved === 'system') {
-        return saved
+        initialTheme = saved
       }
     } catch {
       // Ignore storage errors
     }
-    return 'system'
-  })
-
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'light'
-    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-  })
+    setThemeState(initialTheme)
+    setInitialized(true)
+  }, [])
 
   useEffect(() => {
+    if (!initialized) return
     const root = document.documentElement
 
     const applyTheme = (currentTheme: Theme) => {
@@ -75,7 +77,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [theme])
+  }, [theme, initialized])
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme)
