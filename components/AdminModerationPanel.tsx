@@ -19,6 +19,7 @@ import {
   OFFICIAL_AD_PLANS,
   FREE_INITIAL_AD_DAYS,
   resolveAdOrderPlacement,
+  extractSeasonalRunwayMeta,
   getListingFreeTrialStatus,
   buildInitialFreeAdAttrs,
   getAdOrderTimeStatus,
@@ -474,9 +475,17 @@ export default function AdminModerationPanel({
       const { data: { user } } = await supabase.auth.getUser()
       const now = new Date()
       const targetAd = adOrders.find((a) => a.id === adOrderId)
-      const durationDays = targetAd?.package?.duration_days || 7
-      const startsAt = targetAd?.starts_at || now.toISOString()
-      const endsAt = targetAd?.ends_at || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+      const seasonalMeta = extractSeasonalRunwayMeta(targetAd)
+      const matchedSeasonalRunway = seasonalMeta.specialRunwayId
+        ? (liveAdPageConfig.customRunways || []).find((r) => r.id === seasonalMeta.specialRunwayId)
+        : null
+
+      const durationDays =
+        seasonalMeta.isSeasonalOnly && matchedSeasonalRunway?.defaultDurationDays
+          ? Number(matchedSeasonalRunway.defaultDurationDays)
+          : targetAd?.package?.duration_days || 7
+      const startsAt = now.toISOString()
+      const endsAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString()
 
       const { error } = await supabase
         .from('ad_order')
@@ -491,6 +500,67 @@ export default function AdminModerationPanel({
         .eq('id', adOrderId)
 
       if (error) throw error
+
+      // Si la campaña incluye o es exclusivamente una Pasarela de Temporada, activarla con las mismas condiciones que las pasarelas originales
+      if (seasonalMeta.specialRunwayId && targetAd) {
+        const runwayId = seasonalMeta.specialRunwayId
+        const sellerId =
+          targetAd.listing?.seller_id || targetAd.ad_account?.advertiser?.seller_id || null
+        const listingId = targetAd.listing_id || null
+
+        if (listingId) {
+          const baseAttrs = targetAd.listing?.attrs || {}
+          const resolved = resolveAdOrderPlacement(targetAd)
+          const nextAttrs: Record<string, any> = {
+            ...baseAttrs,
+            ad_placement: seasonalMeta.isSeasonalOnly ? 'pasarela_temporada' : resolved.placement,
+            special_runway_id: runwayId,
+            special_runway_title:
+              matchedSeasonalRunway?.title ||
+              seasonalMeta.specialRunwayTitle ||
+              baseAttrs.special_runway_title,
+            special_runway_badge: matchedSeasonalRunway
+              ? `${matchedSeasonalRunway.icon} ${matchedSeasonalRunway.badge}`
+              : baseAttrs.special_runway_badge,
+            runway_independent_status: {
+              ...(baseAttrs.runway_independent_status || {}),
+              customRunways: {
+                ...(baseAttrs.runway_independent_status?.customRunways || {}),
+                [runwayId]: {
+                  enabled: true,
+                  endsAt,
+                },
+              },
+            },
+          }
+          try {
+            await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', listingId)
+          } catch {
+            // Ignorar si falla actualización secundaria
+          }
+          setListings((prev) =>
+            prev.map((l) => (l.id === listingId ? { ...l, attrs: nextAttrs } : l))
+          )
+        }
+
+        const nextRunways = (liveAdPageConfig.customRunways || []).map((r) => {
+          if (r.id !== runwayId) return r
+          const assigned = new Set(r.assignedListingIds || [])
+          const authorized = new Set(r.authorizedSellerIds || [])
+          if (listingId) assigned.add(listingId)
+          if (sellerId) authorized.add(sellerId)
+          return {
+            ...r,
+            active: true,
+            assignedListingIds: Array.from(assigned),
+            authorizedSellerIds: Array.from(authorized),
+          }
+        })
+        await persistLiveAdPageConfig({
+          ...liveAdPageConfig,
+          customRunways: nextRunways,
+        })
+      }
 
       setAdOrders((prev) =>
         prev.map((item) =>
@@ -508,7 +578,11 @@ export default function AdminModerationPanel({
         )
       )
 
-      showToast('Campaña publicitaria aprobada y activada (live) exitosamente.')
+      showToast(
+        seasonalMeta.specialRunwayId
+          ? `Campaña y Pasarela de Temporada "${matchedSeasonalRunway?.title || seasonalMeta.specialRunwayTitle || 'Especial'}" activadas (live) exitosamente.`
+          : 'Campaña publicitaria aprobada y activada (live) exitosamente.'
+      )
     } catch (err: any) {
       showToast(err.message || 'Error al aprobar la campaña publicitaria', 'error')
     } finally {
@@ -1070,7 +1144,32 @@ export default function AdminModerationPanel({
       }
       setTransactions((prev) => [newTxRecord, ...prev])
 
-      showToast(`Recarga aprobada exitosamente. Se acreditaron $${Number(req.amount).toLocaleString('es-CO')} COP.`)
+      // Si el pago aprobado corresponde a una Pasarela de Temporada (sola o combinada), habilitar automáticamente al vendedor en esa pasarela
+      const rechargeSeasonalMeta = extractSeasonalRunwayMeta({
+        target_category: req.notes || null,
+      })
+      if (rechargeSeasonalMeta.specialRunwayId && req.seller_id) {
+        const nextRunways = (liveAdPageConfig.customRunways || []).map((r) => {
+          if (r.id !== rechargeSeasonalMeta.specialRunwayId) return r
+          const authorized = new Set(r.authorizedSellerIds || [])
+          authorized.add(req.seller_id)
+          return {
+            ...r,
+            active: true,
+            authorizedSellerIds: Array.from(authorized),
+          }
+        })
+        await persistLiveAdPageConfig({
+          ...liveAdPageConfig,
+          customRunways: nextRunways,
+        })
+      }
+
+      showToast(
+        rechargeSeasonalMeta.specialRunwayId
+          ? `Recarga aprobada ($${Number(req.amount).toLocaleString('es-CO')} COP) y vendedor habilitado en Pasarela de Temporada.`
+          : `Recarga aprobada exitosamente. Se acreditaron $${Number(req.amount).toLocaleString('es-CO')} COP.`
+      )
     } catch (err: any) {
       showToast(err.message || 'Error al aprobar la recarga', 'error')
     } finally {

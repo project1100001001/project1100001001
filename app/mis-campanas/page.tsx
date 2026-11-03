@@ -148,7 +148,7 @@ export default async function MisCampanasPage() {
   // 4. Obtener todos los listings del vendedor
   const { data: sellerListings } = await supabase
     .from('listing')
-    .select('id, title, status, price, category_id, seller_id')
+    .select('id, title, status, price, category_id, seller_id, city, description, type, attrs, listing_media(*)')
     .in('seller_id', sellerIds)
 
   const sellerListingIds = (sellerListings || []).map((l) => l.id)
@@ -247,8 +247,36 @@ export default async function MisCampanasPage() {
       contacts = Math.floor(Math.random() * 5 + 4)
     }
 
+    const listingOverride = (o.listing as any)?.attrs?.campaign_overrides?.[o.id]
+
     return {
       ...o,
+      ...(listingOverride
+        ? {
+            headline: listingOverride.headline ?? o.headline,
+            body: listingOverride.body !== undefined ? listingOverride.body : o.body,
+            image_url:
+              listingOverride.image_url !== undefined
+                ? listingOverride.image_url
+                : o.image_url,
+            listing_id:
+              listingOverride.listing_id !== undefined
+                ? listingOverride.listing_id
+                : o.listing_id,
+            target_city:
+              listingOverride.target_city !== undefined
+                ? listingOverride.target_city
+                : o.target_city,
+            target_category:
+              listingOverride.target_category !== undefined
+                ? listingOverride.target_category
+                : o.target_category,
+            cta_label:
+              listingOverride.cta_label !== undefined
+                ? listingOverride.cta_label
+                : o.cta_label,
+          }
+        : {}),
       clicks_count: clicks,
       impressions_count: impressions,
       contacts_count: contacts,
@@ -277,7 +305,7 @@ export default async function MisCampanasPage() {
             <span>Mis Campañas Publicitarias</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Supervisa el tiempo restante, clics generados, contactos de WhatsApp y resultados comerciales de tus anuncios en la vitrina.
+            Visualiza y edita los campos de tus campañas (incluida la imagen cargada) y supervisa el tiempo restante, clics generados y contactos de WhatsApp.
           </p>
         </div>
 
@@ -285,6 +313,8 @@ export default async function MisCampanasPage() {
           initialOrders={enrichedOrders}
           balance={balance}
           advertiserName={advertisers?.[0]?.legal_name || sellers[0].business_name}
+          userId={user.id}
+          sellerListings={sellerListings || []}
         />
       </div>
     </main>

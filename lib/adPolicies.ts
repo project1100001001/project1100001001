@@ -15,7 +15,12 @@ export const PLAN_COMBO_SAVINGS =
 
 export const MIN_AD_PLAN_PRICE = PLAN_PASARELA_PRICE // $10.000 COP
 
-export type AdPlacementType = 'pasarela' | 'gran_vitrina' | 'combo' | 'free_initial'
+export type AdPlacementType =
+  | 'pasarela'
+  | 'gran_vitrina'
+  | 'combo'
+  | 'pasarela_temporada'
+  | 'free_initial'
 
 export interface OfficialAdPlan extends AdPackage {
   code: 'plan_pasarela' | 'plan_gran_vitrina' | 'plan_combo_ambas'
@@ -167,11 +172,114 @@ export function normalizeToOfficialPackages(dbPackages?: AdPackage[] | null): Of
 }
 
 /**
+ * Extrae metadatos de Pasarela de Temporada desde target_category o attrs de la publicación
+ */
+export function extractSeasonalRunwayMeta(adOrderOrItem?: {
+  target_category?: string | null
+  attrs?: Record<string, any> | null
+  listing?: { attrs?: Record<string, any> | null } | null
+} | null): {
+  isSeasonalOnly: boolean
+  specialRunwayId: string | null
+  specialRunwayTitle: string | null
+  combinedBasePlacement: AdPlacementType | null
+} {
+  if (!adOrderOrItem) {
+    return {
+      isSeasonalOnly: false,
+      specialRunwayId: null,
+      specialRunwayTitle: null,
+      combinedBasePlacement: null,
+    }
+  }
+
+  const targetCat = String(adOrderOrItem.target_category || '').trim()
+  const attrs = adOrderOrItem.listing?.attrs || adOrderOrItem.attrs || {}
+
+  // Formato 1: [SOLO_TEMPORADA:runway_id] Título de la pasarela
+  const soloMatch = targetCat.match(/^\[SOLO_TEMPORADA:([^\]]+)\]\s*(.*)$/)
+  if (soloMatch) {
+    return {
+      isSeasonalOnly: true,
+      specialRunwayId: soloMatch[1].trim() || attrs.special_runway_id || null,
+      specialRunwayTitle: soloMatch[2].trim() || attrs.special_runway_title || null,
+      combinedBasePlacement: null,
+    }
+  }
+
+  // Formato 2: [PLAN_MAS_TEMPORADA:runway_id:base_placement] Título de la pasarela
+  const combinedMatch = targetCat.match(/^\[PLAN_MAS_TEMPORADA:([^:\]]+)(?::([^\]]+))?\]\s*(.*)$/)
+  if (combinedMatch) {
+    const rawBase = (combinedMatch[2] || '').trim() as AdPlacementType
+    const validBase: AdPlacementType | null =
+      rawBase === 'combo' || rawBase === 'gran_vitrina' || rawBase === 'pasarela'
+        ? rawBase
+        : null
+    return {
+      isSeasonalOnly: false,
+      specialRunwayId: combinedMatch[1].trim() || attrs.special_runway_id || null,
+      specialRunwayTitle: combinedMatch[3].trim() || attrs.special_runway_title || null,
+      combinedBasePlacement: validBase,
+    }
+  }
+
+  // Formato 3 (retrocompatible): [PASARELA_ESPECIAL:runway_id] Título
+  const legacyMatch = targetCat.match(/^\[PASARELA_ESPECIAL:([^\]]+)\]\s*(.*)$/)
+  if (legacyMatch) {
+    const isOnly = attrs.ad_placement === 'pasarela_temporada'
+    return {
+      isSeasonalOnly: isOnly,
+      specialRunwayId: legacyMatch[1].trim() || attrs.special_runway_id || null,
+      specialRunwayTitle: legacyMatch[2].trim() || attrs.special_runway_title || null,
+      combinedBasePlacement:
+        attrs.ad_placement === 'combo' ||
+        attrs.ad_placement === 'gran_vitrina' ||
+        attrs.ad_placement === 'pasarela'
+          ? attrs.ad_placement
+          : null,
+    }
+  }
+
+  if (attrs.ad_placement === 'pasarela_temporada') {
+    return {
+      isSeasonalOnly: true,
+      specialRunwayId: attrs.special_runway_id || null,
+      specialRunwayTitle: attrs.special_runway_title || null,
+      combinedBasePlacement: null,
+    }
+  }
+
+  if (attrs.special_runway_id) {
+    return {
+      isSeasonalOnly: false,
+      specialRunwayId: String(attrs.special_runway_id),
+      specialRunwayTitle: attrs.special_runway_title ? String(attrs.special_runway_title) : null,
+      combinedBasePlacement:
+        attrs.ad_placement === 'combo' ||
+        attrs.ad_placement === 'gran_vitrina' ||
+        attrs.ad_placement === 'pasarela'
+          ? attrs.ad_placement
+          : null,
+    }
+  }
+
+  return {
+    isSeasonalOnly: false,
+    specialRunwayId: null,
+    specialRunwayTitle: null,
+    combinedBasePlacement: null,
+  }
+}
+
+/**
  * Determina qué plan y ubicación corresponde a una orden publicitaria o paquete
  */
 export function resolveAdOrderPlacement(adOrderOrPkg: {
   package_id?: string | null
   price_paid?: number | null
+  target_category?: string | null
+  attrs?: Record<string, any> | null
+  listing?: { attrs?: Record<string, any> | null } | null
   package?: { id?: string; name?: string; slot_id?: string; price?: number } | null
 }): {
   placement: AdPlacementType
@@ -183,6 +291,63 @@ export function resolveAdOrderPlacement(adOrderOrPkg: {
   const pkgName = (adOrderOrPkg.package?.name || '').toLowerCase()
   const slotId = adOrderOrPkg.package?.slot_id || ''
   const pricePaid = Number(adOrderOrPkg.price_paid ?? adOrderOrPkg.package?.price ?? 0)
+  const seasonalMeta = extractSeasonalRunwayMeta(adOrderOrPkg)
+
+  // 1. Si contrató ÚNICAMENTE una Pasarela de Temporada / Adicional (sin plan original)
+  if (seasonalMeta.isSeasonalOnly) {
+    const seasonalPrice =
+      pricePaid > 0
+        ? pricePaid
+        : Number(
+            adOrderOrPkg.listing?.attrs?.special_catalog_cost ||
+              adOrderOrPkg.attrs?.special_catalog_cost ||
+              15000
+          )
+    const titleLabel = seasonalMeta.specialRunwayTitle
+      ? `: ${seasonalMeta.specialRunwayTitle}`
+      : ''
+    return {
+      placement: 'pasarela_temporada',
+      planLabelEs: `🎄 Plan Pasarela de Temporada${titleLabel} ($${seasonalPrice.toLocaleString('es-CO')})`,
+      planLabelEn: `🎄 Seasonal Runway Plan${titleLabel} ($${seasonalPrice.toLocaleString('en-US')})`,
+      price: seasonalPrice,
+    }
+  }
+
+  // 2. Si combinó un Plan Original + Pasarela de Temporada
+  if (seasonalMeta.combinedBasePlacement && seasonalMeta.specialRunwayId) {
+    const basePlacement = seasonalMeta.combinedBasePlacement
+    const seasonalSuffixEs = seasonalMeta.specialRunwayTitle
+      ? ` + 🎄 ${seasonalMeta.specialRunwayTitle}`
+      : ' + 🎄 Pasarela de Temporada'
+    const seasonalSuffixEn = seasonalMeta.specialRunwayTitle
+      ? ` + 🎄 ${seasonalMeta.specialRunwayTitle}`
+      : ' + 🎄 Seasonal Runway'
+    const totalPaid = pricePaid > 0 ? pricePaid : PLAN_PASARELA_PRICE
+
+    if (basePlacement === 'combo') {
+      return {
+        placement: 'combo',
+        planLabelEs: `🔥 Plan en Combo${seasonalSuffixEs} ($${totalPaid.toLocaleString('es-CO')})`,
+        planLabelEn: `🔥 Combo Plan${seasonalSuffixEn} ($${totalPaid.toLocaleString('en-US')})`,
+        price: totalPaid,
+      }
+    }
+    if (basePlacement === 'gran_vitrina') {
+      return {
+        placement: 'gran_vitrina',
+        planLabelEs: `✨ Gran Vitrina${seasonalSuffixEs} ($${totalPaid.toLocaleString('es-CO')})`,
+        planLabelEn: `✨ Grand Showcase${seasonalSuffixEn} ($${totalPaid.toLocaleString('en-US')})`,
+        price: totalPaid,
+      }
+    }
+    return {
+      placement: 'pasarela',
+      planLabelEs: `🛍️ Pasarela${seasonalSuffixEs} ($${totalPaid.toLocaleString('es-CO')})`,
+      planLabelEn: `🛍️ Runway${seasonalSuffixEn} ($${totalPaid.toLocaleString('en-US')})`,
+      price: totalPaid,
+    }
+  }
 
   if (pricePaid === 0 || slotId === 'free.initial' || pkgName.includes('gratis')) {
     return {
@@ -198,7 +363,7 @@ export function resolveAdOrderPlacement(adOrderOrPkg: {
     pkgName.includes('combo') ||
     slotId === 'category.banner' ||
     pricePaid === PLAN_COMBO_PRICE ||
-    pricePaid >= 25000
+    (pricePaid >= 25000 && !seasonalMeta.specialRunwayId)
   ) {
     return {
       placement: 'combo',
@@ -469,6 +634,27 @@ export function resolveIndependentRunwayStates(
   const defaultProveedores = true
 
   const customRunwaysMap: Record<string, IndependentMediumItemState> = {}
+
+  // Si la campaña o publicación contrató una Pasarela de Temporada / Especial, se activa por defecto con la misma vigencia
+  const defaultSpecialRunwayId = orderOrListing.attrs?.special_runway_id
+    ? String(orderOrListing.attrs.special_runway_id)
+    : null
+  if (defaultSpecialRunwayId) {
+    const endMs = new Date(baseEndsAt).getTime()
+    const validEndMs = isNaN(endMs)
+      ? Date.now() + FREE_INITIAL_AD_DAYS * 24 * 60 * 60 * 1000
+      : endMs
+    const diffMs = validEndMs - Date.now()
+    customRunwaysMap[defaultSpecialRunwayId] = {
+      enabled: diffMs > 0,
+      endsAt: new Date(validEndMs).toISOString(),
+      daysRemaining: diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0,
+      hoursRemaining:
+        diffMs > 0 ? Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) : 0,
+      isExpired: diffMs <= 0,
+    }
+  }
+
   if (itemOverrides.customRunways && typeof itemOverrides.customRunways === 'object') {
     for (const [rId, rVal] of Object.entries(itemOverrides.customRunways as Record<string, any>)) {
       const endMs = new Date(rVal?.endsAt || baseEndsAt).getTime()

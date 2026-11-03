@@ -343,10 +343,28 @@ CREATE POLICY "ad_order_admin_update"
       WHERE a.id = ad_order.ad_account_id
         AND s.owner_user_id = auth.uid()
     )
+    OR EXISTS (
+      SELECT 1 FROM public.listing l
+      JOIN public.seller s ON s.id = l.seller_id
+      WHERE l.id = ad_order.listing_id
+        AND s.owner_user_id = auth.uid()
+    )
   )
   WITH CHECK (
     public.is_admin()
-    OR status IN ('draft', 'submitted', 'paused')
+    OR EXISTS (
+      SELECT 1 FROM public.ad_account a
+      JOIN public.advertiser adv ON adv.id = a.advertiser_id
+      JOIN public.seller s ON s.id = adv.seller_id
+      WHERE a.id = ad_order.ad_account_id
+        AND s.owner_user_id = auth.uid()
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.listing l
+      JOIN public.seller s ON s.id = l.seller_id
+      WHERE l.id = ad_order.listing_id
+        AND s.owner_user_id = auth.uid()
+    )
   );
 
 -- wallet_transaction

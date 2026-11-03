@@ -73,12 +73,26 @@ export default function PromotionForm({
     initialRechargeRequests || []
   )
 
-  // Package for recharge
+  // Lista administrada de Clasificaciones de Pasarela y Catálogos Exclusivos
+  const [availableRunways, setAvailableRunways] = useState<DynamicRunwayConfig[]>(
+    DEFAULT_AD_PAGE_CONFIG.customRunways
+  )
+
+  // Package & Seasonal Runway for recharge (Tab 1)
+  // Permite elegir un Plan Original, o 'none' (Solo Pasarela de Temporada), o sumar ambos
   const [selectedRechargePackageId, setSelectedRechargePackageId] = useState<string>(
     packages[0]?.id || ''
   )
+  const [selectedRechargeRunwayId, setSelectedRechargeRunwayId] = useState<string>('')
   const selectedRechargePackage =
-    packages.find((p) => p.id === selectedRechargePackageId) || packages[0]
+    selectedRechargePackageId === 'none'
+      ? null
+      : packages.find((p) => p.id === selectedRechargePackageId) || packages[0] || null
+  const selectedRechargeRunway =
+    availableRunways.find((r) => r.id === selectedRechargeRunwayId) || null
+  const rechargeAmountCop =
+    (selectedRechargePackage ? Number(selectedRechargePackage.price || 0) : 0) +
+    (selectedRechargeRunway ? Number(selectedRechargeRunway.campaignCostCop || 0) : 0)
 
   // Payment proof form state
   const [paymentMethod, setPaymentMethod] = useState<'nequi' | 'daviplata' | 'bancolombia' | 'transferencia' | 'efectivo'>('nequi')
@@ -90,24 +104,24 @@ export default function PromotionForm({
   const [rechargeSuccessMsg, setRechargeSuccessMsg] = useState<string | null>(null)
   const [rechargeErrorMsg, setRechargeErrorMsg] = useState<string | null>(null)
 
-  // Campaign builder state
+  // Campaign builder state (Tab 2)
+  // Permite elegir un Plan Original, o 'none' (Solo Pasarela de Temporada), o sumar ambos
   const [selectedCampaignPackageId, setSelectedCampaignPackageId] = useState<string>(
     packages[0]?.id || ''
   )
   const selectedCampaignPackage =
-    packages.find((p) => p.id === selectedCampaignPackageId) || packages[0]
+    selectedCampaignPackageId === 'none'
+      ? null
+      : packages.find((p) => p.id === selectedCampaignPackageId) || null
 
   const [selectedListingId, setSelectedListingId] = useState<string>(
     preselectedListingId || (publishedListings[0]?.id || '')
   )
   const selectedListing = publishedListings.find((l) => l.id === selectedListingId)
 
-  // Lista administrada de Clasificaciones de Pasarela y Catálogos Exclusivos
-  const [availableRunways, setAvailableRunways] = useState<DynamicRunwayConfig[]>(
-    DEFAULT_AD_PAGE_CONFIG.customRunways
-  )
   const [selectedSpecialRunwayId, setSelectedSpecialRunwayId] = useState<string>('')
-  const selectedSpecialRunway = availableRunways.find((r) => r.id === selectedSpecialRunwayId)
+  const selectedSpecialRunway =
+    availableRunways.find((r) => r.id === selectedSpecialRunwayId) || null
 
   const [headline, setHeadline] = useState('')
   const [body, setBody] = useState('')
@@ -126,8 +140,18 @@ export default function PromotionForm({
   const tabFromUrl = searchParams ? searchParams.get('tab') : null
 
   const currentBalance = adAccount?.balance || 0
-  const minRequiredPrice = packages[0]?.price || MIN_AD_PLAN_PRICE
-  const hasApprovedBalance = currentBalance >= minRequiredPrice
+  const minSeasonalCost =
+    availableRunways.length > 0
+      ? Math.min(
+          ...availableRunways
+            .filter((r) => r.active !== false && Number(r.campaignCostCop) > 0)
+            .map((r) => Number(r.campaignCostCop))
+        )
+      : MIN_AD_PLAN_PRICE
+  const minRequiredPrice = Math.min(
+    packages[0]?.price || MIN_AD_PLAN_PRICE,
+    Number.isFinite(minSeasonalCost) && minSeasonalCost > 0 ? minSeasonalCost : MIN_AD_PLAN_PRICE
+  )
 
   const [activeTab, setActiveTab] = useState<'recharge' | 'campaign'>(() => {
     if (initialTab) return initialTab
@@ -188,6 +212,9 @@ export default function PromotionForm({
       }
       if (selectedListing.attrs?.special_runway_id) {
         setSelectedSpecialRunwayId(String(selectedListing.attrs.special_runway_id))
+        if (selectedListing.attrs?.ad_placement === 'pasarela_temporada') {
+          setSelectedCampaignPackageId('none')
+        }
       } else {
         setSelectedSpecialRunwayId('')
       }
@@ -357,9 +384,9 @@ export default function PromotionForm({
       return
     }
 
-    const amountToRecharge = selectedRechargePackage ? selectedRechargePackage.price : 0
+    const amountToRecharge = rechargeAmountCop
     if (amountToRecharge <= 0) {
-      setRechargeErrorMsg('Selecciona un paquete publicitario válido.')
+      setRechargeErrorMsg('Selecciona un Plan Original, una Pasarela de Temporada, o ambos para recargar.')
       return
     }
 
@@ -368,6 +395,20 @@ export default function PromotionForm({
       return
     }
 
+    const rTitle =
+      selectedRechargeRunway?.title ||
+      (selectedRechargeRunway as any)?.titleEs ||
+      'Pasarela de Temporada'
+    const planSummaryPrefix =
+      !selectedRechargePackage && selectedRechargeRunway
+        ? `[SOLO_TEMPORADA:${selectedRechargeRunway.id}] Solo Pasarela de Temporada: ${rTitle}`
+        : selectedRechargePackage && selectedRechargeRunway
+        ? `[PLAN_MAS_TEMPORADA:${selectedRechargeRunway.id}:${selectedRechargePackage.placement}] ${selectedRechargePackage.name} + Pasarela: ${rTitle}`
+        : ''
+    const combinedRechargeNotes = [planSummaryPrefix, rechargeNotes.trim()]
+      .filter(Boolean)
+      .join(' | ')
+
     setSubmittingRecharge(true)
     try {
       const { data: newReq, error: reqErr } = await supabase
@@ -375,12 +416,12 @@ export default function PromotionForm({
         .insert({
           ad_account_id: adAccount.id,
           seller_id: seller.id,
-          package_id: selectedRechargePackage?.id || null,
+          package_id: selectedRechargePackage?.id || packages[0]?.id || null,
           amount: amountToRecharge,
           payment_method: paymentMethod,
           reference_code: referenceCode.trim() || null,
           proof_image_url: proofImageUrl.trim() || null,
-          notes: rechargeNotes.trim() || null,
+          notes: combinedRechargeNotes || null,
           status: 'pending',
         })
         .select(`
@@ -393,7 +434,7 @@ export default function PromotionForm({
 
       setRechargeRequests((prev) => [newReq as AdRechargeRequest, ...prev])
       setRechargeSuccessMsg(
-        `¡Comprobante enviado con éxito! Tu solicitud de recarga por $${amountToRecharge.toLocaleString('es-CO')} COP está pendiente de aprobación por el administrador. En cuanto sea verificada, tu saldo se acreditará y la configuración de campaña se habilitará automáticamente.`
+        `¡Comprobante enviado con éxito! Tu solicitud de recarga por $${amountToRecharge.toLocaleString('es-CO')} COP está pendiente de aprobación por el administrador. En cuanto sea verificada, tu saldo se acreditará y la pasarela se activará con las mismas condiciones vigentes.`
       )
       setReferenceCode('')
       setProofImageUrl('')
@@ -442,9 +483,10 @@ export default function PromotionForm({
     }
   }
 
-  // Costo adicional por Catálogo Exclusivo (según la clasificación seleccionada en la lista administrada)
+  // Costo de Plan Original (puede ser $0 si el usuario eligió únicamente Pasarela de Temporada) + Costo de Pasarela de Temporada
+  const basePlanCost = selectedCampaignPackage ? Number(selectedCampaignPackage.price || 0) : 0
   const extraCatalogCost = selectedSpecialRunway ? Number(selectedSpecialRunway.campaignCostCop || 0) : 0
-  const totalCampaignPrice = (selectedCampaignPackage?.price || 0) + extraCatalogCost
+  const totalCampaignPrice = basePlanCost + extraCatalogCost
 
   // Submit Campaign Order (with approved balance)
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -456,8 +498,10 @@ export default function PromotionForm({
       return
     }
 
-    if (!selectedCampaignPackage) {
-      setOrderErrorMsg('Debes seleccionar un paquete publicitario.')
+    if (!selectedCampaignPackage && !selectedSpecialRunway) {
+      setOrderErrorMsg(
+        'Debes elegir un Plan Original, una Pasarela de Temporada / Adicional, o ambos.'
+      )
       return
     }
 
@@ -471,10 +515,16 @@ export default function PromotionForm({
       return
     }
 
-    // Strict balance check (Plan Base + Costo Adicional de Catálogo Exclusivo si aplica)
+    // Strict balance check (Plan Original si aplica + Pasarela de Temporada si aplica)
     if (currentBalance < totalCampaignPrice) {
+      const breakdownText =
+        selectedCampaignPackage && selectedSpecialRunway
+          ? `Plan ${selectedCampaignPackage.name} $${basePlanCost.toLocaleString('es-CO')} + Pasarela de Temporada $${extraCatalogCost.toLocaleString('es-CO')}`
+          : selectedSpecialRunway
+          ? `Solo Pasarela de Temporada $${extraCatalogCost.toLocaleString('es-CO')}`
+          : `Plan ${selectedCampaignPackage?.name} $${basePlanCost.toLocaleString('es-CO')}`
       setOrderErrorMsg(
-        `Saldo insuficiente. Cuentas con $${currentBalance.toLocaleString('es-CO')} COP y el costo total de la campaña es $${totalCampaignPrice.toLocaleString('es-CO')} COP (Plan $${selectedCampaignPackage.price.toLocaleString('es-CO')}${extraCatalogCost > 0 ? ` + Catálogo Exclusivo $${extraCatalogCost.toLocaleString('es-CO')}` : ''}). Por favor recarga saldo en el Paso 1 y espera la aprobación del administrador.`
+        `Saldo insuficiente. Cuentas con $${currentBalance.toLocaleString('es-CO')} COP y el costo total de la campaña es $${totalCampaignPrice.toLocaleString('es-CO')} COP (${breakdownText}). Por favor recarga saldo en el Paso 1 y espera la aprobación del administrador.`
       )
       return
     }
@@ -482,26 +532,48 @@ export default function PromotionForm({
     setSubmittingOrder(true)
 
     try {
+      const effectiveDurationDays = selectedCampaignPackage
+        ? Number(selectedCampaignPackage.duration_days || 7)
+        : Number(selectedSpecialRunway?.defaultDurationDays || 7)
       const startsAt = new Date().toISOString()
       const endsAt = new Date(
-        Date.now() + selectedCampaignPackage.duration_days * 24 * 60 * 60 * 1000
+        Date.now() + effectiveDurationDays * 24 * 60 * 60 * 1000
       ).toISOString()
+
+      const specialTitle =
+        selectedSpecialRunway?.title ||
+        (selectedSpecialRunway as any)?.titleEs ||
+        'Pasarela de Temporada'
+      const specialBadge = selectedSpecialRunway
+        ? `${selectedSpecialRunway.icon || '🎄'} ${
+            selectedSpecialRunway.badge || (selectedSpecialRunway as any).badgeEs || 'Temporada'
+          }`
+        : ''
+
+      const resolvedTargetCategory =
+        !selectedCampaignPackage && selectedSpecialRunway
+          ? `[SOLO_TEMPORADA:${selectedSpecialRunway.id}] ${specialTitle}${
+              targetCategory.trim() ? ` | ${targetCategory.trim()}` : ''
+            }`
+          : selectedCampaignPackage && selectedSpecialRunway
+          ? `[PLAN_MAS_TEMPORADA:${selectedSpecialRunway.id}:${selectedCampaignPackage.placement}] ${specialTitle}${
+              targetCategory.trim() ? ` | ${targetCategory.trim()}` : ''
+            }`
+          : targetCategory.trim() || null
 
       // 1. Insert ad_order with status 'submitted'
       const { data: orderData, error: orderErr } = await supabase
         .from('ad_order')
         .insert({
           ad_account_id: adAccount.id,
-          package_id: selectedCampaignPackage.id,
+          package_id: selectedCampaignPackage?.id || packages[0]?.id,
           listing_id: selectedListingId || null,
           headline: headline.trim(),
           body: body.trim() || null,
           image_url: imageUrl.trim(),
           cta_label: 'Ver más',
           target_city: targetCity.trim() || null,
-          target_category: selectedSpecialRunway
-            ? `${targetCategory.trim() ? `${targetCategory.trim()} | ` : ''}Catálogo: ${selectedSpecialRunway.titleEs}`
-            : targetCategory.trim() || null,
+          target_category: resolvedTargetCategory,
           status: 'submitted',
           starts_at: startsAt,
           ends_at: endsAt,
@@ -518,15 +590,30 @@ export default function PromotionForm({
         throw orderErr
       }
 
-      // 1.B Si seleccionó una Clasificación Especial de Pasarela / Catálogo Exclusivo, actualizar identificación del artículo y habilitar vendedor
+      // 1.B Actualizar ubicación y/o Pasarela de Temporada en el artículo y sincronizar con las mismas condiciones que las pasarelas originales
       if (selectedListingId && selectedListing) {
         try {
-          const currentAttrs = { ...(selectedListing.attrs || {}) }
+          const currentAttrs: Record<string, any> = { ...(selectedListing.attrs || {}) }
+          currentAttrs.ad_placement =
+            !selectedCampaignPackage && selectedSpecialRunway
+              ? 'pasarela_temporada'
+              : selectedCampaignPackage?.placement || 'pasarela'
+
           if (selectedSpecialRunway) {
             currentAttrs.special_runway_id = selectedSpecialRunway.id
-            currentAttrs.special_runway_title = selectedSpecialRunway.titleEs
-            currentAttrs.special_runway_badge = selectedSpecialRunway.badgeEs
-            currentAttrs.special_catalog_cost = Number(selectedSpecialRunway.campaignCostCop || 0)
+            currentAttrs.special_runway_title = specialTitle
+            currentAttrs.special_runway_badge = specialBadge
+            currentAttrs.special_catalog_cost = extraCatalogCost
+            currentAttrs.runway_independent_status = {
+              ...(currentAttrs.runway_independent_status || {}),
+              customRunways: {
+                ...(currentAttrs.runway_independent_status?.customRunways || {}),
+                [selectedSpecialRunway.id]: {
+                  enabled: true,
+                  endsAt,
+                },
+              },
+            }
           } else {
             delete currentAttrs.special_runway_id
             delete currentAttrs.special_runway_title
@@ -557,8 +644,19 @@ export default function PromotionForm({
             }
             return { ...r, assignedListingIds: withoutListing }
           })
-          const nextConfig = { ...baseConfig, customRunways: nextCustomRunways }
+          const nextConfig = sanitizeAdPageConfig({
+            ...baseConfig,
+            customRunways: nextCustomRunways,
+            updatedAt: new Date().toISOString(),
+          })
           localStorage.setItem(AD_PAGE_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig))
+          window.dispatchEvent(new CustomEvent('ad-page-config-updated', { detail: nextConfig }))
+          try {
+            const encodedSlot = encodeAdPageConfigToSlot(nextConfig)
+            await supabase.from('ad_slot').upsert([encodedSlot], { onConflict: 'id' })
+          } catch {
+            // Ignorar si tabla ad_slot no requiere actualización
+          }
         } catch (syncErr) {
           console.warn('Aviso sincronizando clasificación de catálogo exclusivo:', syncErr)
         }
@@ -614,45 +712,95 @@ export default function PromotionForm({
           ¡Campaña Publicitaria Creada!
         </h2>
         <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-          Tu anuncio ha sido recibido y enviado a revisión de creatividad (estado <strong>submitted</strong>).
-          El monto de la campaña fue debitado de tu saldo aprobado.
+          Tu anuncio ha sido registrado exitosamente. En <strong>Mis Campañas</strong> puedes visualizar todos sus campos y editarlos en cualquier momento (incluida la imagen cargada).
         </p>
 
-        <div className="mt-6 rounded-2xl bg-zinc-50 p-4 border border-zinc-200 dark:bg-zinc-800/60 dark:border-zinc-700 text-left text-xs space-y-1.5">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Titular:</span>
-            <span className="font-bold text-zinc-900 dark:text-zinc-100">{successOrder.headline}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Inversión debitada:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">
-              ${Number(successOrder.price_paid).toLocaleString('es-CO')} COP
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Nuevo Saldo disponible:</span>
-            <span className="font-bold text-purple-600 dark:text-purple-400">
-              ${Number(adAccount?.balance || 0).toLocaleString('es-CO')} COP
-            </span>
-          </div>
-          <div className="flex justify-between pt-1 border-t border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-400">
-            <span>ID de Campaña:</span>
-            <span className="font-mono">{successOrder.id}</span>
+        {/* Vista previa de la imagen y campos de la campaña recién creada */}
+        <div className="mt-6 rounded-2xl bg-zinc-50 p-4 border border-zinc-200 dark:bg-zinc-800/60 dark:border-zinc-700 text-left text-xs space-y-3">
+          {successOrder.image_url && (
+            <div className="flex items-center gap-3.5 pb-3 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={successOrder.image_url}
+                  alt={successOrder.headline || 'Imagen de la campaña'}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <span className="inline-block rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                  Vista previa de creatividad
+                </span>
+                <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                  {successOrder.headline}
+                </div>
+                {successOrder.body && (
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
+                    {successOrder.body}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between gap-2">
+              <span className="text-zinc-500">Titular:</span>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100 text-right">
+                {successOrder.headline}
+              </span>
+            </div>
+            {successOrder.body && (
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-500">Descripción:</span>
+                <span className="font-medium text-zinc-700 dark:text-zinc-300 text-right max-w-xs truncate">
+                  {successOrder.body}
+                </span>
+              </div>
+            )}
+            {selectedListing && (
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-500">Publicación vinculada:</span>
+                <span className="font-semibold text-purple-700 dark:text-purple-300 text-right truncate max-w-xs">
+                  {selectedListing.title}
+                </span>
+              </div>
+            )}
+            {successOrder.target_city && (
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-500">Ciudad objetivo:</span>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  {successOrder.target_city}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between gap-2">
+              <span className="text-zinc-500">Inversión debitada:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                ${Number(successOrder.price_paid).toLocaleString('es-CO')} COP
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-zinc-500">Nuevo Saldo disponible:</span>
+              <span className="font-bold text-purple-600 dark:text-purple-400">
+                ${Number(adAccount?.balance || 0).toLocaleString('es-CO')} COP
+              </span>
+            </div>
+            <div className="flex justify-between pt-1.5 border-t border-zinc-200 dark:border-zinc-700 text-[11px] text-zinc-400">
+              <span>ID de Campaña:</span>
+              <span className="font-mono">{successOrder.id}</span>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+        {/* Únicamente el botón de ir a las campañas */}
+        <div className="mt-8 flex justify-center">
           <Link
             href="/mis-campanas"
-            className="rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-500 transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-xs font-bold text-white shadow-sm hover:bg-purple-500 transition-colors"
           >
-            Ver mis campañas →
-          </Link>
-          <Link
-            href="/mis-publicaciones"
-            className="rounded-xl border border-zinc-300 px-5 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
-          >
-            Volver a mis publicaciones
+            <span>📢</span>
+            <span>Ir a Mis Campañas →</span>
           </Link>
         </div>
       </div>
@@ -841,10 +989,10 @@ export default function PromotionForm({
           <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 dark:border-blue-900/60 dark:bg-blue-950/30">
             <h3 className="text-sm font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
               <span>ℹ️</span>
-              <span>Proceso de Recarga y Planes de Publicidad (Individuales y Combo)</span>
+              <span>Proceso de Recarga: Planes Originales y Pasarelas de Temporada (Independientes o Combinados)</span>
             </h3>
             <p className="mt-1 text-xs text-blue-800/90 dark:text-blue-300 leading-relaxed">
-              Recuerda que al crear un producto o servicio tienes <strong>7 días iniciales con publicidad gratis</strong>. Para continuar promocionando o impulsar tus anuncios, elige entre el <strong>Plan Individual Pasarela ($10.000 COP)</strong>, <strong>Plan Individual Gran Vitrina ($20.000 COP)</strong> o el <strong>Plan en Combo con las dos por $25.000 COP</strong>.
+              Al crear un producto o servicio tienes <strong>7 días iniciales con publicidad gratis</strong>. Para promocionar tus anuncios puedes elegir: <strong>(1) Solo un Plan Original</strong> (Pasarela $10.000, Gran Vitrina $20.000 o Combo $25.000), <strong>(2) Únicamente una Pasarela de Temporada</strong> (sin plan original), o <strong>(3) Un Plan Original + Pasarela de Temporada</strong>. Todas se activan apenas se valida el pago con las mismas condiciones de vigencia.
             </p>
           </div>
 
@@ -861,74 +1009,196 @@ export default function PromotionForm({
           )}
 
           <form onSubmit={handleSubmitRechargeRequest} className="rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-8">
-            {/* Paso 1.1: Selección del paquete a adquirir */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  1. Elige el Plan Publicitario que deseas Recargar *
-                </label>
-                <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">
-                  Tarifas oficiales vigentes
-                </span>
+            {/* Paso 1.1: Selección del paquete a adquirir (Original, Solo Temporada, o Ambos) */}
+            <div className="space-y-5">
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                    1.A Planes Originales (Opcional si solo deseas una Pasarela de Temporada)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRechargePackageId('none')
+                      if (!selectedRechargeRunwayId && availableRunways.length > 0) {
+                        setSelectedRechargeRunwayId(availableRunways[0].id)
+                      }
+                    }}
+                    className={`rounded-xl px-3 py-1 text-[11px] font-bold border transition-all cursor-pointer ${
+                      selectedRechargePackageId === 'none'
+                        ? 'border-amber-600 bg-amber-600 text-white shadow-2xs'
+                        : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                    }`}
+                  >
+                    🎄 Quiero únicamente Pasarela de Temporada (Sin plan original)
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
+                  {packages.map((pkg) => {
+                    const isSelected = selectedRechargePackageId === pkg.id
+                    const isCombo = pkg.categoryType === 'combo'
+                    return (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedRechargePackageId(
+                            isSelected && selectedRechargeRunwayId ? 'none' : pkg.id
+                          )
+                        }
+                        className={`relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 ring-2 ring-purple-600 shadow-sm'
+                            : isCombo
+                            ? 'border-amber-300 bg-amber-50/20 dark:border-amber-800/70 dark:bg-amber-950/10 hover:border-amber-400'
+                            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                                isCombo
+                                  ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
+                                  : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                              }`}
+                            >
+                              {locale === 'en' ? pkg.badgeEn : pkg.badgeEs}
+                            </span>
+                            <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                              ⏱️ {pkg.duration_days}d
+                            </span>
+                          </div>
+
+                          <div className="mt-2 text-xs font-black text-zinc-900 dark:text-zinc-50">
+                            {locale === 'en' ? pkg.nameEn : pkg.nameEs}
+                          </div>
+                          <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                            {locale === 'en' ? pkg.subtitleEn : pkg.subtitleEs}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-zinc-200/70 dark:border-zinc-800 flex items-baseline justify-between">
+                          <div>
+                            <span className="text-base font-black text-zinc-900 dark:text-zinc-100">
+                              ${Number(pkg.price).toLocaleString('es-CO')}
+                            </span>
+                            <span className="ml-1 text-[10px] text-zinc-400 font-bold">COP</span>
+                          </div>
+                          {isCombo && (
+                            <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
+                              -$5.000
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+
+                  {/* Opción explícita: Sin Plan Original (Solo Pasarela de Temporada) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRechargePackageId('none')
+                      if (!selectedRechargeRunwayId && availableRunways.length > 0) {
+                        setSelectedRechargeRunwayId(availableRunways[0].id)
+                      }
+                    }}
+                    className={`relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                      selectedRechargePackageId === 'none'
+                        ? 'border-amber-600 bg-amber-50/80 dark:bg-amber-950/40 ring-2 ring-amber-600 shadow-sm'
+                        : 'border-dashed border-amber-300 bg-amber-50/20 hover:border-amber-400 dark:border-amber-800/70 dark:bg-amber-950/10'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-900 dark:bg-amber-900 dark:text-amber-200">
+                          🎄 Solo Temporada
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                          Independiente
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs font-black text-zinc-900 dark:text-zinc-50">
+                        Sin Plan Original (Únicamente Pasarela de Temporada)
+                      </div>
+                      <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                        Elige esta opción si solo deseas publicar en una Pasarela de Temporada sin adquirir los planes originales.
+                      </p>
+                    </div>
+                    <div className="mt-3 pt-2.5 border-t border-amber-200/70 dark:border-amber-800/60 flex items-baseline justify-between">
+                      <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300">
+                        $0 Plan Original
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                        Elige pasarela abajo ↓
+                      </span>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {packages.map((pkg) => {
-                  const isSelected = selectedRechargePackageId === pkg.id
-                  const isCombo = pkg.categoryType === 'combo'
-                  return (
+              {/* Paso 1.B: Selección de Pasarela de Temporada (Sola o Adicional) en Recarga */}
+              <div className="rounded-2xl border border-amber-300 bg-amber-50/40 p-4 dark:border-amber-900/60 dark:bg-amber-950/20 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                      🎄 1.B Pasarela de Temporada / Catálogo Exclusivo (Única o Adicional)
+                    </label>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                      Puedes escoger <strong>únicamente una Pasarela de Temporada</strong> (marcando arriba &ldquo;Sin Plan Original&rdquo;) o <strong>adicionarla a tu Plan Original</strong>. Se activa con las mismas condiciones apenas se valida el pago.
+                    </p>
+                  </div>
+                  {selectedRechargeRunway && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/80 dark:bg-amber-900/70 px-2.5 py-1 text-[10px] font-black text-amber-900 dark:text-amber-200">
+                      {selectedRechargePackageId === 'none' ? 'Valor Pasarela:' : 'Adicional:'} $
+                      {Number(selectedRechargeRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP
+                    </span>
+                  )}
+                </div>
+
+                <select
+                  value={selectedRechargeRunwayId}
+                  onChange={(e) => {
+                    const nextId = e.target.value
+                    setSelectedRechargeRunwayId(nextId)
+                    if (!nextId && selectedRechargePackageId === 'none') {
+                      setSelectedRechargePackageId(packages[0]?.id || '')
+                    }
+                  }}
+                  className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-zinc-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  <option value="">
+                    — Sin Pasarela de Temporada (Solo Plan Original seleccionado arriba) — $0 COP —
+                  </option>
+                  {availableRunways.map((r) => {
+                    const costCop = Number(r.campaignCostCop || 0)
+                    const rTitle = r.title || (r as any).titleEs || 'Pasarela de Temporada'
+                    const rBadge = r.badge || (r as any).badgeEs || 'Temporada'
+                    return (
+                      <option key={r.id} value={r.id}>
+                        {r.icon || '🎄'} {rTitle} ({rBadge}) — ${costCop.toLocaleString('es-CO')} COP (Vigencia: {r.defaultDurationDays || 7} días + Pasarela de Proveedores)
+                      </option>
+                    )
+                  })}
+                </select>
+
+                {selectedRechargeRunway && selectedRechargePackageId !== 'none' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-amber-900 dark:text-amber-200">
+                    <span>
+                      Actualmente estás sumando <strong>{selectedRechargePackage?.name}</strong> +{' '}
+                      <strong>{selectedRechargeRunway.title || (selectedRechargeRunway as any).titleEs}</strong>.
+                    </span>
                     <button
-                      key={pkg.id}
                       type="button"
-                      onClick={() => setSelectedRechargePackageId(pkg.id)}
-                      className={`relative flex flex-col justify-between p-5 rounded-2xl border text-left transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 ring-2 ring-purple-600 shadow-sm'
-                          : isCombo
-                          ? 'border-amber-300 bg-amber-50/20 dark:border-amber-800/70 dark:bg-amber-950/10 hover:border-amber-400'
-                          : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900'
-                      }`}
+                      onClick={() => setSelectedRechargePackageId('none')}
+                      className="underline font-bold text-amber-800 dark:text-amber-300 hover:text-amber-600 cursor-pointer"
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
-                              isCombo
-                                ? 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200'
-                                : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                            }`}
-                          >
-                            {locale === 'en' ? pkg.badgeEn : pkg.badgeEs}
-                          </span>
-                          <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
-                            ⏱️ {pkg.duration_days} días
-                          </span>
-                        </div>
-
-                        <div className="mt-2.5 text-sm font-black text-zinc-900 dark:text-zinc-50">
-                          {locale === 'en' ? pkg.nameEn : pkg.nameEs}
-                        </div>
-                        <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                          {locale === 'en' ? pkg.descriptionEn : pkg.descriptionEs}
-                        </p>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-zinc-200/70 dark:border-zinc-800 flex items-baseline justify-between">
-                        <div>
-                          <span className="text-lg font-black text-zinc-900 dark:text-zinc-100">
-                            ${Number(pkg.price).toLocaleString('es-CO')}
-                          </span>
-                          <span className="ml-1 text-[10px] text-zinc-400 font-bold">COP</span>
-                        </div>
-                        {isCombo && (
-                          <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
-                            ¡Ahorras $5.000!
-                          </span>
-                        )}
-                      </div>
+                      Usar únicamente esta Pasarela de Temporada (${Number(selectedRechargeRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP)
                     </button>
-                  )
-                })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -939,7 +1209,7 @@ export default function PromotionForm({
                 <span>2. Canales Oficiales para Transferir el Pago</span>
               </h4>
               <p className="text-xs text-zinc-500">
-                Transfiere exactamente <strong>${Number(selectedRechargePackage?.price || 0).toLocaleString('es-CO')} COP</strong> a cualquiera de las siguientes opciones oficiales:
+                Transfiere exactamente <strong>${Number(rechargeAmountCop).toLocaleString('es-CO')} COP</strong> a cualquiera de las siguientes opciones oficiales:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
@@ -1082,13 +1352,27 @@ export default function PromotionForm({
 
             {/* Botón de Enviar Solicitud */}
             <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs text-zinc-500">
-                Monto a autorizar: <strong className="text-zinc-900 dark:text-zinc-100">${Number(selectedRechargePackage?.price || 0).toLocaleString('es-CO')} COP</strong>
+              <div className="text-xs text-zinc-500 space-y-0.5">
+                <div>
+                  Monto a autorizar:{' '}
+                  <strong className="text-zinc-900 dark:text-zinc-100">
+                    ${Number(rechargeAmountCop).toLocaleString('es-CO')} COP
+                  </strong>
+                </div>
+                <div className="text-[11px] text-zinc-400">
+                  {!selectedRechargePackage && selectedRechargeRunway
+                    ? `Únicamente Pasarela de Temporada: "${selectedRechargeRunway.title || (selectedRechargeRunway as any).titleEs}"`
+                    : selectedRechargePackage && selectedRechargeRunway
+                    ? `${selectedRechargePackage.name} ($${Number(selectedRechargePackage.price).toLocaleString('es-CO')}) + "${selectedRechargeRunway.title || (selectedRechargeRunway as any).titleEs}" ($${Number(selectedRechargeRunway.campaignCostCop).toLocaleString('es-CO')})`
+                    : selectedRechargePackage
+                    ? `Plan Original: ${selectedRechargePackage.name}`
+                    : 'Selecciona al menos un plan o pasarela'}
+                </div>
               </div>
 
               <button
                 type="submit"
-                disabled={submittingRecharge || uploadingReceipt}
+                disabled={submittingRecharge || uploadingReceipt || rechargeAmountCop <= 0}
                 className="w-full sm:w-auto rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {submittingRecharge ? (
@@ -1207,7 +1491,7 @@ export default function PromotionForm({
                   Configuración de Campaña Bloqueada
                 </h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Para diseñar y publicar tu anuncio publicitario, primero debes contar con saldo aprobado por el administrador.
+                  Para diseñar y publicar tu anuncio en un Plan Original o en una Pasarela de Temporada, primero debes contar con saldo aprobado por el administrador.
                 </p>
               </div>
 
@@ -1220,7 +1504,7 @@ export default function PromotionForm({
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Plan Mínimo Disponible (Pasarela):</span>
+                  <span className="text-zinc-500">Monto Mínimo Disponible:</span>
                   <span className="font-extrabold text-purple-600 dark:text-purple-400">
                     ${minRequiredPrice.toLocaleString('es-CO')} COP
                   </span>
@@ -1256,7 +1540,7 @@ export default function PromotionForm({
               ) : (
                 <div className="space-y-2">
                   <div className="rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 p-3.5 text-xs text-purple-900 dark:text-purple-200">
-                    <span>👈 Para adquirir saldo y desbloquear la campaña (desde $10.000 COP), utiliza la opción <strong>Recarga de Saldo</strong> en el menú lateral izquierdo.</span>
+                    <span>👈 Para adquirir saldo y desbloquear tu campaña (en un Plan Original o únicamente en una Pasarela de Temporada), utiliza la opción <strong>Recarga de Saldo</strong> en el menú lateral izquierdo.</span>
                   </div>
                 </div>
               )}
@@ -1284,7 +1568,7 @@ export default function PromotionForm({
                   Configurar Plan de Publicidad y Lanzar Anuncio
                 </h2>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Después de los 7 días iniciales de publicidad gratis, elige tu Plan Individual (Pasarela $10.000 o Gran Vitrina $20.000) o el Plan en Combo (las dos por $25.000).
+                  Puedes elegir <strong>un Plan Original</strong> (Pasarela $10.000, Gran Vitrina $20.000 o Combo $25.000), <strong>únicamente una Pasarela de Temporada</strong> (sin ligarla a un plan original), o <strong>combinar ambos</strong>. Todas se activan apenas se valida el pago y las condiciones de la pasarela.
                 </p>
               </div>
 
@@ -1335,8 +1619,8 @@ export default function PromotionForm({
                         </div>
                         <p className="mt-0.5 text-[11px] opacity-90">
                           {selectedListingFreeTrial.isFreeTrialActive
-                            ? 'Tu producto o servicio fue creado recientemente y goza de 7 días iniciales gratis. Puedes adquirir un Plan Individual o en Combo ahora para extender y multiplicar su alcance.'
-                            : 'Activa a continuación el Plan Individual (Gran Vitrina $20.000 o Pasarela $10.000) o el Plan en Combo (las dos por $25.000) para mantener tu anuncio en vitrina.'}
+                            ? 'Tu producto o servicio fue creado recientemente y goza de 7 días iniciales gratis. Puedes adquirir un Plan Original o una Pasarela de Temporada ahora para multiplicar su alcance.'
+                            : 'Activa a continuación un Plan Original, una Pasarela de Temporada independiente, o ambos para mantener tu anuncio destacado.'}
                         </p>
                       </div>
                     </div>
@@ -1349,18 +1633,31 @@ export default function PromotionForm({
                 )}
               </div>
 
-              {/* 2. Seleccionar Paquete Publicitario (Individual o Combo) */}
+              {/* 2.A Seleccionar Paquete Publicitario Original (Opcional si solo se elige Pasarela de Temporada) */}
               <div>
-                <div className="flex items-center justify-between mb-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                    2. Elige tu Plan Publicitario (Individual o en Combo) *
+                    2.A Plan Publicitario Original (O elige &ldquo;Solo Pasarela de Temporada&rdquo;)
                   </label>
-                  <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                    Vigencia: 7 días por plan
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCampaignPackageId('none')
+                      if (!selectedSpecialRunwayId && availableRunways.length > 0) {
+                        setSelectedSpecialRunwayId(availableRunways[0].id)
+                      }
+                    }}
+                    className={`rounded-xl px-3 py-1 text-[11px] font-bold border transition-all cursor-pointer ${
+                      selectedCampaignPackageId === 'none'
+                        ? 'border-amber-600 bg-amber-600 text-white shadow-2xs'
+                        : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200'
+                    }`}
+                  >
+                    🎄 Usar únicamente Pasarela de Temporada (Sin plan original)
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
                   {packages.map((pkg) => {
                     const isSelected = selectedCampaignPackageId === pkg.id
                     const canAfford = currentBalance >= pkg.price
@@ -1369,7 +1666,11 @@ export default function PromotionForm({
                       <button
                         key={pkg.id}
                         type="button"
-                        onClick={() => setSelectedCampaignPackageId(pkg.id)}
+                        onClick={() =>
+                          setSelectedCampaignPackageId(
+                            isSelected && selectedSpecialRunwayId ? 'none' : pkg.id
+                          )
+                        }
                         className={`flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? 'border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 ring-2 ring-purple-600 shadow-sm'
@@ -1390,14 +1691,14 @@ export default function PromotionForm({
                               {locale === 'en' ? pkg.badgeEn : pkg.badgeEs}
                             </span>
                             {!canAfford ? (
-                              <span className="text-[10px] text-red-500 font-bold">Saldo insuficiente</span>
+                              <span className="text-[10px] text-red-500 font-bold">Saldo insuf.</span>
                             ) : (
                               <span className="text-[11px] font-semibold text-zinc-500">
-                                ⏱️ {pkg.duration_days} días
+                                ⏱️ {pkg.duration_days}d
                               </span>
                             )}
                           </div>
-                          <span className="mt-2 block text-sm font-black text-zinc-900 dark:text-zinc-50">
+                          <span className="mt-2 block text-xs font-black text-zinc-900 dark:text-zinc-50">
                             {locale === 'en' ? pkg.nameEn : pkg.nameEs}
                           </span>
                           <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
@@ -1405,7 +1706,7 @@ export default function PromotionForm({
                           </p>
                         </div>
 
-                        <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-baseline justify-between">
+                        <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800 flex items-baseline justify-between">
                           <div>
                             <span className="text-base font-extrabold text-zinc-900 dark:text-zinc-100">
                               ${Number(pkg.price).toLocaleString('es-CO')}
@@ -1414,53 +1715,129 @@ export default function PromotionForm({
                           </div>
                           {isCombo && (
                             <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400">
-                              Ahorras $5.000
+                              -$5.000
                             </span>
                           )}
                         </div>
                       </button>
                     )
                   })}
+
+                  {/* Tarjeta 4: Sin Plan Original (Únicamente Pasarela de Temporada) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCampaignPackageId('none')
+                      if (!selectedSpecialRunwayId && availableRunways.length > 0) {
+                        setSelectedSpecialRunwayId(availableRunways[0].id)
+                      }
+                    }}
+                    className={`flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                      selectedCampaignPackageId === 'none'
+                        ? 'border-amber-600 bg-amber-50/80 dark:bg-amber-950/40 ring-2 ring-amber-600 shadow-sm'
+                        : 'border-dashed border-amber-300 bg-amber-50/20 hover:border-amber-400 dark:border-amber-800/70 dark:bg-amber-950/10'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between w-full gap-1">
+                        <span className="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 dark:bg-amber-900 dark:text-amber-200">
+                          🎄 Solo Temporada
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                          Independiente
+                        </span>
+                      </div>
+                      <span className="mt-2 block text-xs font-black text-zinc-900 dark:text-zinc-50">
+                        Sin Plan Original (Solo Pasarela de Temporada)
+                      </span>
+                      <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        Activa tu anuncio únicamente en la Pasarela de Temporada elegida abajo (+ Pasarela de Proveedores), con las mismas condiciones de las pasarelas originales.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-amber-200/70 dark:border-amber-800/60 flex items-baseline justify-between">
+                      <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300">
+                        $0 Plan Base
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                        Ver 2.B ↓
+                      </span>
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              {/* 2.B Clasificación Especial de Pasarela y Catálogo Exclusivo (Lista Administrada) */}
+              {/* 2.B Clasificación Especial de Pasarela de Temporada y Catálogo Exclusivo (Independiente o Adicional) */}
               <div className="rounded-2xl border border-amber-300 bg-amber-50/40 p-4 dark:border-amber-900/60 dark:bg-amber-950/20 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <label className="block text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
-                      ⭐ 2.B Clasificación de Pasarela y Catálogo Exclusivo (Lista Administrada)
+                      🎄 2.B Pasarela de Temporada y Catálogo Exclusivo (Única o Adicional al Plan Original)
                     </label>
                     <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
-                      Identifica especialmente el artículo en esta campaña para integrarlo en un <strong>Catálogo Exclusivo</strong> y en su pasarela correspondiente. Un nuevo catálogo conlleva el costo adicional de campaña establecido en administración.
+                      La elección de Pasarela de Temporada <strong>no está obligatoriamente ligada a los planes originales</strong>: puedes elegir únicamente una Pasarela de Temporada o sumarla a un Plan Original. Apenas se valida el pago y las condiciones, se activa igual que las pasarelas originales.
                     </p>
                   </div>
                   {selectedSpecialRunway && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/80 dark:bg-amber-900/70 px-2.5 py-1 text-[10px] font-black text-amber-900 dark:text-amber-200">
-                      +${Number(selectedSpecialRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP (Catálogo Exclusivo)
+                      {selectedCampaignPackageId === 'none' ? 'Costo Único:' : 'Costo Adicional:'} $
+                      {Number(selectedSpecialRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP
                     </span>
                   )}
                 </div>
 
                 <select
                   value={selectedSpecialRunwayId}
-                  onChange={(e) => setSelectedSpecialRunwayId(e.target.value)}
+                  onChange={(e) => {
+                    const nextId = e.target.value
+                    setSelectedSpecialRunwayId(nextId)
+                    if (!nextId && selectedCampaignPackageId === 'none') {
+                      setSelectedCampaignPackageId(packages[0]?.id || '')
+                    }
+                  }}
                   className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-zinc-900 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:border-amber-800 dark:bg-zinc-900 dark:text-zinc-100"
                 >
                   <option value="">
-                    — Sin Catálogo Exclusivo adicional (Solo Catálogo General) — $0 COP extra —
+                    — Sin Pasarela de Temporada (Usar únicamente el Plan Original seleccionado arriba) — $0 COP —
                   </option>
                   {availableRunways.map((r) => {
                     const costCop = Number(r.campaignCostCop || 0)
+                    const rTitle = r.title || (r as any).titleEs || 'Pasarela de Temporada'
+                    const rBadge = r.badge || (r as any).badgeEs || 'Temporada'
                     const isExplicitlyAuthorized = (r.authorizedSellerIds || []).includes(seller.id)
                     return (
                       <option key={r.id} value={r.id}>
-                        ⭐ {r.titleEs} ({r.badgeEs}) — Costo adicional de catálogo: +${costCop.toLocaleString('es-CO')} COP{' '}
-                        {isExplicitlyAuthorized ? '[✓ Vendedor Habilitado en Admin]' : '[Se habilita al pagar campaña]'}
+                        {r.icon || '🎄'} {rTitle} ({rBadge}) — ${costCop.toLocaleString('es-CO')} COP ({r.defaultDurationDays || 7} días){' '}
+                        {isExplicitlyAuthorized ? '[✓ Vendedor Habilitado]' : '[Se activa al validar pago y campaña]'}
                       </option>
                     )
                   })}
                 </select>
+
+                {selectedSpecialRunway && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-amber-900 dark:text-amber-200">
+                    <span>
+                      {selectedCampaignPackageId === 'none' ? (
+                        <>
+                          Modalidad activa: <strong>Únicamente Pasarela de Temporada &ldquo;{selectedSpecialRunway.title || (selectedSpecialRunway as any).titleEs}&rdquo;</strong> (sin plan original).
+                        </>
+                      ) : (
+                        <>
+                          Modalidad activa: <strong>{selectedCampaignPackage?.name}</strong> + Pasarela de Temporada <strong>&ldquo;{selectedSpecialRunway.title || (selectedSpecialRunway as any).titleEs}&rdquo;</strong>.
+                        </>
+                      )}
+                    </span>
+                    {selectedCampaignPackageId !== 'none' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCampaignPackageId('none')}
+                        className="underline font-bold text-amber-800 dark:text-amber-300 hover:text-amber-600 cursor-pointer"
+                      >
+                        Quiero únicamente esta Pasarela de Temporada (${Number(selectedSpecialRunway.campaignCostCop || 0).toLocaleString('es-CO')} COP)
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 3. Creatividad del Anuncio (Headline & Body) */}
@@ -1568,7 +1945,7 @@ export default function PromotionForm({
                           </span>
                           {selectedSpecialRunway && (
                             <span className="inline-block rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 uppercase tracking-wider dark:bg-amber-950 dark:text-amber-300">
-                              ⭐ {selectedSpecialRunway.badgeEs}
+                              ⭐ {selectedSpecialRunway.badge || (selectedSpecialRunway as any).badgeEs}
                             </span>
                           )}
                         </div>
@@ -1619,18 +1996,34 @@ export default function PromotionForm({
                   <div>
                     Costo Total: <strong>${Number(totalCampaignPrice).toLocaleString('es-CO')} COP</strong> (se descontará de tu saldo de ${currentBalance.toLocaleString('es-CO')}).
                   </div>
-                  {extraCatalogCost > 0 && selectedSpecialRunway && (
-                    <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-                      Incluye Plan Base (${Number(selectedCampaignPackage.price).toLocaleString('es-CO')}) + Catálogo Exclusivo &ldquo;{selectedSpecialRunway.titleEs}&rdquo; (+${extraCatalogCost.toLocaleString('es-CO')} COP)
-                    </div>
-                  )}
+                  <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                    {!selectedCampaignPackage && selectedSpecialRunway ? (
+                      <>
+                        Únicamente Pasarela de Temporada &ldquo;{selectedSpecialRunway.title || (selectedSpecialRunway as any).titleEs}&rdquo; (${extraCatalogCost.toLocaleString('es-CO')} COP) — Sin plan original
+                      </>
+                    ) : selectedCampaignPackage && selectedSpecialRunway ? (
+                      <>
+                        Incluye {selectedCampaignPackage.name} (${basePlanCost.toLocaleString('es-CO')}) + Pasarela de Temporada &ldquo;{selectedSpecialRunway.title || (selectedSpecialRunway as any).titleEs}&rdquo; (+${extraCatalogCost.toLocaleString('es-CO')} COP)
+                      </>
+                    ) : selectedCampaignPackage ? (
+                      <>
+                        Incluye Plan Original: {selectedCampaignPackage.name} (${basePlanCost.toLocaleString('es-CO')} COP)
+                      </>
+                    ) : (
+                      <>Selecciona al menos un Plan Original o una Pasarela de Temporada</>
+                    )}
+                  </div>
                 </div>
 
                 <div className="w-full sm:w-auto">
-
                   <button
                     type="submit"
-                    disabled={submittingOrder || uploadingImage || currentBalance < totalCampaignPrice}
+                    disabled={
+                      submittingOrder ||
+                      uploadingImage ||
+                      totalCampaignPrice <= 0 ||
+                      currentBalance < totalCampaignPrice
+                    }
                     className="w-full sm:w-auto rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                   >
                     {submittingOrder ? (

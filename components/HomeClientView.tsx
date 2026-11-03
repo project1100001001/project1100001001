@@ -13,6 +13,7 @@ import ProductsRunway from '@/components/ProductsRunway'
 import MerchantsRunway, { type MerchantShowcase } from '@/components/MerchantsRunway'
 import {
   resolveAdOrderPlacement,
+  extractSeasonalRunwayMeta,
   getListingFreeTrialStatus,
   resolveIndependentRunwayStates,
   INDEPENDENT_RUNWAY_OVERRIDES_KEY,
@@ -126,28 +127,54 @@ export default function HomeClientView({
         : 999
     const sellerCounts = new Map<string, number>()
 
-    // Prioridad 1: Campañas publicitarias activas o registradas en ad_order
+    // Prioridad 1: Campañas publicitarias activas o vigentes registradas en ad_order
     campaignAds.forEach((ad) => {
       const listing = ad.listing
       if (!listing) return
       if (listing.seller?.status === 'blocked' || listing.seller?.status === 'suspended') return
+
+      // Si la orden fue rechazada, cancelada, pausada o finalizada, no se exhibe como campaña activa
+      if (['rejected', 'cancelled', 'paused', 'ended'].includes(ad.status)) {
+        return
+      }
+
+      // Cálculo de vigencia de campaña: si ends_at ya venció, caduca su exhibición patrocinada
+      let daysLeft = 7
+      if (ad.ends_at) {
+        const diff = new Date(ad.ends_at).getTime() - Date.now()
+        if (diff <= 0) {
+          return
+        }
+        daysLeft = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+      } else if (ad.package?.duration_days) {
+        daysLeft = ad.package.duration_days
+      }
 
       const currentSellerCount = sellerCounts.get(listing.seller_id) || 0
       if (currentSellerCount >= maxPerSeller) return
       sellerCounts.set(listing.seller_id, currentSellerCount + 1)
 
       seenListingIds.add(listing.id)
-      const resolved = resolveAdOrderPlacement(ad)
-      const placement = resolved.placement
-
-      // Cálculo de vigencia de campaña
-      let daysLeft = 7
-      if (ad.ends_at) {
-        const diff = new Date(ad.ends_at).getTime() - Date.now()
-        daysLeft = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-      } else if (ad.package?.duration_days) {
-        daysLeft = ad.package.duration_days
+      const override = listing.attrs?.campaign_overrides?.[ad.id] || {}
+      const effectiveAd = {
+        ...ad,
+        headline: override.headline ?? ad.headline,
+        body: override.body !== undefined ? override.body : ad.body,
+        image_url:
+          override.image_url !== undefined
+            ? override.image_url
+            : listing.attrs?.custom_campaign_image_url || ad.image_url,
+        target_city:
+          override.target_city !== undefined ? override.target_city : ad.target_city,
+        target_category:
+          override.target_category !== undefined
+            ? override.target_category
+            : ad.target_category,
       }
+
+      const resolved = resolveAdOrderPlacement(effectiveAd)
+      const placement = resolved.placement
+      const seasonalMeta = extractSeasonalRunwayMeta(effectiveAd)
 
       // Obtener exclusivamente imágenes legítimas cargadas por el usuario (mismo criterio que en /catalogo)
       const mediaUrls: string[] = []
@@ -163,8 +190,11 @@ export default function HomeClientView({
       }
 
       // Si la campaña adjuntó una imagen personalizada real (no test/unsplash)
-      if (isValidUserUploadedImage(ad.image_url) && !mediaUrls.includes(ad.image_url)) {
-        mediaUrls.unshift(ad.image_url)
+      if (
+        isValidUserUploadedImage(effectiveAd.image_url) &&
+        !mediaUrls.includes(effectiveAd.image_url)
+      ) {
+        mediaUrls.unshift(effectiveAd.image_url)
       }
 
       const limitedMedia = mediaUrls.slice(0, maxPhotos)
@@ -174,14 +204,15 @@ export default function HomeClientView({
         id: `ad-${ad.id}`,
         listingId: listing.id,
         title: listing.title,
-        headline: ad.headline || listing.title,
-        description: ad.body || listing.description || '',
+        headline: effectiveAd.headline || listing.title,
+        description: effectiveAd.body || listing.description || '',
         imageUrl: primaryImage,
         allImages: limitedMedia,
         price: listing.price,
         priceUnit: listing.price_unit,
         type: listing.type || 'product',
-        city: listing.city || ad.target_city || listing.seller?.city || null,
+        city:
+          listing.city || effectiveAd.target_city || listing.seller?.city || null,
         categoryName: listing.category?.name || 'Catálogo',
         categorySlug: listing.category?.slug || '',
         sellerName: listing.seller?.business_name || 'Comercio Local',
@@ -196,6 +227,13 @@ export default function HomeClientView({
         attrs: {
           ...(listing.attrs || {}),
           ad_placement: placement,
+          ...(seasonalMeta.specialRunwayId
+            ? {
+                special_runway_id: seasonalMeta.specialRunwayId,
+                special_runway_title:
+                  seasonalMeta.specialRunwayTitle || listing.attrs?.special_runway_title,
+              }
+            : {}),
         },
       })
     })
@@ -297,6 +335,32 @@ export default function HomeClientView({
     return states[medium].enabled
   }
 
+  const isItemEnabledInCustomRunway = (item: ShowcaseItem, customRunwayId: string): boolean => {
+    const rawOrderId = item.id.startsWith('ad-') ? item.id.slice(3) : item.listingId
+    let localOverrides: Record<string, any> = {}
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(INDEPENDENT_RUNWAY_OVERRIDES_KEY)
+        if (raw) localOverrides = JSON.parse(raw)
+      } catch {
+        // Ignore
+      }
+    }
+    const states = resolveIndependentRunwayStates(
+      {
+        id: rawOrderId,
+        placement: (item.attrs?.ad_placement as any) || 'pasarela',
+        attrs: item.attrs || null,
+      },
+      localOverrides
+    )
+    const customState = states.customRunways?.[customRunwayId]
+    if (customState !== undefined) {
+      return customState.enabled && !customState.isExpired
+    }
+    return true
+  }
+
   const heroItems = useMemo(() => {
     const limit = adPageConfig.maxHeroItems || 5
     const granVitrinaOrCombo = showcaseItems.filter(
@@ -318,7 +382,7 @@ export default function HomeClientView({
 
   const sortForRunway = (list: ShowcaseItem[]) => {
     const priorityOrder = (placement?: string) => {
-      if (placement === 'combo' || placement === 'pasarela') return 0
+      if (placement === 'combo' || placement === 'pasarela' || placement === 'pasarela_temporada') return 0
       if (placement === 'gran_vitrina') return 1
       if (placement === 'free_trial_7d' || placement === 'free_initial') return 2
       return 3
@@ -361,6 +425,7 @@ export default function HomeClientView({
       const placement = item.attrs?.ad_placement
       const isPromotedSeller =
         placement === 'pasarela' ||
+        placement === 'pasarela_temporada' ||
         placement === 'combo' ||
         placement === 'gran_vitrina' ||
         placement === 'free_trial_7d' ||
@@ -537,13 +602,30 @@ export default function HomeClientView({
             )}
 
             {adPageConfig.customRunways
-              .filter(
-                (r) =>
-                  r.active &&
-                  (selectedExclusiveRunwayId === 'all' || r.id === selectedExclusiveRunwayId)
-              )
+              .filter((r) => {
+                if (!r.active) return false
+                if (r.endsAt && new Date(r.endsAt).getTime() <= Date.now()) return false
+                return selectedExclusiveRunwayId === 'all' || r.id === selectedExclusiveRunwayId
+              })
               .map((customRunway) => {
                 const rawMatched = showcaseItems.filter((item) => {
+                  if (!isItemEnabledInCustomRunway(item, customRunway.id)) {
+                    return false
+                  }
+
+                  // Si la pasarela exige vendedores autorizados o con campaña vigente:
+                  const hasAuthorizedList =
+                    Array.isArray(customRunway.authorizedSellerIds) &&
+                    customRunway.authorizedSellerIds.length > 0
+                  const isSellerAuthorized =
+                    hasAuthorizedList &&
+                    customRunway.authorizedSellerIds!.includes(item.sellerId)
+
+                  // Si el anuncio perdió vigencia publicitaria (caducó su campaña y sus 7 días gratis) y el vendedor no está explícitamente autorizado, sale de la pasarela publicitaria
+                  if (!item.isPaidCampaign && !isSellerAuthorized && customRunway.allowAllPaidSellers !== false) {
+                    return false
+                  }
+
                   if (
                     item.attrs?.special_runway_id === customRunway.id ||
                     customRunway.assignedListingIds?.includes(item.listingId)
