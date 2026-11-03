@@ -537,14 +537,13 @@ export const getWhatsappUrl = (
 
   let priceText = isEn ? 'Quote on request' : 'Cotización a solicitud'
   if (ref?.price !== undefined && ref?.price !== null) {
-    const formattedNum = Number(ref.price).toLocaleString('es-CO')
+    const cleanInt = Math.round(Number(ref.price))
+    const formattedNum = String(cleanInt).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     const unitPart = ref.priceUnit ? ` / ${ref.priceUnit}` : ''
     priceText = `$ ${formattedNum} COP${unitPart}`
   }
 
-  const origin =
-    typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''
-  const listingUrl = ref?.listingId ? `${origin}/catalogo/${ref.listingId}` : ''
+  const listingPath = ref?.listingId ? `/catalogo/${ref.listingId}` : ''
 
   const lines: string[] = isEn
     ? [
@@ -555,7 +554,7 @@ export const getWhatsappUrl = (
         `🏷️ *Type:* ${typeLabel}${categoryText}`,
         `💰 *Price:* ${priceText}`,
         ...(ref?.city ? [`📍 *City:* ${ref.city}`] : []),
-        ...(listingUrl ? [`🔗 *Listing Link:* ${listingUrl}`] : []),
+        ...(listingPath ? [`🔗 *Listing sheet:* ${listingPath}`] : []),
         ``,
         `I would like to talk directly about reference *${refCode}*. Is it currently available?`,
       ]
@@ -567,7 +566,7 @@ export const getWhatsappUrl = (
         `🏷️ *Clasificación:* ${typeLabel}${categoryText}`,
         `💰 *Precio / Tarifa:* ${priceText}`,
         ...(ref?.city ? [`📍 *Ubicación:* ${ref.city}`] : []),
-        ...(listingUrl ? [`🔗 *Ficha del anuncio:* ${listingUrl}`] : []),
+        ...(listingPath ? [`🔗 *Ficha del anuncio:* ${listingPath}`] : []),
         ``,
         `Quedo atento(a) para hablar sobre la referencia *${refCode}*.`,
       ]

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
-export type Theme = 'light' | 'dark' | 'system'
+export type Theme = 'light' | 'dark'
 
 interface ThemeContextType {
   theme: Theme
@@ -12,7 +12,7 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'system',
+  theme: 'light',
   resolvedTheme: 'light',
   setTheme: () => {},
   toggleTheme: () => {},
@@ -20,44 +20,40 @@ const ThemeContext = createContext<ThemeContextType>({
 
 const STORAGE_KEY = 'marketplace_theme'
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
-  const [initialized, setInitialized] = useState(false)
+function getSavedManualTheme(): Theme {
+  if (typeof window === 'undefined') return 'light'
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved === 'dark') return 'dark'
+    if (saved === 'light') return 'light'
+  } catch {
+    // Ignore storage errors
+  }
+  return 'light'
+}
 
-  // Cargar preferencia guardada al montar en el cliente (evita mismatch de hidratación SSR)
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>('light')
+
   useEffect(() => {
-    let initialTheme: Theme = 'system'
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
-      if (saved === 'light' || saved === 'dark' || saved === 'system') {
-        initialTheme = saved
-      }
-    } catch {
-      // Ignore storage errors
+    const initial = getSavedManualTheme()
+    setThemeState(initial)
+    const root = document.documentElement
+    if (initial === 'dark') {
+      root.classList.add('dark')
+      root.style.colorScheme = 'dark'
+    } else {
+      root.classList.remove('dark')
+      root.style.colorScheme = 'light'
     }
-    setThemeState(initialTheme)
-    setInitialized(true)
   }, [])
 
-  useEffect(() => {
-    if (!initialized) return
-    const root = document.documentElement
-
-    const applyTheme = (currentTheme: Theme) => {
-      let activeTheme: 'light' | 'dark' = 'light'
-
-      if (currentTheme === 'system') {
-        activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light'
-      } else {
-        activeTheme = currentTheme
-      }
-
-      setResolvedTheme(activeTheme)
-
-      if (activeTheme === 'dark') {
+  const applyAndSaveTheme = (newTheme: Theme) => {
+    const next: Theme = newTheme === 'dark' ? 'dark' : 'light'
+    setThemeState(next)
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement
+      if (next === 'dark') {
         root.classList.add('dark')
         root.style.colorScheme = 'dark'
       } else {
@@ -65,24 +61,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.colorScheme = 'light'
       }
     }
-
-    applyTheme(theme)
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => {
-      if (theme === 'system') {
-        applyTheme('system')
-      }
-    }
-
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [theme, initialized])
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme)
     try {
-      localStorage.setItem(STORAGE_KEY, newTheme)
+      localStorage.setItem(STORAGE_KEY, next)
     } catch {
       // Ignore storage errors
     }
@@ -92,13 +72,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const isCurrentlyDark =
       typeof document !== 'undefined'
         ? document.documentElement.classList.contains('dark')
-        : resolvedTheme === 'dark'
-    const nextTheme = isCurrentlyDark ? 'light' : 'dark'
-    setTheme(nextTheme)
+        : theme === 'dark'
+    applyAndSaveTheme(isCurrentlyDark ? 'light' : 'dark')
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        resolvedTheme: theme,
+        setTheme: applyAndSaveTheme,
+        toggleTheme,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   )

@@ -388,7 +388,7 @@ function FullScreenDescriptiveLoaderOverlay({
   const displayDescription = subtitle || routeInfo.description
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950/65 dark:bg-black/80 backdrop-blur-md px-4 py-10 select-none overflow-hidden animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-100/80 dark:bg-zinc-950/85 backdrop-blur-md px-4 py-10 select-none overflow-hidden animate-in fade-in duration-150">
       {/* Recuadro Grande con la información de descripción actual */}
       <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-200/80 dark:border-zinc-800/90 bg-white/95 dark:bg-zinc-900/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
         {/* Luz ambiental decorativa */}
