@@ -1,7 +1,7 @@
 // components/HomeClientView.tsx
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, ListingWithRelations } from '@/lib/types'
@@ -20,11 +20,276 @@ import {
 } from '@/lib/adPolicies'
 import {
   type AdPageConfig,
+  type DynamicRunwayConfig,
   DEFAULT_AD_PAGE_CONFIG,
   AD_PAGE_CONFIG_STORAGE_KEY,
   sanitizeAdPageConfig,
 } from '@/lib/adPageConfig'
-import { getWhatsappUrl, getListingReferenceCode, trackAdEvent } from '@/lib/useContinuousScroll'
+import {
+  useGpuContinuousScroll,
+  createLoopedItems,
+  getWhatsappUrl,
+  getListingReferenceCode,
+  trackAdEvent,
+} from '@/lib/useContinuousScroll'
+
+function ExclusiveCatalogRunwayTrack({
+  customRunway,
+  items,
+  exclusivePosition,
+  locale,
+  scrollSpeed = 0.65,
+}: {
+  customRunway: DynamicRunwayConfig
+  items: ShowcaseItem[]
+  exclusivePosition: number
+  locale: string
+  scrollSpeed?: number
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const loopedItems = useMemo(() => createLoopedItems(items), [items])
+  const control = useGpuContinuousScroll({
+    trackRef,
+    itemCount: items.length,
+    speed: customRunway.scrollSpeed || scrollSpeed,
+  })
+
+  if (items.length === 0) return null
+
+  const rTitle = customRunway.title
+  const rSubtitle = customRunway.subtitle
+  const rBadge = customRunway.badge
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+      {/* Cabecera Sutil y Exclusiva de la Pasarela de Temporada / Ofertas */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 pb-3 border-b border-zinc-200/70 dark:border-zinc-800/80">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-300 dark:bg-amber-400/15 dark:text-amber-300 dark:border dark:border-amber-400/30">
+              ✦ Exclusivo #{exclusivePosition}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/90 border border-amber-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300">
+              <span>{rBadge}</span>
+            </span>
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+            <span>{customRunway.icon}</span>
+            <span>{rTitle}</span>
+          </h2>
+          {rSubtitle && (
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {rSubtitle}
+            </p>
+          )}
+        </div>
+
+        {/* Controles de Desplazamiento Continuo y Manual */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
+              control.isPaused
+                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
+                : 'text-zinc-700 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                control.isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'
+              }`}
+            />
+            <span className="hidden sm:inline">
+              {control.isPaused ? 'Pausado' : 'Continuo'}
+            </span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => control.stepManual('left')}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+            aria-label="Desplazar a la izquierda"
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            onClick={() => control.stepManual('right')}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+            aria-label="Desplazar a la derecha"
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+
+      {/* Carrusel Continuo con Tarjetas Full-Bleed (Imagen al 100% del recuadro + Textos y Botones superpuestos) */}
+      <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
+        <div
+          ref={trackRef}
+          className="flex w-max gap-5 will-change-transform cursor-grab active:cursor-grabbing"
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            touchAction: 'pan-y',
+          }}
+          onPointerDown={control.handlePointerDown}
+          onPointerMove={control.handlePointerMove}
+          onPointerUp={control.handlePointerUp}
+          onTouchStart={control.handleTouchStart}
+          onTouchMove={control.handleTouchMove}
+          onTouchEnd={control.handleTouchEnd}
+          onTouchCancel={control.handleTouchEnd}
+          onClickCapture={control.handleClickCapture}
+        >
+          {loopedItems.map((item, idx) => {
+            const refCode = getListingReferenceCode(item.listingId, item.attrs)
+            const whatsappUrl = getWhatsappUrl(
+              item.sellerWhatsapp,
+              item.sellerName,
+              item.title,
+              locale,
+              {
+                listingId: item.listingId,
+                referenceCode: refCode,
+                type: item.type,
+                categoryName: item.categoryName,
+                price: item.price,
+                priceUnit: item.priceUnit,
+                city: item.city,
+                attrs: item.attrs,
+              }
+            )
+
+            return (
+              <article
+                key={`${customRunway.id}-${item.id}-${idx}`}
+                onMouseEnter={control.pause}
+                onMouseLeave={control.resume}
+                className="group relative h-[350px] sm:h-[370px] w-72 sm:w-80 shrink-0 overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-amber-400/70 dark:border-zinc-800"
+              >
+                {/* 1. Imagen cubriendo el 100% del recuadro de presentación */}
+                <Link
+                  href={`/catalogo/${item.listingId}`}
+                  onClick={() => trackAdEvent(item, 'click')}
+                  className="absolute inset-0 block h-full w-full"
+                  aria-label={item.headline || item.title}
+                >
+                  {item.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-950 to-purple-950 text-6xl">
+                      <span className="opacity-35 transition-transform duration-500 group-hover:scale-110">
+                        {item.type === 'service'
+                          ? '🛠️'
+                          : item.type === 'article'
+                          ? '📦'
+                          : '🛍️'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Velos de contraste multicapa para garantizar legibilidad perfecta sobre cualquier foto */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72%] bg-gradient-to-t from-black/95 via-black/75 to-transparent" />
+                </Link>
+
+                {/* 2. Capa de Contenido Superpuesta con Alineación Fija Superior e Inferior */}
+                <div className="pointer-events-none relative z-10 flex h-full flex-col justify-between p-4">
+                  {/* Fila Superior: Insignia de Temporada y Código de Referencia */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-extrabold text-amber-300 backdrop-blur-md border border-white/15 shadow-2xs truncate max-w-[65%]">
+                      <span>{customRunway.icon}</span>
+                      <span className="truncate">{rBadge}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-black/55 px-2.5 py-1 font-mono text-[10px] font-bold text-white/95 backdrop-blur-md border border-white/15 shadow-2xs">
+                      📌 {refCode}
+                    </span>
+                  </div>
+
+                  {/* Bloque Inferior: Precio, Título, Vendedor y Botones perfectamente alineados */}
+                  <div className="space-y-2.5">
+                    {/* Precio y Categoría */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center rounded-lg bg-amber-400/95 px-2.5 py-0.5 text-xs font-black text-zinc-950 shadow-xs">
+                        {item.price
+                          ? `$${Number(item.price).toLocaleString('es-CO')} COP`
+                          : 'Cotizar'}
+                      </span>
+                      {item.categoryName && (
+                        <span className="truncate max-w-[45%] rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-zinc-100 backdrop-blur-md border border-white/15">
+                          {item.categoryName}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Título con altura fija de 2 líneas para mantener la alineación entre todas las tarjetas */}
+                    <div className="min-h-[2.6rem] flex items-end">
+                      <Link
+                        href={`/catalogo/${item.listingId}`}
+                        onClick={() => trackAdEvent(item, 'click')}
+                        className="pointer-events-auto block w-full"
+                      >
+                        <h3
+                          className="text-sm sm:text-[15px] font-extrabold text-white leading-snug line-clamp-2 drop-shadow-xs group-hover:text-amber-200 transition-colors"
+                          title={item.headline || item.title}
+                        >
+                          {item.headline || item.title}
+                        </h3>
+                      </Link>
+                    </div>
+
+                    {/* Vendedor, Ciudad y Calificación */}
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-200/90 border-t border-white/15 pt-2">
+                      <span className="truncate">
+                        🏪 <strong className="font-semibold text-white">{item.sellerName}</strong>
+                        {item.city ? ` • ${item.city}` : ''}
+                      </span>
+                      <span className="shrink-0 font-bold text-amber-400">
+                        ★ {item.sellerRating.toFixed(1)}
+                      </span>
+                    </div>
+
+                    {/* Botones de Acción Superpuestos con Efecto Cristal (Glassmorphism) */}
+                    <div className="pointer-events-auto grid grid-cols-2 gap-2 pt-0.5">
+                      {whatsappUrl ? (
+                        <a
+                          href={whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => trackAdEvent(item, 'whatsapp')}
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/95 px-3 text-xs font-extrabold text-white shadow-sm backdrop-blur-md hover:bg-emerald-400 transition-all"
+                        >
+                          <span>💬</span>
+                          <span>WhatsApp</span>
+                        </a>
+                      ) : null}
+                      <Link
+                        href={`/catalogo/${item.listingId}`}
+                        onClick={() => trackAdEvent(item, 'click')}
+                        className={`inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-white/30 bg-white/15 px-3 text-xs font-bold text-white backdrop-blur-md hover:bg-white/25 transition-all ${
+                          !whatsappUrl ? 'col-span-2' : ''
+                        }`}
+                      >
+                        <span>Ver ficha</span>
+                        <span>↗</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 interface HomeClientViewProps {
   categories: Category[]
@@ -493,113 +758,70 @@ export default function HomeClientView({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. PASARELA DE SERVICIOS Y SOLUCIONES (SERVICES RUNWAY - AISLADA)         */}
-      {/* ========================================================================= */}
-      {adPageConfig.showServicesRunway && (
-        <ServicesRunway
-          items={serviceItems}
-          locale={locale}
-          t={t}
-          scrollSpeed={effectiveScrollSpeed}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. PASARELA DE ARTÍCULOS USADOS (ARTICLES / PRE-OWNED RUNWAY - AISLADA)   */}
-      {/* ========================================================================= */}
-      {adPageConfig.showArticlesRunway && (
-        <ArticlesRunway
-          items={articleItems}
-          locale={locale}
-          t={t}
-          scrollSpeed={effectiveScrollSpeed}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 4. PASARELA DE PRODUCTOS NUEVOS (NEW PRODUCTS RUNWAY - AISLADA)           */}
-      {/* ========================================================================= */}
-      {adPageConfig.showProductsRunway && (
-        <ProductsRunway
-          items={productItems}
-          locale={locale}
-          t={t}
-          scrollSpeed={effectiveScrollSpeed}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 5. PASARELA DE MARCAS Y COMERCIOS (MERCHANTS BRAND RUNWAY - AISLADA)      */}
-      {/* ========================================================================= */}
-      {adPageConfig.showMerchantsRunway && (
-        <MerchantsRunway
-          merchants={merchantShowcases}
-          locale={locale}
-          t={t}
-          scrollSpeed={effectiveScrollSpeed}
-        />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 5.B PASARELAS ADICIONALES Y CATÁLOGOS EXCLUSIVOS EN VENTANA DE PUBLICIDAD */}
+      {/* 2. POSICIÓN EXCLUSIVA INMEDIATA DESPUÉS DE LA GRAN VITRINA DESTACADA:     */}
+      {/*    PASARELAS DE CATÁLOGOS EXCLUSIVOS (CONSECUTIVAS: 1, 2, 3, ETC.)        */}
       {/* ========================================================================= */}
       {adPageConfig.customRunways &&
         adPageConfig.customRunways.filter((r) => r.active).length > 0 && (
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
-            {/* Filtro de Catálogos Exclusivos en la Ventana de Publicidad (Opciones de configuración visibles SOLO si está logueado) */}
-            {viewerRole !== 'guest' && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                    <span>⭐</span>
-                    <span>
-                      Catálogos Exclusivos de Pasarela (Artículos Identificados Especialmente)
-                    </span>
-                  </span>
-                  {(viewerRole === 'seller' || viewerRole === 'admin') && (
-                    <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-950/60 px-2.5 py-0.5 rounded-full">
-                      {viewerRole === 'admin'
-                        ? '⚙️ Configurable en Control Página Publicidad'
-                        : '🏪 Habilitado según campaña activa'}
-                    </span>
-                  )}
+          <div className="space-y-2">
+            {/* Filtro rápido de Catálogos Exclusivos (visible para usuarios autenticados cuando hay más de una) */}
+            {viewerRole !== 'guest' &&
+              adPageConfig.customRunways.filter((r) => r.active).length > 1 && (
+                <div className="w-full px-4 pt-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                        <span>⭐</span>
+                        <span>
+                          Posición Exclusiva Post-Gran Vitrina: Catálogos Exclusivos de Pasarela
+                        </span>
+                      </span>
+                      {(viewerRole === 'seller' || viewerRole === 'admin') && (
+                        <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-950/60 px-2.5 py-0.5 rounded-full">
+                          {viewerRole === 'admin'
+                            ? '⚙️ Orden consecutivo administrable en Control Página Publicidad'
+                            : '🏪 Habilitado según campaña activa'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedExclusiveRunwayId('all')}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                          selectedExclusiveRunwayId === 'all'
+                            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                            : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800'
+                        }`}
+                      >
+                        <span>🌐</span>
+                        <span>Todas las Pasarelas Exclusivas Consecutivas</span>
+                      </button>
+                      {adPageConfig.customRunways
+                        .filter((r) => r.active && r.hasExclusiveCatalog !== false)
+                        .map((cat, idx) => {
+                          const isCurrent = selectedExclusiveRunwayId === cat.id
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => setSelectedExclusiveRunwayId(cat.id)}
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-400'
+                                  : 'bg-white text-amber-900 border border-amber-300 hover:bg-amber-100/60 dark:bg-zinc-900 dark:text-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              <span>#{idx + 1}</span>
+                              <span>{cat.icon}</span>
+                              <span>{cat.title}</span>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedExclusiveRunwayId('all')}
-                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                      selectedExclusiveRunwayId === 'all'
-                        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
-                        : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800'
-                    }`}
-                  >
-                    <span>🌐</span>
-                    <span>Todas las Pasarelas Exclusivas</span>
-                  </button>
-                  {adPageConfig.customRunways
-                    .filter((r) => r.active && r.hasExclusiveCatalog !== false)
-                    .map((cat) => {
-                      const isCurrent = selectedExclusiveRunwayId === cat.id
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setSelectedExclusiveRunwayId(cat.id)}
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                            isCurrent
-                              ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-400'
-                              : 'bg-white text-amber-900 border border-amber-300 hover:bg-amber-100/60 dark:bg-zinc-900 dark:text-amber-300 dark:border-amber-800'
-                          }`}
-                        >
-                          <span>{cat.icon}</span>
-                          <span>{cat.title}</span>
-                        </button>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
+              )}
 
             {adPageConfig.customRunways
               .filter((r) => {
@@ -607,13 +829,12 @@ export default function HomeClientView({
                 if (r.endsAt && new Date(r.endsAt).getTime() <= Date.now()) return false
                 return selectedExclusiveRunwayId === 'all' || r.id === selectedExclusiveRunwayId
               })
-              .map((customRunway) => {
+              .map((customRunway, idx) => {
                 const rawMatched = showcaseItems.filter((item) => {
                   if (!isItemEnabledInCustomRunway(item, customRunway.id)) {
                     return false
                   }
 
-                  // Si la pasarela exige vendedores autorizados o con campaña vigente:
                   const hasAuthorizedList =
                     Array.isArray(customRunway.authorizedSellerIds) &&
                     customRunway.authorizedSellerIds.length > 0
@@ -621,8 +842,11 @@ export default function HomeClientView({
                     hasAuthorizedList &&
                     customRunway.authorizedSellerIds!.includes(item.sellerId)
 
-                  // Si el anuncio perdió vigencia publicitaria (caducó su campaña y sus 7 días gratis) y el vendedor no está explícitamente autorizado, sale de la pasarela publicitaria
-                  if (!item.isPaidCampaign && !isSellerAuthorized && customRunway.allowAllPaidSellers !== false) {
+                  if (
+                    !item.isPaidCampaign &&
+                    !isSellerAuthorized &&
+                    customRunway.allowAllPaidSellers !== false
+                  ) {
                     return false
                   }
 
@@ -656,145 +880,67 @@ export default function HomeClientView({
 
                 if (matchedItems.length === 0) return null
 
-                const rTitle = customRunway.title
-                const rSubtitle = customRunway.subtitle
-                const rBadge = customRunway.badge
-
                 return (
-                  <section key={customRunway.id} className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                            <span>{rBadge}</span>
-                          </span>
-                          {customRunway.hasExclusiveCatalog !== false && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800">
-                              ⭐ Catálogo Exclusivo
-                            </span>
-                          )}
-                          <h2 className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                            {customRunway.icon} {rTitle}
-                          </h2>
-                        </div>
-                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                          {rSubtitle}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {matchedItems.map((item) => {
-                        const refCode = getListingReferenceCode(item.listingId, item.attrs)
-                        const whatsappUrl = getWhatsappUrl(
-                          item.sellerWhatsapp,
-                          item.sellerName,
-                          item.title,
-                          locale,
-                          {
-                            listingId: item.listingId,
-                            referenceCode: refCode,
-                            type: item.type,
-                            categoryName: item.categoryName,
-                            price: item.price,
-                            priceUnit: item.priceUnit,
-                            city: item.city,
-                            attrs: item.attrs,
-                          }
-                        )
-
-                        return (
-                          <div
-                            key={`${customRunway.id}-${item.id}`}
-                            className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-purple-400 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-                          >
-                            <div>
-                              <Link
-                                href={`/catalogo/${item.listingId}`}
-                                onClick={() => trackAdEvent(item, 'click')}
-                                className="block relative h-36 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"
-                              >
-                                {item.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.title}
-                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-3xl">
-                                    {item.type === 'service'
-                                      ? '🛠️'
-                                      : item.type === 'article'
-                                      ? '📦'
-                                      : '🛍️'}
-                                  </div>
-                                )}
-                                <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                                  <span className="rounded-lg bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
-                                    {rBadge}
-                                  </span>
-                                  <span className="rounded-lg bg-emerald-600/90 px-2 py-0.5 font-mono text-[9px] font-bold text-white backdrop-blur-xs">
-                                    📌 {refCode}
-                                  </span>
-                                </div>
-                              </Link>
-                              <Link
-                                href={`/catalogo/${item.listingId}`}
-                                onClick={() => trackAdEvent(item, 'click')}
-                              >
-                                <h3 className="mt-2.5 text-xs font-extrabold text-zinc-900 dark:text-zinc-50 line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                                  {item.headline || item.title}
-                                </h3>
-                              </Link>
-                              <p className="mt-0.5 text-[11px] text-zinc-500 line-clamp-1">
-                                🏪 {item.sellerName} {item.city ? `• ${item.city}` : ''}
-                              </p>
-                            </div>
-                            <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-black text-purple-700 dark:text-purple-300">
-                                  {item.price
-                                    ? `$${Number(item.price).toLocaleString('es-CO')} COP`
-                                    : 'Cotizar'}
-                                </span>
-                                <span className="font-mono text-[10px] font-bold text-zinc-400">
-                                  {refCode}
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {whatsappUrl ? (
-                                  <a
-                                    href={whatsappUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => trackAdEvent(item, 'whatsapp')}
-                                    className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-500 transition-colors"
-                                  >
-                                    <span>💬</span>
-                                    <span>WhatsApp</span>
-                                  </a>
-                                ) : null}
-                                <Link
-                                  href={`/catalogo/${item.listingId}`}
-                                  onClick={() => trackAdEvent(item, 'click')}
-                                  className={`inline-flex items-center justify-center rounded-xl border border-zinc-300 px-2.5 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors ${
-                                    !whatsappUrl ? 'col-span-2' : ''
-                                  }`}
-                                >
-                                  Ver ficha ↗
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </section>
+                  <ExclusiveCatalogRunwayTrack
+                    key={customRunway.id}
+                    customRunway={customRunway}
+                    items={matchedItems}
+                    exclusivePosition={idx + 1}
+                    locale={locale}
+                    scrollSpeed={effectiveScrollSpeed}
+                  />
                 )
               })}
           </div>
         )}
+
+      {/* ========================================================================= */}
+      {/* 3. PASARELA DE SERVICIOS Y SOLUCIONES (SERVICES RUNWAY - AISLADA)         */}
+      {/* ========================================================================= */}
+      {adPageConfig.showServicesRunway && (
+        <ServicesRunway
+          items={serviceItems}
+          locale={locale}
+          t={t}
+          scrollSpeed={effectiveScrollSpeed}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. PASARELA DE ARTÍCULOS USADOS (ARTICLES / PRE-OWNED RUNWAY - AISLADA)   */}
+      {/* ========================================================================= */}
+      {adPageConfig.showArticlesRunway && (
+        <ArticlesRunway
+          items={articleItems}
+          locale={locale}
+          t={t}
+          scrollSpeed={effectiveScrollSpeed}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. PASARELA DE PRODUCTOS NUEVOS (NEW PRODUCTS RUNWAY - AISLADA)           */}
+      {/* ========================================================================= */}
+      {adPageConfig.showProductsRunway && (
+        <ProductsRunway
+          items={productItems}
+          locale={locale}
+          t={t}
+          scrollSpeed={effectiveScrollSpeed}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. PASARELA DE MARCAS Y COMERCIOS (MERCHANTS BRAND RUNWAY - AISLADA)      */}
+      {/* ========================================================================= */}
+      {adPageConfig.showMerchantsRunway && (
+        <MerchantsRunway
+          merchants={merchantShowcases}
+          locale={locale}
+          t={t}
+          scrollSpeed={effectiveScrollSpeed}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* 6. ACCESO RÁPIDO POR CATÁLOGOS: SERVICIOS, USADOS Y NUEVOS               */}

@@ -26,6 +26,13 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Indie Clasificados | Economía en Circulación',
   description: 'Indie Clasificados — Economía en Circulación. Catálogo comercial mobile-first para conectar compradores con pequeñas empresas, servicios y emprendedores locales.',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 }
 
 export default function RootLayout({
@@ -42,7 +49,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('marketplace_theme');var d=document.documentElement;if(t==='dark'){d.classList.add('dark');d.style.colorScheme='dark';}else{d.classList.remove('dark');d.style.colorScheme='light';}}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('marketplace_theme');var d=document.documentElement;if(t==='dark'){d.classList.add('dark');d.style.colorScheme='dark';}else{d.classList.remove('dark');d.style.colorScheme='light';}}catch(e){}try{if(typeof performance!=='undefined'&&typeof performance.measure==='function'){var origMeasure=performance.measure.bind(performance);performance.measure=function(){try{return origMeasure.apply(this,arguments);}catch(err){return undefined;}};}}catch(e){}})();`,
           }}
         />
       </head>

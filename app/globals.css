@@ -17,6 +17,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --container-7xl: min(96vw, 1960px);
+}
+
+/* Ancho fluido adaptable para monitores grandes (27", 32", QHD y 4K) */
+.max-w-7xl {
+  width: 100%;
+  max-width: min(96vw, 1960px);
 }
 
 body {

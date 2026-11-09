@@ -33,6 +33,7 @@ import {
   encodeAdPageConfigToSlot,
   getListingSpecialClassification,
 } from '@/lib/adPageConfig'
+import { useRegisterGlobalLoadPhase } from './AvantGardeLoader'
 
 interface PromotionFormProps {
   userId: string
@@ -67,6 +68,8 @@ export default function PromotionForm({
   const [adAccount, setAdAccount] = useState<AdAccount | null>(initialAdAccount)
   const [loadingAccount, setLoadingAccount] = useState(!initialAdAccount)
   const [refreshingBalance, setRefreshingBalance] = useState(false)
+
+  useRegisterGlobalLoadPhase(loadingAccount)
 
   // Recharge requests state
   const [rechargeRequests, setRechargeRequests] = useState<AdRechargeRequest[]>(

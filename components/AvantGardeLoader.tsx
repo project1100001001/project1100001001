@@ -324,7 +324,7 @@ export function resolveRouteContext(href: string): RouteContextInfo {
   }
 }
 
-// Estado compartido entre AvantGardeLoader (loading.tsx / páginas) y GlobalNavigationLoader (overlay único de pantalla completa)
+// Estado compartido entre AvantGardeLoader (loading.tsx / páginas), hooks de carga de datos y GlobalNavigationLoader (overlay único de pantalla completa)
 let isGlobalHostMounted = false
 let activeLoaderCount = 0
 let activeCustomTitle: string | undefined = undefined
@@ -335,6 +335,35 @@ const loaderListeners = new Set<() => void>()
 
 function notifyLoaderListeners() {
   loaderListeners.forEach((fn) => fn())
+}
+
+/**
+ * Hook para registrar una fase de carga secundaria (ej. consulta inicial de cliente tras montar la ruta)
+ * dentro de la MISMA sesión de carga global, evitando que la ventana se muestre a medio cargar
+ * o que aparezca una segunda pantalla de carga independiente.
+ */
+export function useRegisterGlobalLoadPhase(
+  isLoading: boolean,
+  customTitle?: string,
+  customSubtitle?: string
+) {
+  useEffect(() => {
+    if (!isLoading) return
+
+    activeLoaderCount += 1
+    if (customTitle) activeCustomTitle = customTitle
+    if (customSubtitle) activeCustomSubtitle = customSubtitle
+    notifyLoaderListeners()
+
+    return () => {
+      activeLoaderCount = Math.max(0, activeLoaderCount - 1)
+      if (activeLoaderCount === 0 && !manualNavigationActive) {
+        activeCustomTitle = undefined
+        activeCustomSubtitle = undefined
+      }
+      notifyLoaderListeners()
+    }
+  }, [isLoading, customTitle, customSubtitle])
 }
 
 /**
@@ -353,17 +382,19 @@ export function triggerGlobalNavigationLoader(
     if (href === currentFull && !customTitle) return
   }
   lastPendingHref = href
-  activeCustomTitle = customTitle
-  activeCustomSubtitle = customSubtitle
+  if (customTitle) activeCustomTitle = customTitle
+  if (customSubtitle) activeCustomSubtitle = customSubtitle
   manualNavigationActive = true
   if (manualSafetyTimer) clearTimeout(manualSafetyTimer)
   manualSafetyTimer = setTimeout(() => {
     manualNavigationActive = false
     lastPendingHref = null
-    activeCustomTitle = undefined
-    activeCustomSubtitle = undefined
+    if (activeLoaderCount === 0) {
+      activeCustomTitle = undefined
+      activeCustomSubtitle = undefined
+    }
     notifyLoaderListeners()
-  }, 8000)
+  }, 10000)
   notifyLoaderListeners()
 }
 
@@ -476,12 +507,12 @@ export default function AvantGardeLoader({
   title,
   subtitle,
 }: AvantGardeLoaderProps) {
-  const [hostReady, setHostReady] = useState(() => isGlobalHostMounted)
+  const [hostReady, setHostReady] = useState(false)
 
   useEffect(() => {
     activeLoaderCount += 1
-    activeCustomTitle = title
-    activeCustomSubtitle = subtitle
+    if (title) activeCustomTitle = title
+    if (subtitle) activeCustomSubtitle = subtitle
     setHostReady(isGlobalHostMounted)
     notifyLoaderListeners()
 
@@ -495,17 +526,13 @@ export default function AvantGardeLoader({
     }
   }, [title, subtitle])
 
-  // Si el contenedor global ya está montado, él renderiza el único overlay de pantalla completa
+  // Si el contenedor global ya está montado en cliente tras el primer efecto, él renderiza el único overlay de pantalla completa
   if (hostReady) {
     return <div className="flex-1 min-h-[72vh]" aria-hidden="true" />
   }
 
-  // Fallback para SSR inicial antes de que hidrate GlobalNavigationLoader
-  const initialHref =
-    lastPendingHref ||
-    (typeof window !== 'undefined'
-      ? window.location.pathname + (window.location.search || '')
-      : '/')
+  // Fallback consistente para SSR e hidratación inicial antes de que se sincronice con GlobalNavigationLoader
+  const initialHref = lastPendingHref || '/'
 
   return (
     <FullScreenDescriptiveLoaderOverlay
@@ -520,32 +547,49 @@ export default function AvantGardeLoader({
 function NavigationProgressInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [isNavigating, setIsNavigating] = useState(false)
+  const [isRoutePending, setIsRoutePending] = useState(false)
   const [externalLoaders, setExternalLoaders] = useState(0)
+  const [isOverlayActive, setIsOverlayActive] = useState(false)
   const [progress, setProgress] = useState(20)
   const [targetHref, setTargetHref] = useState<string>('/')
 
   const currentRouteKey = `${pathname || '/'}?${searchParams ? searchParams.toString() : ''}`
   const prevRouteKeyRef = React.useRef<string>(currentRouteKey)
   const navStartTimeRef = React.useRef<number>(0)
+  const settleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Suscribirse a cualquier AvantGardeLoader activo o disparo manual (móvil y escritorio)
+  const clearPendingCloseTimers = () => {
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = null
+    }
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+  }
+
+  // Suscribirse a cualquier AvantGardeLoader activo, hook de fase de carga o disparo manual
   useEffect(() => {
     isGlobalHostMounted = true
     const sync = () => {
       setExternalLoaders(activeLoaderCount)
-      if (manualNavigationActive) {
+      if (manualNavigationActive || activeLoaderCount > 0) {
+        clearPendingCloseTimers()
         if (navStartTimeRef.current === 0) {
           navStartTimeRef.current = Date.now()
         }
-        setProgress(24)
-        setIsNavigating(true)
+        setProgress((prev) => (prev < 24 || prev >= 100 ? 24 : prev))
+        setIsOverlayActive(true)
+        if (manualNavigationActive) {
+          setIsRoutePending(true)
+        }
         if (lastPendingHref) {
           setTargetHref(lastPendingHref)
+        } else if (typeof window !== 'undefined') {
+          setTargetHref(window.location.pathname + (window.location.search || ''))
         }
-      }
-      if (activeLoaderCount > 0 && !lastPendingHref && typeof window !== 'undefined') {
-        setTargetHref(window.location.pathname + (window.location.search || ''))
       }
     }
     sync()
@@ -556,7 +600,8 @@ function NavigationProgressInner() {
     }
   }, [])
 
-  // Cuando cambia realmente la ruta o los query params, garantizamos un tiempo mínimo visible (520ms) para cubrir incluso rutas en caché o filtros rápidos
+  // Cuando cambia la ruta o los query params, marcamos que la transición de URL llegó,
+  // pero NO cerramos la pantalla si aún hay fases de carga activas (loading.tsx, Suspense o datos de página).
   useEffect(() => {
     if (prevRouteKeyRef.current === currentRouteKey) {
       return
@@ -568,36 +613,63 @@ function NavigationProgressInner() {
       clearTimeout(manualSafetyTimer)
       manualSafetyTimer = null
     }
-    if (isNavigating) {
-      const elapsed = navStartTimeRef.current > 0 ? Date.now() - navStartTimeRef.current : 0
-      const minTotalMs = 520
-      const remainingMs = Math.max(220, minTotalMs - elapsed)
-
-      const finishProgressTimer = setTimeout(() => {
-        setProgress(100)
-      }, Math.max(40, remainingMs - 160))
-
-      const doneTimer = setTimeout(() => {
-        navStartTimeRef.current = 0
-        setIsNavigating(false)
-        setProgress(20)
-        if (activeLoaderCount === 0) {
-          activeCustomTitle = undefined
-          activeCustomSubtitle = undefined
-        }
-      }, remainingMs)
-
-      return () => {
-        clearTimeout(finishProgressTimer)
-        clearTimeout(doneTimer)
-      }
+    if (typeof window !== 'undefined') {
+      setTargetHref(window.location.pathname + (window.location.search || ''))
     }
-  }, [currentRouteKey, isNavigating])
+    setIsRoutePending(false)
+  }, [currentRouteKey])
 
-  // Interceptar clics en TODOS los enlaces (en fase de burbujeo, después de que Next.js Link llama a e.preventDefault() e inicia la navegación)
+  // Unificador central de cierre: SOLO cierra la pantalla de espera cuando TANTO la ruta
+  // como TODOS los cargadores secundarios (loading.tsx, Suspense, useRegisterGlobalLoadPhase)
+  // han terminado de forma estable durante la ventana de coalescencia.
+  const hasAnyActivePhase = isRoutePending || externalLoaders > 0 || manualNavigationActive
+
+  useEffect(() => {
+    if (hasAnyActivePhase) {
+      clearPendingCloseTimers()
+      if (navStartTimeRef.current === 0) {
+        navStartTimeRef.current = Date.now()
+      }
+      setProgress((prev) => (prev < 24 || prev >= 100 ? 24 : prev))
+      setIsOverlayActive(true)
+      return
+    }
+
+    if (!isOverlayActive) return
+
+    clearPendingCloseTimers()
+    const elapsed = navStartTimeRef.current > 0 ? Date.now() - navStartTimeRef.current : 0
+    const minTotalMs = 520
+    // Ventana de coalescencia (320ms minimum) para absorber cualquier segundo proceso de carga consecutivo sin parpadear
+    const waitBeforeCompleteMs = Math.max(320, minTotalMs - elapsed)
+
+    settleTimerRef.current = setTimeout(() => {
+      // Verificar nuevamente que no se haya activado otra fase de carga en este intervalo
+      if (activeLoaderCount > 0 || manualNavigationActive) {
+        return
+      }
+      setProgress(100)
+      hideTimerRef.current = setTimeout(() => {
+        if (activeLoaderCount > 0 || manualNavigationActive) {
+          return
+        }
+        navStartTimeRef.current = 0
+        setIsOverlayActive(false)
+        setProgress(20)
+        activeCustomTitle = undefined
+        activeCustomSubtitle = undefined
+      }, 170)
+    }, waitBeforeCompleteMs)
+
+    return () => {
+      clearPendingCloseTimers()
+    }
+  }, [hasAnyActivePhase, isOverlayActive])
+
+  // Interceptar clics en TODOS los enlaces
   useEffect(() => {
     let safetyTimer: ReturnType<typeof setTimeout> | null = null
-    let sameRouteFallbackTimer: ReturnType<typeof setTimeout> | null = null
+    let sameUrlCheckTimer: ReturnType<typeof setTimeout> | null = null
 
     const activateForElement = (targetEl: HTMLElement | null) => {
       const anchor = targetEl?.closest('a')
@@ -623,43 +695,35 @@ function NavigationProgressInner() {
         window.location.pathname + (window.location.search ? window.location.search : '')
       if (href === currentFull) return
 
-      navStartTimeRef.current = Date.now()
+      clearPendingCloseTimers()
+      if (navStartTimeRef.current === 0) {
+        navStartTimeRef.current = Date.now()
+      }
       lastPendingHref = href
       setTargetHref(href)
-      setProgress(24)
-      setIsNavigating(true)
+      setProgress((prev) => (isOverlayActive && prev > 24 && prev < 95 ? prev : 24))
+      setIsRoutePending(true)
+      setIsOverlayActive(true)
 
-      if (sameRouteFallbackTimer) clearTimeout(sameRouteFallbackTimer)
-      // Si la transición es manejada localmente por eventos (ej. sub-secciones ya montadas), cerrar suavemente tras completarse
-      sameRouteFallbackTimer = setTimeout(() => {
+      if (sameUrlCheckTimer) clearTimeout(sameUrlCheckTimer)
+      // Solo liberar isRoutePending si la URL destino ya coincide con la URL actual (nunca cortar a mitad de una carga real)
+      sameUrlCheckTimer = setTimeout(() => {
         const nowFull =
           window.location.pathname + (window.location.search ? window.location.search : '')
-        if (activeLoaderCount === 0 && (nowFull === href || Date.now() - navStartTimeRef.current >= 600)) {
-          setProgress(100)
-          setTimeout(() => {
-            if (activeLoaderCount === 0) {
-              navStartTimeRef.current = 0
-              lastPendingHref = null
-              manualNavigationActive = false
-              setIsNavigating(false)
-              setProgress(20)
-            }
-          }, 180)
+        if (nowFull === href && !manualNavigationActive) {
+          setIsRoutePending(false)
         }
-      }, 750)
+      }, 650)
 
       if (safetyTimer) clearTimeout(safetyTimer)
       safetyTimer = setTimeout(() => {
-        navStartTimeRef.current = 0
         lastPendingHref = null
         manualNavigationActive = false
-        setIsNavigating(false)
-        setProgress(20)
-      }, 8000)
+        setIsRoutePending(false)
+      }, 10000)
     }
 
     const handleDocumentClick = (e: MouseEvent) => {
-      // Nota: NO filtrar por e.defaultPrevented porque Next.js <Link> llama a e.preventDefault() para hacer client-side routing
       if (
         (typeof e.button === 'number' && e.button !== 0) ||
         e.metaKey ||
@@ -676,26 +740,24 @@ function NavigationProgressInner() {
     return () => {
       document.removeEventListener('click', handleDocumentClick, false)
       if (safetyTimer) clearTimeout(safetyTimer)
-      if (sameRouteFallbackTimer) clearTimeout(sameRouteFallbackTimer)
+      if (sameUrlCheckTimer) clearTimeout(sameUrlCheckTimer)
     }
-  }, [])
+  }, [isOverlayActive])
 
-  const isVisible = isNavigating || externalLoaders > 0
-
-  // Avance progresivo del porcentaje mientras la pantalla de espera está activa
+  // Avance progresivo monotónico del porcentaje mientras la sesión de carga unificada está activa
   useEffect(() => {
-    if (!isVisible) return
+    if (!isOverlayActive) return
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 96) return 96
-        const step = prev < 60 ? 9 : prev < 85 ? 4 : 1
-        return Math.min(96, prev + step)
+        if (prev >= 95) return prev
+        const step = prev < 55 ? 8 : prev < 80 ? 4 : 1
+        return Math.min(95, prev + step)
       })
     }, 160)
     return () => clearInterval(interval)
-  }, [isVisible])
+  }, [isOverlayActive])
 
-  if (!isVisible) return null
+  if (!isOverlayActive) return null
 
   const effectiveHref =
     lastPendingHref ||

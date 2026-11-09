@@ -15,7 +15,7 @@ import {
   ALL_TEST_PROFILES,
   TestProfile,
 } from '@/lib/testProfiles'
-import AvantGardeLoader from '@/components/AvantGardeLoader'
+import AvantGardeLoader, { triggerGlobalNavigationLoader } from '@/components/AvantGardeLoader'
 
 function LoginForm() {
   const router = useRouter()
@@ -76,6 +76,11 @@ function LoginForm() {
       setSuccessMsg(
         locale === 'en' ? 'Login successful! Opening welcome guide...' : '¡Inicio de sesión exitoso! Abriendo bienvenida...'
       )
+      triggerGlobalNavigationLoader(
+        targetUrl,
+        'Iniciando Sesión en Indie Clasificados',
+        'Abriendo tu ventana liviana de bienvenida y guía rápida según tu perfil...'
+      )
       router.push(targetUrl)
     } catch (err: any) {
       setErrorMsg(err.message || (locale === 'en' ? 'Login error' : 'Error al iniciar sesión'))
@@ -106,8 +111,14 @@ function LoginForm() {
         if (error) throw error
 
         if (data.session) {
+          const nextWelcomeUrl = `/bienvenida?role=buyer&name=${encodeURIComponent(fullName || email.split('@')[0])}`
           setSuccessMsg(locale === 'en' ? 'Account created and logged in!' : '¡Cuenta creada e inicio de sesión exitoso!')
-          router.push(`/bienvenida?role=buyer&name=${encodeURIComponent(fullName || email.split('@')[0])}`)
+          triggerGlobalNavigationLoader(
+            nextWelcomeUrl,
+            'Cuenta Creada en Indie Clasificados',
+            'Preparando tu panel de bienvenida...'
+          )
+          router.push(nextWelcomeUrl)
         } else {
           setSuccessMsg(
             locale === 'en'

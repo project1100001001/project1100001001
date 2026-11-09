@@ -310,7 +310,7 @@ export default function CatalogClientView({
           </div>
         ) : (
           /* MODO CUADRÍCULA */
-          <div className="grid grid-cols-2 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {visibleListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} viewMode="grid" />
             ))}

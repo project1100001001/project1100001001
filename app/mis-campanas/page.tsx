@@ -145,6 +145,19 @@ export default async function MisCampanasPage() {
   const balance = adAccounts.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0)
   const adAccountIds = adAccounts.map((a) => a.id)
 
+  // 3.5. Obtener paquetes publicitarios y solicitudes de recarga del vendedor para reactivación y validación de pago
+  const { data: packages } = await supabase
+    .from('ad_package')
+    .select('*')
+    .eq('active', true)
+    .order('price', { ascending: true })
+
+  const { data: rechargeRequests } = await supabase
+    .from('ad_recharge_request')
+    .select('*')
+    .in('seller_id', sellerIds)
+    .order('created_at', { ascending: false })
+
   // 4. Obtener todos los listings del vendedor
   const { data: sellerListings } = await supabase
     .from('listing')
@@ -305,7 +318,7 @@ export default async function MisCampanasPage() {
             <span>Mis Campañas Publicitarias</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Visualiza y edita los campos de tus campañas (incluida la imagen cargada) y supervisa el tiempo restante, clics generados y contactos de WhatsApp.
+            Visualiza, edita o reactiva tus campañas del historial (con configuración de planes, pasarelas y validación de pago) y supervisa el tiempo restante y métricas.
           </p>
         </div>
 
@@ -314,6 +327,10 @@ export default async function MisCampanasPage() {
           balance={balance}
           advertiserName={advertisers?.[0]?.legal_name || sellers[0].business_name}
           userId={user.id}
+          sellerId={sellers[0].id}
+          adAccountId={adAccounts[0]?.id}
+          packages={packages || []}
+          initialRechargeRequests={rechargeRequests || []}
           sellerListings={sellerListings || []}
         />
       </div>

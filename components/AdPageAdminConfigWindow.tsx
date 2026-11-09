@@ -362,6 +362,16 @@ export default function AdPageAdminConfigWindow({
     updateField('customRunways', nextList)
   }
 
+  const handleMoveCustomRunway = (index: number, direction: 'up' | 'down') => {
+    const list = [...(config.customRunways || [])]
+    const targetIdx = direction === 'up' ? index - 1 : index + 1
+    if (targetIdx < 0 || targetIdx >= list.length) return
+    const temp = list[index]
+    list[index] = list[targetIdx]
+    list[targetIdx] = temp
+    updateField('customRunways', list)
+  }
+
   const handleToggleRunwaySeller = (runwayId: string, sellerUserId: string) => {
     const runway = (config.customRunways || []).find((r) => r.id === runwayId)
     if (!runway) return
@@ -1003,17 +1013,17 @@ export default function AdPageAdminConfigWindow({
                 </span>
               </div>
               <h3 className="mt-1.5 text-base font-extrabold text-zinc-900 dark:text-zinc-50">
-                Adicionar y Administrar Pasarelas en la Página de Publicidad y Nuevos Catálogos Exclusivos
+                Adicionar y Administrar Pasarelas en Posición Exclusiva (Consecutivas después de la Gran Vitrina)
               </h3>
               <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                Crea nuevas pasarelas en la Página de Publicidad (por temporada o expansión de mercado). Cada nueva pasarela habilita su propio <strong>Catálogo Exclusivo</strong>, su <strong>lista de clasificación</strong> para artículos y campañas, su <strong>costo adicional de campaña ($ COP)</strong> y la <strong>habilitación de vendedores según el pago realizado</strong>.
+                Cada pasarela de <strong>Catálogo Exclusivo</strong> se ubica en <strong>posición exclusiva inmediatamente después de la Gran Vitrina Destacada</strong> de manera consecutiva (#1, #2, #3, etc.), antes de las pasarelas generales de Servicios, Usados, Nuevos y Proveedores.
               </p>
             </div>
           </div>
 
           {/* Lista de Pasarelas Adicionales Existentes en la Página de Publicidad */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {(config.customRunways || []).map((customR) => {
+            {(config.customRunways || []).map((customR, idx) => {
               const assignedIds = Array.isArray(customR.assignedListingIds)
                 ? customR.assignedListingIds
                 : []
@@ -1044,6 +1054,9 @@ export default function AdPageAdminConfigWindow({
                       </span>
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black uppercase text-white shadow-2xs">
+                            ⭐ Posición Exclusiva #{idx + 1} (Post-Gran Vitrina)
+                          </span>
                           <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
                             {customR.title}
                           </h4>
@@ -1070,8 +1083,26 @@ export default function AdPageAdminConfigWindow({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveCustomRunway(idx, 'up')}
+                        className="rounded-lg border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 cursor-pointer"
+                        title="Subir posición consecutiva después de Gran Vitrina"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === (config.customRunways || []).length - 1}
+                        onClick={() => handleMoveCustomRunway(idx, 'down')}
+                        className="rounded-lg border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-zinc-700 hover:bg-zinc-100 disabled:opacity-35 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 cursor-pointer"
+                        title="Bajar posición consecutiva después de Gran Vitrina"
+                      >
+                        ▼
+                      </button>
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer ml-1">
                         <input
                           type="checkbox"
                           checked={customR.active}

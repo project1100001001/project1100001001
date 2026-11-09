@@ -691,7 +691,7 @@ export default function SellersDirectoryClientView({
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-5">
           {visibleSellers.map((seller) => {
             const initial = seller.business_name ? seller.business_name[0].toUpperCase() : 'C'
             const whatsappUrl = formatWhatsappUrl(seller.whatsapp, seller.business_name)

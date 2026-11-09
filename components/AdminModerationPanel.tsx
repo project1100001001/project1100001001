@@ -130,13 +130,33 @@ export default function AdminModerationPanel({
 
   // Ads state & Independent Runway Administration
   const [adOrders, setAdOrders] = useState<AdOrderWithRelations[]>(initialAdOrders)
-  const [adActiveTab, setAdActiveTab] = useState<'pending' | 'live' | 'rejected' | 'all'>('all')
+  const [adActiveTab, setAdActiveTab] = useState<
+    'pending' | 'live' | 'ended' | 'rejected' | 'all'
+  >('all')
   const [adMediumFilter, setAdMediumFilter] = useState<
     'all' | 'vitrina' | 'pasarela' | 'proveedores' | string
   >('all')
   const [rejectingAd, setRejectingAd] = useState<AdOrderWithRelations | null>(null)
   const [adRejectReason, setAdRejectReason] = useState('')
   const [isSyncingPolicies, setIsSyncingPolicies] = useState(false)
+
+  // Estados para Reactivación de Campaña con Configuraciones y Validación de Pago (Perfil Admin)
+  const [adminReactivatingAd, setAdminReactivatingAd] = useState<AdOrderWithRelations | null>(null)
+  const [adminReactivatePlacement, setAdminReactivatePlacement] = useState<
+    'pasarela' | 'gran_vitrina' | 'combo' | 'none'
+  >('pasarela')
+  const [adminReactivateRunwayId, setAdminReactivateRunwayId] = useState<string>('')
+  const [adminReactivateDurationDays, setAdminReactivateDurationDays] = useState<number>(7)
+  const [adminReactivateHeadline, setAdminReactivateHeadline] = useState<string>('')
+  const [adminReactivateBody, setAdminReactivateBody] = useState<string>('')
+  const [adminReactivateImageUrl, setAdminReactivateImageUrl] = useState<string>('')
+  const [adminReactivatePaymentValidation, setAdminReactivatePaymentValidation] = useState<
+    'approve_pending_recharge' | 'deduct_wallet' | 'direct_validated'
+  >('deduct_wallet')
+  const [adminReactivateSelectedRechargeId, setAdminReactivateSelectedRechargeId] =
+    useState<string>('')
+  const [isSubmittingAdminReactivation, setIsSubmittingAdminReactivation] =
+    useState<boolean>(false)
 
   // Configuración viva de pasarelas (incluye customRunways por temporada o expansión de mercado)
   const [liveAdPageConfig, setLiveAdPageConfig] = useState<AdPageConfig>(() =>
@@ -282,9 +302,24 @@ export default function AdminModerationPanel({
     )
   }
 
+  const isAdEndedOrExpired = (ad: AdOrderWithRelations) => {
+    const ts = getAdOrderTimeStatus(ad)
+    return (
+      ad.status === 'ended' ||
+      ad.status === 'cancelled' ||
+      ad.status === 'paused' ||
+      (ts.isExpired && !pendingAdStatuses.includes(ad.status))
+    )
+  }
+
   const filteredAds = adOrders.filter((ad) => {
     if (adActiveTab === 'pending' && !pendingAdStatuses.includes(ad.status)) return false
-    if (adActiveTab === 'live' && ad.status !== 'live' && ad.status !== 'approved') return false
+    if (
+      adActiveTab === 'live' &&
+      ((ad.status !== 'live' && ad.status !== 'approved') || isAdEndedOrExpired(ad))
+    )
+      return false
+    if (adActiveTab === 'ended' && !isAdEndedOrExpired(ad)) return false
     if (adActiveTab === 'rejected' && ad.status !== 'rejected') return false
 
     const mediumStates = getAdIndependentStates(ad)
@@ -317,7 +352,10 @@ export default function AdminModerationPanel({
   })
 
   const pendingAdsCount = adOrders.filter((a) => pendingAdStatuses.includes(a.status)).length
-  const liveAdsCount = adOrders.filter((a) => a.status === 'live' || a.status === 'approved').length
+  const liveAdsCount = adOrders.filter(
+    (a) => (a.status === 'live' || a.status === 'approved') && !isAdEndedOrExpired(a)
+  ).length
+  const endedAdsCount = adOrders.filter((a) => isAdEndedOrExpired(a)).length
   const rejectedAdsCount = adOrders.filter((a) => a.status === 'rejected').length
 
   // Contadores independientes por medio para el panel de administración
@@ -586,6 +624,406 @@ export default function AdminModerationPanel({
     } catch (err: any) {
       showToast(err.message || 'Error al aprobar la campaña publicitaria', 'error')
     } finally {
+      setProcessingId(null)
+    }
+  }
+
+  // Abrir modal administrativo de reactivación y configuración de campaña (Perfil Admin)
+  const handleOpenAdminReactivateModal = (ad: AdOrderWithRelations) => {
+    setAdminReactivatingAd(ad)
+    setAdminReactivateHeadline(ad.headline || '')
+    setAdminReactivateBody(ad.body || '')
+    setAdminReactivateImageUrl(ad.image_url || '')
+
+    const seasonalMeta = extractSeasonalRunwayMeta(ad)
+    const resolvedPl = resolveAdOrderPlacement(ad)
+
+    if (seasonalMeta.isSeasonalOnly && seasonalMeta.specialRunwayId) {
+      setAdminReactivatePlacement('none')
+      setAdminReactivateRunwayId(seasonalMeta.specialRunwayId)
+    } else {
+      if (resolvedPl.placement === 'combo') {
+        setAdminReactivatePlacement('combo')
+      } else if (resolvedPl.placement === 'gran_vitrina') {
+        setAdminReactivatePlacement('gran_vitrina')
+      } else {
+        setAdminReactivatePlacement('pasarela')
+      }
+      setAdminReactivateRunwayId(
+        seasonalMeta.specialRunwayId || (ad.listing as any)?.attrs?.special_runway_id || ''
+      )
+    }
+
+    const durationDays = ad.package?.duration_days || 7
+    setAdminReactivateDurationDays(durationDays)
+
+    // Buscar si existe una solicitud de recarga pendiente vinculada a esta campaña o del mismo vendedor
+    const sellerId =
+      ad.listing?.seller_id || ad.ad_account?.advertiser?.seller_id || ''
+    const linkedPendingReq =
+      rechargeRequests.find(
+        (r) => r.status === 'pending' && r.notes?.includes(`[REACTIVAR_CAMPANA:${ad.id}]`)
+      ) ||
+      rechargeRequests.find(
+        (r) =>
+          r.status === 'pending' &&
+          (r.ad_account_id === ad.ad_account_id || (sellerId && r.seller_id === sellerId))
+      )
+
+    if (linkedPendingReq) {
+      setAdminReactivateSelectedRechargeId(linkedPendingReq.id)
+      setAdminReactivatePaymentValidation('approve_pending_recharge')
+    } else {
+      setAdminReactivateSelectedRechargeId('')
+      const sellerAcc = adAccounts.find(
+        (acc) =>
+          acc.id === ad.ad_account_id ||
+          (sellerId && acc.advertiser?.seller_id === sellerId)
+      )
+      const sellerBal = Number(sellerAcc?.balance || 0)
+      const baseCost =
+        seasonalMeta.isSeasonalOnly && seasonalMeta.specialRunwayId
+          ? 0
+          : resolvedPl.placement === 'combo'
+            ? 25000
+            : resolvedPl.placement === 'gran_vitrina'
+              ? 20000
+              : 10000
+      setAdminReactivatePaymentValidation(
+        sellerBal >= baseCost ? 'deduct_wallet' : 'direct_validated'
+      )
+    }
+  }
+
+  // Confirmar reactivación administrativa de campaña con configuración de pasarelas y validación de pago
+  const handleConfirmAdminReactivateAd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!adminReactivatingAd) return
+
+    const selectedRunway =
+      (liveAdPageConfig.customRunways || []).find((r) => r.id === adminReactivateRunwayId) ||
+      null
+
+    if (adminReactivatePlacement === 'none' && !selectedRunway) {
+      showToast(
+        'Debes seleccionar al menos un Plan Original o una Pasarela de Temporada para reactivar la campaña.',
+        'error'
+      )
+      return
+    }
+
+    setIsSubmittingAdminReactivation(true)
+    setProcessingId(adminReactivatingAd.id)
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      const baseCost =
+        adminReactivatePlacement === 'combo'
+          ? 25000
+          : adminReactivatePlacement === 'gran_vitrina'
+            ? 20000
+            : adminReactivatePlacement === 'pasarela'
+              ? 10000
+              : 0
+      const seasonalCost = selectedRunway
+        ? Number(selectedRunway.campaignCostCop || 15000)
+        : 0
+      const totalCost = baseCost + seasonalCost
+
+      const sellerId =
+        adminReactivatingAd.listing?.seller_id ||
+        adminReactivatingAd.ad_account?.advertiser?.seller_id ||
+        ''
+      const targetAccount =
+        adAccounts.find((a) => a.id === adminReactivatingAd.ad_account_id) ||
+        adAccounts.find((a) => sellerId && a.advertiser?.seller_id === sellerId)
+
+      let currentAccBalance = Number(targetAccount?.balance || 0)
+
+      // 1. Procesar Validación de Pago según la modalidad elegida por el Admin
+      if (
+        adminReactivatePaymentValidation === 'approve_pending_recharge' &&
+        adminReactivateSelectedRechargeId
+      ) {
+        const pendingReq = rechargeRequests.find(
+          (r) => r.id === adminReactivateSelectedRechargeId
+        )
+        if (pendingReq && pendingReq.status === 'pending') {
+          await supabase
+            .from('ad_recharge_request')
+            .update({
+              status: 'approved',
+              approved_by: user?.id || null,
+              approved_at: new Date().toISOString(),
+            })
+            .eq('id', pendingReq.id)
+
+          currentAccBalance += Number(pendingReq.amount || 0)
+
+          if (targetAccount) {
+            await supabase
+              .from('ad_account')
+              .update({ balance: currentAccBalance })
+              .eq('id', targetAccount.id)
+
+            await supabase.from('wallet_transaction').insert({
+              ad_account_id: targetAccount.id,
+              kind: 'topup',
+              amount: pendingReq.amount,
+              balance_after: currentAccBalance,
+              ref_type: pendingReq.payment_method,
+              ref_id: pendingReq.reference_code,
+            })
+          }
+
+          setRechargeRequests((prev) =>
+            prev.map((r) =>
+              r.id === pendingReq.id
+                ? { ...r, status: 'approved', approved_at: new Date().toISOString() }
+                : r
+            )
+          )
+        }
+      }
+
+      if (
+        (adminReactivatePaymentValidation === 'deduct_wallet' ||
+          adminReactivatePaymentValidation === 'approve_pending_recharge') &&
+        targetAccount
+      ) {
+        if (currentAccBalance < totalCost) {
+          throw new Error(
+            `El saldo en la billetera del vendedor ($${currentAccBalance.toLocaleString('es-CO')} COP) es menor al costo de reactivación ($${totalCost.toLocaleString('es-CO')} COP). Usa "Pago Directo Validado" o aprueba una recarga mayor.`
+          )
+        }
+        const nextBalance = Math.max(0, currentAccBalance - totalCost)
+        await supabase
+          .from('ad_account')
+          .update({ balance: nextBalance })
+          .eq('id', targetAccount.id)
+
+        const { data: spendTx } = await supabase
+          .from('wallet_transaction')
+          .insert({
+            ad_account_id: targetAccount.id,
+            kind: 'spend',
+            amount: totalCost,
+            balance_after: nextBalance,
+            ref_type: 'admin_campaign_reactivation',
+            ref_id: adminReactivatingAd.id,
+          })
+          .select('id')
+          .maybeSingle()
+
+        setAdAccounts((prev) =>
+          prev.map((a) => (a.id === targetAccount.id ? { ...a, balance: nextBalance } : a))
+        )
+
+        const newSpendTx: WalletTransactionWithRelations = {
+          id: Number(spendTx?.id) || Date.now(),
+          ad_account_id: targetAccount.id,
+          kind: 'spend',
+          amount: totalCost,
+          balance_after: nextBalance,
+          ref_type: 'admin_campaign_reactivation',
+          ref_id: adminReactivatingAd.id,
+          idempotency_key: null,
+          created_at: new Date().toISOString(),
+          ad_account: targetAccount,
+        }
+        setTransactions((prev) => [newSpendTx, ...prev])
+      }
+
+      // 2. Resolver plan oficial, fechas de vigencia y etiquetas de temporada
+      const matchedOfficialPlan =
+        adminReactivatePlacement === 'combo'
+          ? OFFICIAL_AD_PLANS.find((p) => p.placement === 'combo')
+          : adminReactivatePlacement === 'gran_vitrina'
+            ? OFFICIAL_AD_PLANS.find((p) => p.placement === 'gran_vitrina')
+            : OFFICIAL_AD_PLANS.find((p) => p.placement === 'pasarela')
+
+      const resolvedPackageId =
+        matchedOfficialPlan?.id || adminReactivatingAd.package_id
+      const resolvedSlotId =
+        matchedOfficialPlan?.slot_id || adminReactivatingAd.slot_id
+
+      const rawCat = (adminReactivatingAd.target_category || '').trim()
+      const cleanCat = rawCat
+        .replace(/^(\[(?:SOLO_TEMPORADA|PLAN_MAS_TEMPORADA):[^\]]+\])\s*/, '')
+        .trim()
+
+      const seasonalPrefix =
+        adminReactivatePlacement === 'none' && selectedRunway
+          ? `[SOLO_TEMPORADA:${selectedRunway.id}]`
+          : adminReactivatePlacement !== 'none' && selectedRunway
+            ? `[PLAN_MAS_TEMPORADA:${selectedRunway.id}:${adminReactivatePlacement}]`
+            : ''
+
+      const finalTargetCategory = seasonalPrefix
+        ? cleanCat
+          ? `${seasonalPrefix} ${cleanCat}`
+          : `${seasonalPrefix} ${selectedRunway?.title || 'Temporada'}`
+        : cleanCat || null
+
+      const durationDays = Math.max(1, Number(adminReactivateDurationDays) || 7)
+      const now = new Date()
+      const startsAt = now.toISOString()
+      const endsAt = new Date(
+        now.getTime() + durationDays * 24 * 60 * 60 * 1000
+      ).toISOString()
+
+      const updateAdPayload = {
+        package_id: resolvedPackageId,
+        slot_id: resolvedSlotId,
+        headline: adminReactivateHeadline.trim() || adminReactivatingAd.headline,
+        body: adminReactivateBody.trim() || null,
+        image_url: adminReactivateImageUrl.trim() || null,
+        target_category: finalTargetCategory,
+        price_paid: totalCost,
+        status: 'live' as AdOrderStatus,
+        reject_reason: null,
+        reviewed_by: user?.id || null,
+        reviewed_at: startsAt,
+        starts_at: startsAt,
+        ends_at: endsAt,
+      }
+
+      const { error: adUpdErr } = await supabase
+        .from('ad_order')
+        .update(updateAdPayload)
+        .eq('id', adminReactivatingAd.id)
+
+      if (adUpdErr) throw adUpdErr
+
+      // 3. Sincronizar estados independientes por pasarela y atributos de la publicación
+      const listingId = adminReactivatingAd.listing_id || null
+      const independentStateForOrder = {
+        vitrina: {
+          enabled:
+            adminReactivatePlacement === 'gran_vitrina' ||
+            adminReactivatePlacement === 'combo',
+          endsAt,
+        },
+        pasarela: {
+          enabled:
+            adminReactivatePlacement === 'pasarela' ||
+            adminReactivatePlacement === 'combo',
+          endsAt,
+        },
+        proveedores: {
+          enabled: true,
+          endsAt,
+        },
+        customRunways: selectedRunway
+          ? {
+              [selectedRunway.id]: {
+                enabled: true,
+                endsAt,
+              },
+            }
+          : {},
+      }
+
+      const nextOverridesMap = {
+        ...localRunwayOverrides,
+        [adminReactivatingAd.id]: independentStateForOrder,
+      }
+      setLocalRunwayOverrides(nextOverridesMap)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          INDEPENDENT_RUNWAY_OVERRIDES_KEY,
+          JSON.stringify(nextOverridesMap)
+        )
+      }
+
+      if (listingId) {
+        const baseAttrs = adminReactivatingAd.listing?.attrs || {}
+        const nextAttrs: Record<string, any> = {
+          ...baseAttrs,
+          ad_placement:
+            adminReactivatePlacement === 'none'
+              ? 'pasarela_temporada'
+              : adminReactivatePlacement,
+          custom_campaign_image_url: updateAdPayload.image_url,
+          runway_independent_status: independentStateForOrder,
+          campaign_overrides: {
+            ...(baseAttrs.campaign_overrides || {}),
+            [adminReactivatingAd.id]: {
+              headline: updateAdPayload.headline,
+              body: updateAdPayload.body,
+              image_url: updateAdPayload.image_url,
+              target_category: updateAdPayload.target_category,
+              pending_reactivation_payment: false,
+              reactivated_at: startsAt,
+            },
+          },
+        }
+
+        if (selectedRunway) {
+          nextAttrs.special_runway_id = selectedRunway.id
+          nextAttrs.special_runway_title = selectedRunway.title
+          nextAttrs.special_runway_badge = `${selectedRunway.icon} ${selectedRunway.badge}`
+          nextAttrs.special_catalog_cost = selectedRunway.campaignCostCop
+        } else {
+          delete nextAttrs.special_runway_id
+          delete nextAttrs.special_runway_title
+          delete nextAttrs.special_runway_badge
+          delete nextAttrs.special_catalog_cost
+        }
+
+        try {
+          await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', listingId)
+        } catch {
+          // Ignorar error secundario
+        }
+
+        setListings((prev) =>
+          prev.map((l) => (l.id === listingId ? { ...l, attrs: nextAttrs } : l))
+        )
+      }
+
+      if (selectedRunway) {
+        const nextRunways = (liveAdPageConfig.customRunways || []).map((r) => {
+          if (r.id !== selectedRunway.id) return r
+          const assigned = new Set(r.assignedListingIds || [])
+          const authorized = new Set(r.authorizedSellerIds || [])
+          if (listingId) assigned.add(listingId)
+          if (sellerId) authorized.add(sellerId)
+          return {
+            ...r,
+            active: true,
+            assignedListingIds: Array.from(assigned),
+            authorizedSellerIds: Array.from(authorized),
+          }
+        })
+        await persistLiveAdPageConfig({
+          ...liveAdPageConfig,
+          customRunways: nextRunways,
+        })
+      }
+
+      setAdOrders((prev) =>
+        prev.map((item) =>
+          item.id === adminReactivatingAd.id
+            ? {
+                ...item,
+                ...updateAdPayload,
+              }
+            : item
+        )
+      )
+
+      setAdminReactivatingAd(null)
+      showToast(
+        `✅ Campaña "${updateAdPayload.headline}" reactivada en vivo (${durationDays} días) con pago validado ($${totalCost.toLocaleString('es-CO')} COP).`
+      )
+    } catch (err: any) {
+      showToast(err.message || 'Error al reactivar la campaña', 'error')
+    } finally {
+      setIsSubmittingAdminReactivation(false)
       setProcessingId(null)
     }
   }
@@ -1163,6 +1601,44 @@ export default function AdminModerationPanel({
           ...liveAdPageConfig,
           customRunways: nextRunways,
         })
+      }
+
+      // Si la solicitud de recarga está vinculada a la reactivación de una campaña ([REACTIVAR_CAMPANA:<order_id>]), reactivarla automáticamente
+      const reactivateMatch = (req.notes || '').match(/\[REACTIVAR_CAMPANA:([^\]]+)\]/)
+      if (reactivateMatch?.[1]) {
+        const targetOrderId = reactivateMatch[1].trim()
+        const targetAd = adOrders.find((a) => a.id === targetOrderId)
+        if (targetAd) {
+          const orderCost = Number(targetAd.price_paid || req.amount || 0)
+          if (newBalance >= orderCost && orderCost > 0) {
+            const balanceAfterSpend = newBalance - orderCost
+            await supabase
+              .from('ad_account')
+              .update({ balance: balanceAfterSpend })
+              .eq('id', req.ad_account_id)
+
+            await supabase.from('wallet_transaction').insert({
+              ad_account_id: req.ad_account_id,
+              kind: 'spend',
+              amount: orderCost,
+              balance_after: balanceAfterSpend,
+              ref_type: 'campaign_reactivation',
+              ref_id: targetOrderId,
+            })
+
+            setAdAccounts((prev) =>
+              prev.map((a) =>
+                a.id === req.ad_account_id ? { ...a, balance: balanceAfterSpend } : a
+              )
+            )
+          }
+
+          await handleApproveAd(targetOrderId)
+          showToast(
+            `✅ Pago validado ($${Number(req.amount).toLocaleString('es-CO')} COP) y campaña "${targetAd.headline}" reactivada automáticamente en vivo (live).`
+          )
+          return
+        }
       }
 
       showToast(
@@ -2753,6 +3229,12 @@ export default function AdminModerationPanel({
                   color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
                 },
                 {
+                  id: 'ended',
+                  label: 'Finalizadas / Historial para Reactivar',
+                  count: endedAdsCount,
+                  color: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300',
+                },
+                {
                   id: 'rejected',
                   label: 'Rechazadas',
                   count: rejectedAdsCount,
@@ -2881,6 +3363,12 @@ export default function AdminModerationPanel({
                   ad.listing,
                   liveAdPageConfig.customRunways
                 )
+                const pendingReactivationRecharge = rechargeRequests.find(
+                  (r) =>
+                    r.status === 'pending' &&
+                    typeof r.notes === 'string' &&
+                    r.notes.includes(`[REACTIVAR_CAMPANA:${ad.id}]`)
+                )
 
                 return (
                   <div
@@ -2937,6 +3425,11 @@ export default function AdminModerationPanel({
                                 ? '✕ Rechazado'
                                 : ad.status}
                             </span>
+                            {pendingReactivationRecharge && (
+                              <span className="rounded-md bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200">
+                                🧾 Comprobante de reactivación pendiente (${Number(pendingReactivationRecharge.amount).toLocaleString('es-CO')} COP)
+                              </span>
+                            )}
                             <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">
                               ${Number(ad.price_paid).toLocaleString('es-CO')} COP (Incluye Proveedor en Pasarela)
                             </span>
@@ -3008,7 +3501,7 @@ export default function AdminModerationPanel({
                         </div>
                       </div>
 
-                      {/* Bloque Derecho: Reloj de Tiempo Restante Global + Acciones Aprobar/Rechazar */}
+                      {/* Bloque Derecho: Reloj de Tiempo Restante Global + Acciones Aprobar/Rechazar/Reactivar */}
                       <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-between gap-3 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-zinc-100 dark:border-zinc-800">
                         {/* Reloj de Tiempo Restante de la Publicación */}
                         <div className="rounded-xl border border-zinc-200 bg-zinc-50/90 px-3.5 py-2.5 dark:border-zinc-800 dark:bg-zinc-800/60 min-w-[230px]">
@@ -3089,6 +3582,20 @@ export default function AdminModerationPanel({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => handleOpenAdminReactivateModal(ad)}
+                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 transition-colors cursor-pointer"
+                          >
+                            <span>🔄</span>
+                            <span>
+                              {timeStatus.isExpired || ad.status === 'ended' || ad.status === 'rejected'
+                                ? 'Reactivar y Validar Pago'
+                                : 'Reconfigurar / Renovar'}
+                            </span>
+                          </button>
+
                           {ad.status !== 'live' && (
                             <button
                               type="button"
@@ -4311,6 +4818,320 @@ export default function AdminModerationPanel({
           </div>
         </div>
       )}
+
+      {/* Modal Administrativo: Reactivación de Campaña con Configuraciones y Validación de Pago */}
+      {adminReactivatingAd && (() => {
+        const sellerId = adminReactivatingAd.listing?.seller?.id || adminReactivatingAd.account?.seller_id
+        const sellerAccount = adAccounts.find(
+          (a) => a.id === adminReactivatingAd.ad_account_id || (sellerId && a.seller_id === sellerId)
+        )
+        const sellerBalance = Number(sellerAccount?.balance || 0)
+        const pendingSellerRecharges = rechargeRequests.filter(
+          (r) =>
+            r.status === 'pending' &&
+            ((sellerId && r.seller_id === sellerId) ||
+              (sellerAccount && r.ad_account_id === sellerAccount.id) ||
+              r.notes?.includes(`[REACTIVAR_CAMPANA:${adminReactivatingAd.id}]`))
+        )
+        const baseCost =
+          adminReactivatePlacement === 'combo'
+            ? 25000
+            : adminReactivatePlacement === 'gran_vitrina'
+            ? 20000
+            : adminReactivatePlacement === 'pasarela'
+            ? 10000
+            : 0
+        const selectedRunway = (liveAdPageConfig.customRunways || []).find(
+          (r) => r.id === adminReactivateRunwayId
+        )
+        const seasonalCost = selectedRunway ? Number(selectedRunway.campaignCostCop || 0) : 0
+        const totalAdminCost = baseCost + seasonalCost
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs overflow-y-auto">
+            <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 my-8 max-h-[92vh] overflow-y-auto space-y-5">
+              <div className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-4 dark:border-zinc-800">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    🔄 Panel Administrativo: Reactivación y Validación de Pago
+                  </span>
+                  <h3 className="mt-1.5 text-lg font-extrabold text-zinc-900 dark:text-zinc-50">
+                    Reactivar Campaña: {adminReactivatingAd.headline}
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Proveedor:{' '}
+                    <strong className="text-zinc-800 dark:text-zinc-200">
+                      {adminReactivatingAd.listing?.seller?.business_name || 'Proveedor Verificado'}
+                    </strong>{' '}
+                    · Saldo en Billetera:{' '}
+                    <strong className="text-emerald-600 dark:text-emerald-400">
+                      ${sellerBalance.toLocaleString('es-CO')} COP
+                    </strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAdminReactivatingAd(null)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 1. Configuración de Planes Originales y Pasarela de Temporada */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  1. Configuración de Plan Original y Pasarela de Temporada
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      id: 'pasarela',
+                      title: '✨ Plan Pasarela',
+                      price: '$10.000 COP',
+                      desc: 'Carrusel Rubro + Proveedores',
+                    },
+                    {
+                      id: 'gran_vitrina',
+                      title: '🏆 Gran Vitrina',
+                      price: '$20.000 COP',
+                      desc: 'Banner Principal + Proveedores',
+                    },
+                    {
+                      id: 'combo',
+                      title: '🔥 Plan Combo Total',
+                      price: '$25.000 COP',
+                      desc: 'Gran Vitrina + Pasarela + Proveedores',
+                    },
+                    {
+                      id: 'none',
+                      title: '🎯 Solo Temporada',
+                      price: '$0 Base',
+                      desc: 'Únicamente Pasarela de Temporada',
+                    },
+                  ].map((plan) => {
+                    const active = adminReactivatePlacement === plan.id
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setAdminReactivatePlacement(plan.id as any)}
+                        className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                          active
+                            ? 'border-purple-600 bg-purple-50/80 ring-2 ring-purple-500/20 dark:border-purple-500 dark:bg-purple-950/40'
+                            : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900'
+                        }`}
+                      >
+                        <div className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                          {plan.title}
+                        </div>
+                        <div className="mt-0.5 text-xs font-black text-purple-600 dark:text-purple-400">
+                          {plan.price}
+                        </div>
+                        <div className="mt-1 text-[10px] text-zinc-500">{plan.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      🎁 Pasarela de Temporada / Catálogo Exclusivo
+                    </label>
+                    <select
+                      value={adminReactivateRunwayId}
+                      onChange={(e) => setAdminReactivateRunwayId(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="none">Ninguna (Solo Plan Original seleccionado)</option>
+                      {(liveAdPageConfig.customRunways || []).map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.icon} {r.title} (+${Number(r.campaignCostCop || 0).toLocaleString('es-CO')} COP · {r.durationDays} días)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      ⏱️ Días de Vigencia a Otorgar
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={adminReactivateDurationDays}
+                      onChange={(e) =>
+                        setAdminReactivateDurationDays(Math.max(1, Number(e.target.value) || 30))
+                      }
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Contenido Visual del Anuncio */}
+              <div className="space-y-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  2. Revisión / Ajuste de Campos de la Campaña
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Titular del anuncio
+                    </label>
+                    <input
+                      type="text"
+                      value={adminReactivateHeadline}
+                      onChange={(e) => setAdminReactivateHeadline(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                      URL de Imagen del Anuncio
+                    </label>
+                    <input
+                      type="text"
+                      value={adminReactivateImageUrl}
+                      onChange={(e) => setAdminReactivateImageUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Descripción / Mensaje Promocional
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adminReactivateBody}
+                    onChange={(e) => setAdminReactivateBody(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Modalidad de Validación de Pago (Perfil Administrador) */}
+              <div className="space-y-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                    3. Validación de Pago para Reactivación
+                  </h4>
+                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+                    Total a Validar: ${totalAdminCost.toLocaleString('es-CO')} COP
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setAdminReactivatePaymentValidation('approve_pending_recharge')}
+                    className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                      adminReactivatePaymentValidation === 'approve_pending_recharge'
+                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 dark:border-emerald-500 dark:bg-emerald-950/40'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                      🧾 Aprobar Comprobante Pendiente ({pendingSellerRecharges.length})
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Aprueba la solicitud de recarga del vendedor, acredita/descuenta el valor y activa la campaña inmediatamente.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminReactivatePaymentValidation('deduct_wallet')}
+                    className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                      adminReactivatePaymentValidation === 'deduct_wallet'
+                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 dark:border-emerald-500 dark:bg-emerald-950/40'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                      💳 Descontar de Billetera (${sellerBalance.toLocaleString('es-CO')})
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Descuenta ${totalAdminCost.toLocaleString('es-CO')} COP del saldo disponible en la billetera del proveedor y registra el movimiento.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdminReactivatePaymentValidation('direct_validated')}
+                    className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                      adminReactivatePaymentValidation === 'direct_validated'
+                        ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 dark:border-emerald-500 dark:bg-emerald-950/40'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                      ✅ Pago Externo Verificado / Cortesía
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Valida el pago directamente por administración sin afectar el saldo actual de la billetera.
+                    </p>
+                  </button>
+                </div>
+
+                {adminReactivatePaymentValidation === 'approve_pending_recharge' && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+                    {pendingSellerRecharges.length === 0 ? (
+                      <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                        ⚠️ Este proveedor no tiene comprobantes de recarga pendientes en este momento. Selecciona &quot;Descontar de Billetera&quot; o &quot;Pago Externo Verificado&quot;.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-amber-900 dark:text-amber-200">
+                          Selecciona el comprobante pendiente a aprobar y vincular:
+                        </label>
+                        <select
+                          value={adminReactivateSelectedRechargeId}
+                          onChange={(e) => setAdminReactivateSelectedRechargeId(e.target.value)}
+                          className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 dark:border-amber-700 dark:bg-zinc-900 dark:text-zinc-100"
+                        >
+                          {pendingSellerRecharges.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              ${Number(r.amount).toLocaleString('es-CO')} COP · Método: {r.payment_method.toUpperCase()} · Ref: {r.reference_number || 'S/N'} ({new Date(r.created_at).toLocaleDateString('es-CO')})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminReactivatingAd(null)}
+                  className="rounded-xl border border-zinc-300 px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingAdminReactivation}
+                  onClick={handleConfirmAdminReactivateAd}
+                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-emerald-500 disabled:opacity-50 cursor-pointer"
+                >
+                  <span>🚀</span>
+                  <span>
+                    {isSubmittingAdminReactivation
+                      ? 'Validando y Reactivando...'
+                      : `Validar Pago y Reactivar Campaña (${adminReactivateDurationDays} días)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { AdOrderWithRelations, AdOrderStatus } from '@/lib/types'
+import type { AdOrderWithRelations, AdOrderStatus, AdPackage, AdRechargeRequest } from '@/lib/types'
 import { useTranslation } from '@/lib/i18n'
 import {
   resolveAdOrderPlacement,
   extractSeasonalRunwayMeta,
   FREE_INITIAL_AD_DAYS,
+  OFFICIAL_AD_PLANS,
 } from '@/lib/adPolicies'
 import {
   DEFAULT_AD_PAGE_CONFIG,
@@ -23,6 +24,10 @@ interface CampaignsListProps {
   balance: number
   advertiserName: string
   userId?: string
+  sellerId?: string
+  adAccountId?: string
+  packages?: AdPackage[]
+  initialRechargeRequests?: AdRechargeRequest[]
   sellerListings?: any[]
 }
 
@@ -31,11 +36,19 @@ export default function CampaignsList({
   balance,
   advertiserName,
   userId,
+  sellerId,
+  adAccountId,
+  packages = [],
+  initialRechargeRequests = [],
   sellerListings = [],
 }: CampaignsListProps) {
   const { t, locale } = useTranslation()
   const supabase = createClient()
   const [orders, setOrders] = useState<AdOrderWithRelations[]>(initialOrders)
+  const [currentBalance, setCurrentBalance] = useState<number>(balance)
+  const [rechargeRequests, setRechargeRequests] =
+    useState<AdRechargeRequest[]>(initialRechargeRequests)
+  const [refreshingWallet, setRefreshingWallet] = useState<boolean>(false)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [itemsPerPage, setItemsPerPage] = useState<number>(10)
@@ -60,6 +73,551 @@ export default function CampaignsList({
   const [savingEditOrder, setSavingEditOrder] = useState<boolean>(false)
   const [editErrorMsg, setEditErrorMsg] = useState<string | null>(null)
   const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null)
+
+  // Estados para Reactivación de Campaña con Configuraciones y Validación de Pago (Perfil Vendedor)
+  const [reactivatingOrder, setReactivatingOrder] = useState<AdOrderWithRelations | null>(null)
+  const [reactivatePlacement, setReactivatePlacement] = useState<
+    'pasarela' | 'gran_vitrina' | 'combo' | 'none'
+  >('pasarela')
+  const [reactivateRunwayId, setReactivateRunwayId] = useState<string>('')
+  const [reactivateHeadline, setReactivateHeadline] = useState<string>('')
+  const [reactivateBody, setReactivateBody] = useState<string>('')
+  const [reactivateImageUrl, setReactivateImageUrl] = useState<string>('')
+  const [reactivateListingId, setReactivateListingId] = useState<string>('')
+  const [reactivateTargetCity, setReactivateTargetCity] = useState<string>('')
+  const [reactivateTargetCategory, setReactivateTargetCategory] = useState<string>('')
+  const [reactivateCtaLabel, setReactivateCtaLabel] = useState<string>('Contactar')
+  const [reactivatePaymentMode, setReactivatePaymentMode] = useState<'wallet' | 'proof'>('wallet')
+  const [reactivatePaymentMethod, setReactivatePaymentMethod] = useState<string>('nequi')
+  const [reactivateReferenceCode, setReactivateReferenceCode] = useState<string>('')
+  const [reactivateProofUrl, setReactivateProofUrl] = useState<string>('')
+  const [reactivateRechargeAmount, setReactivateRechargeAmount] = useState<number>(0)
+  const [reactivateNotes, setReactivateNotes] = useState<string>('')
+  const [uploadingReactivateImage, setUploadingReactivateImage] = useState<boolean>(false)
+  const [uploadingReactivateProof, setUploadingReactivateProof] = useState<boolean>(false)
+  const [submittingReactivation, setSubmittingReactivation] = useState<boolean>(false)
+  const [reactivateErrorMsg, setReactivateErrorMsg] = useState<string | null>(null)
+  const [reactivateSuccessMsg, setReactivateSuccessMsg] = useState<string | null>(null)
+
+  const handleRefreshWalletStatus = async () => {
+    setRefreshingWallet(true)
+    try {
+      if (adAccountId) {
+        const { data: accData } = await supabase
+          .from('ad_account')
+          .select('balance')
+          .eq('id', adAccountId)
+          .maybeSingle()
+        if (accData) {
+          setCurrentBalance(Number(accData.balance) || 0)
+        }
+      }
+      if (sellerId) {
+        const { data: reqsData } = await supabase
+          .from('ad_recharge_request')
+          .select('*')
+          .eq('seller_id', sellerId)
+          .order('created_at', { ascending: false })
+        if (reqsData) {
+          setRechargeRequests(reqsData as AdRechargeRequest[])
+        }
+      }
+    } catch {
+      // Ignorar error de refresco
+    } finally {
+      setRefreshingWallet(false)
+    }
+  }
+
+  const handleOpenReactivateModal = (order: AdOrderWithRelations) => {
+    setReactivatingOrder(order)
+    setReactivateHeadline(order.headline || '')
+    setReactivateBody(order.body || '')
+    setReactivateImageUrl(order.image_url || '')
+    setReactivateListingId(order.listing_id || (order.listing as any)?.id || '')
+    setReactivateTargetCity(order.target_city || '')
+    setReactivateCtaLabel(order.cta_label || 'Contactar')
+    setReactivateErrorMsg(null)
+    setReactivateSuccessMsg(null)
+    setReactivateReferenceCode('')
+    setReactivateProofUrl('')
+    setReactivateNotes('')
+
+    const seasonalMeta = extractSeasonalRunwayMeta(order)
+    const resolvedPl = resolveAdOrderPlacement(order)
+
+    if (seasonalMeta.isSeasonalOnly && seasonalMeta.specialRunwayId) {
+      setReactivatePlacement('none')
+      setReactivateRunwayId(seasonalMeta.specialRunwayId)
+    } else {
+      if (resolvedPl.placement === 'combo') {
+        setReactivatePlacement('combo')
+      } else if (resolvedPl.placement === 'gran_vitrina') {
+        setReactivatePlacement('gran_vitrina')
+      } else {
+        setReactivatePlacement('pasarela')
+      }
+      setReactivateRunwayId(
+        seasonalMeta.specialRunwayId ||
+          (order.listing as any)?.attrs?.special_runway_id ||
+          ''
+      )
+    }
+
+    const rawCat = (order.target_category || '').trim()
+    const matchPrefix = rawCat.match(/^(\[(?:SOLO_TEMPORADA|PLAN_MAS_TEMPORADA):[^\]]+\])\s*(.*)$/)
+    setReactivateTargetCategory(matchPrefix ? matchPrefix[2] || '' : rawCat)
+
+    // Calcular costo inicial para predefinir el modo de validación de pago
+    const basePlanCost =
+      seasonalMeta.isSeasonalOnly && seasonalMeta.specialRunwayId
+        ? 0
+        : resolvedPl.placement === 'combo'
+          ? 25000
+          : resolvedPl.placement === 'gran_vitrina'
+            ? 20000
+            : 10000
+    const matchedRunway = customRunways.find(
+      (r) =>
+        r.id ===
+        (seasonalMeta.specialRunwayId || (order.listing as any)?.attrs?.special_runway_id)
+    )
+    const seasonalCost = matchedRunway ? Number(matchedRunway.campaignCostCop || 15000) : 0
+    const initialTotal = basePlanCost + seasonalCost
+
+    setReactivateRechargeAmount(initialTotal)
+    setReactivatePaymentMode(currentBalance >= initialTotal ? 'wallet' : 'proof')
+  }
+
+  const baseReactivationCost =
+    reactivatePlacement === 'combo'
+      ? 25000
+      : reactivatePlacement === 'gran_vitrina'
+        ? 20000
+        : reactivatePlacement === 'pasarela'
+          ? 10000
+          : 0
+
+  const selectedReactivateRunway = customRunways.find((r) => r.id === reactivateRunwayId) || null
+  const seasonalReactivationCost = selectedReactivateRunway
+    ? Number(selectedReactivateRunway.campaignCostCop || 15000)
+    : 0
+  const totalReactivationCost = baseReactivationCost + seasonalReactivationCost
+  const missingBalanceForReactivation = Math.max(0, totalReactivationCost - currentBalance)
+
+  useEffect(() => {
+    if (totalReactivationCost > 0) {
+      setReactivateRechargeAmount(
+        missingBalanceForReactivation > 0 ? totalReactivationCost : totalReactivationCost
+      )
+      if (currentBalance < totalReactivationCost) {
+        setReactivatePaymentMode('proof')
+      }
+    }
+  }, [totalReactivationCost, currentBalance, missingBalanceForReactivation])
+
+  const handleReactivateImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !reactivatingOrder) return
+
+    setUploadingReactivateImage(true)
+    setReactivateErrorMsg(null)
+    try {
+      const cleanName = `${Date.now()}_reactivate_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const folderOwner = userId || 'shared'
+      const filePath = `${folderOwner}/ads/${cleanName}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('listings')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage
+        .from('listings')
+        .getPublicUrl(uploadData?.path || filePath)
+      if (data?.publicUrl) {
+        setReactivateImageUrl(data.publicUrl)
+      }
+    } catch (err: any) {
+      setReactivateErrorMsg(err.message || 'Error al subir la imagen de la campaña.')
+    } finally {
+      setUploadingReactivateImage(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleReactivateProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingReactivateProof(true)
+    setReactivateErrorMsg(null)
+    try {
+      const cleanName = `${Date.now()}_receipt_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const folderOwner = userId || 'shared'
+      const filePath = `${folderOwner}/receipts/${cleanName}`
+
+      const { data, error } = await supabase.storage
+        .from('listings')
+        .upload(filePath, file, { upsert: true })
+
+      if (error) throw error
+
+      const { data: urlData } = supabase.storage.from('listings').getPublicUrl(data.path)
+      if (urlData?.publicUrl) {
+        setReactivateProofUrl(urlData.publicUrl)
+      }
+    } catch (err: any) {
+      setReactivateErrorMsg(err.message || 'No se pudo subir la imagen del comprobante.')
+    } finally {
+      setUploadingReactivateProof(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleSubmitCampaignReactivation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!reactivatingOrder) return
+
+    if (reactivatePlacement === 'none' && !selectedReactivateRunway) {
+      setReactivateErrorMsg(
+        'Debes seleccionar al menos un Plan Original (Pasarela, Gran Vitrina o Combo) o una Pasarela de Temporada para reactivar la campaña.'
+      )
+      return
+    }
+
+    if (!reactivateHeadline.trim()) {
+      setReactivateErrorMsg('Por favor ingresa un titular principal para la campaña.')
+      return
+    }
+
+    setSubmittingReactivation(true)
+    setReactivateErrorMsg(null)
+    setReactivateSuccessMsg(null)
+
+    try {
+      // Resolver package_id y slot_id según el plan seleccionado
+      const matchedOfficialPlan =
+        reactivatePlacement === 'combo'
+          ? OFFICIAL_AD_PLANS.find((p) => p.placement === 'combo')
+          : reactivatePlacement === 'gran_vitrina'
+            ? OFFICIAL_AD_PLANS.find((p) => p.placement === 'gran_vitrina')
+            : OFFICIAL_AD_PLANS.find((p) => p.placement === 'pasarela')
+
+      const matchedDbPkg =
+        packages.find((p) => p.id === matchedOfficialPlan?.id) ||
+        packages.find((p) => Number(p.price) === baseReactivationCost) ||
+        packages[0]
+
+      const resolvedPackageId =
+        matchedDbPkg?.id || matchedOfficialPlan?.id || reactivatingOrder.package_id
+      const resolvedSlotId =
+        matchedDbPkg?.slot_id || matchedOfficialPlan?.slot_id || reactivatingOrder.slot_id
+
+      // Construir prefijo de categoría para pasarela de temporada (sola o combinada)
+      const rTitle = selectedReactivateRunway?.title || 'Pasarela de Temporada'
+      const seasonalPrefix =
+        reactivatePlacement === 'none' && selectedReactivateRunway
+          ? `[SOLO_TEMPORADA:${selectedReactivateRunway.id}]`
+          : reactivatePlacement !== 'none' && selectedReactivateRunway
+            ? `[PLAN_MAS_TEMPORADA:${selectedReactivateRunway.id}:${reactivatePlacement}]`
+            : ''
+
+      const finalTargetCategory = seasonalPrefix
+        ? reactivateTargetCategory.trim()
+          ? `${seasonalPrefix} ${reactivateTargetCategory.trim()}`
+          : `${seasonalPrefix} ${rTitle}`
+        : reactivateTargetCategory.trim() || null
+
+      const durationDays =
+        reactivatePlacement === 'none' && selectedReactivateRunway?.defaultDurationDays
+          ? Number(selectedReactivateRunway.defaultDurationDays)
+          : matchedDbPkg?.duration_days || 7
+
+      const now = new Date()
+      const startsAt = now.toISOString()
+      const endsAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+
+      // ESCENARIO 1: Validación de Pago Inmediata con Saldo Disponible en Billetera
+      if (reactivatePaymentMode === 'wallet') {
+        if (currentBalance < totalReactivationCost) {
+          setReactivatePaymentMode('proof')
+          throw new Error(
+            `Tu saldo disponible ($${currentBalance.toLocaleString('es-CO')} COP) es menor al costo de reactivación ($${totalReactivationCost.toLocaleString('es-CO')} COP). Por favor registra el comprobante de pago abajo.`
+          )
+        }
+
+        const newBalance = currentBalance - totalReactivationCost
+        const targetAccountId = adAccountId || reactivatingOrder.ad_account_id
+
+        if (targetAccountId) {
+          const { error: balanceErr } = await supabase
+            .from('ad_account')
+            .update({ balance: newBalance })
+            .eq('id', targetAccountId)
+
+          if (balanceErr) throw balanceErr
+
+          await supabase.from('wallet_transaction').insert({
+            ad_account_id: targetAccountId,
+            kind: 'spend',
+            amount: totalReactivationCost,
+            balance_after: newBalance,
+            ref_type: 'campaign_reactivation',
+            ref_id: reactivatingOrder.id,
+          })
+        }
+
+        const updatePayload = {
+          package_id: resolvedPackageId,
+          slot_id: resolvedSlotId,
+          listing_id: reactivateListingId || null,
+          headline: reactivateHeadline.trim(),
+          body: reactivateBody.trim() || null,
+          image_url: reactivateImageUrl.trim() || null,
+          target_city: reactivateTargetCity.trim() || null,
+          target_category: finalTargetCategory,
+          cta_label: reactivateCtaLabel.trim() || 'Contactar',
+          price_paid: totalReactivationCost,
+          status: 'submitted' as AdOrderStatus,
+          reject_reason: null,
+          starts_at: startsAt,
+          ends_at: endsAt,
+        }
+
+        // Actualizar la orden existente (si RLS bloquea en algún caso, respaldar o insertar orden renovada)
+        const { error: orderUpdErr } = await supabase
+          .from('ad_order')
+          .update(updatePayload)
+          .eq('id', reactivatingOrder.id)
+
+        let finalOrderId = reactivatingOrder.id
+        if (orderUpdErr && targetAccountId) {
+          const { data: insertedOrder } = await supabase
+            .from('ad_order')
+            .insert({
+              ad_account_id: targetAccountId,
+              ...updatePayload,
+            })
+            .select('id')
+            .maybeSingle()
+          if (insertedOrder?.id) {
+            finalOrderId = insertedOrder.id
+          }
+        }
+
+        // Sincronizar atributos en la publicación vinculada
+        const targetListingId =
+          reactivateListingId ||
+          reactivatingOrder.listing_id ||
+          (reactivatingOrder.listing as any)?.id
+        const targetListingObj =
+          sellerListings.find((l) => l.id === targetListingId) ||
+          (reactivatingOrder.listing?.id === targetListingId ? reactivatingOrder.listing : null)
+
+        if (targetListingId) {
+          const baseAttrs =
+            targetListingObj && typeof (targetListingObj as any).attrs === 'object'
+              ? { ...(targetListingObj as any).attrs }
+              : {}
+          const prevOverrides =
+            baseAttrs.campaign_overrides && typeof baseAttrs.campaign_overrides === 'object'
+              ? { ...baseAttrs.campaign_overrides }
+              : {}
+
+          const nextAttrs: Record<string, any> = {
+            ...baseAttrs,
+            ad_placement:
+              reactivatePlacement === 'none' ? 'pasarela_temporada' : reactivatePlacement,
+            custom_campaign_image_url: updatePayload.image_url,
+            campaign_overrides: {
+              ...prevOverrides,
+              [finalOrderId]: {
+                ...updatePayload,
+                reactivated_at: now.toISOString(),
+              },
+            },
+          }
+
+          if (selectedReactivateRunway) {
+            nextAttrs.special_runway_id = selectedReactivateRunway.id
+            nextAttrs.special_runway_title = selectedReactivateRunway.title
+            nextAttrs.special_runway_badge = `${selectedReactivateRunway.icon} ${selectedReactivateRunway.badge}`
+            nextAttrs.special_catalog_cost = selectedReactivateRunway.campaignCostCop
+          } else {
+            delete nextAttrs.special_runway_id
+            delete nextAttrs.special_runway_title
+            delete nextAttrs.special_runway_badge
+            delete nextAttrs.special_catalog_cost
+          }
+
+          await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', targetListingId)
+        }
+
+        setCurrentBalance(newBalance)
+
+        const updatedOrderObj: AdOrderWithRelations = {
+          ...reactivatingOrder,
+          ...updatePayload,
+          id: finalOrderId,
+          daysRemaining: durationDays,
+          hoursRemaining: 0,
+          progressPercent: 0,
+          isExpired: false,
+        }
+
+        setOrders((prev) =>
+          prev.map((item) => (item.id === reactivatingOrder.id ? updatedOrderObj : item))
+        )
+        setReactivatingOrder(updatedOrderObj)
+        setReactivateSuccessMsg(
+          `✅ ¡Pago validado con tu saldo disponible ($${totalReactivationCost.toLocaleString('es-CO')} COP) y campaña reactivada por ${durationDays} días! Ya fue enviada para activación en portada.`
+        )
+      } else {
+        // ESCENARIO 2: Validación mediante Comprobante de Pago / Solicitud de Recarga vinculada a la Reactivación
+        const targetAccountId = adAccountId || reactivatingOrder.ad_account_id
+        if (!targetAccountId || !sellerId) {
+          throw new Error('No se encontró la cuenta publicitaria del vendedor para registrar el pago.')
+        }
+
+        if (!reactivateReferenceCode.trim() && !reactivateProofUrl.trim()) {
+          throw new Error(
+            'Por favor ingresa el número de referencia de la transferencia o sube la imagen del comprobante de pago.'
+          )
+        }
+
+        const amountToRequest = Math.max(
+          totalReactivationCost,
+          Number(reactivateRechargeAmount) || totalReactivationCost
+        )
+
+        // 1. Guardar desde ya la nueva configuración de la campaña en ad_order y en listing.attrs
+        const pendingUpdatePayload = {
+          package_id: resolvedPackageId,
+          slot_id: resolvedSlotId,
+          listing_id: reactivateListingId || null,
+          headline: reactivateHeadline.trim(),
+          body: reactivateBody.trim() || null,
+          image_url: reactivateImageUrl.trim() || null,
+          target_city: reactivateTargetCity.trim() || null,
+          target_category: finalTargetCategory,
+          cta_label: reactivateCtaLabel.trim() || 'Contactar',
+          price_paid: totalReactivationCost,
+          status: 'submitted' as AdOrderStatus,
+          reject_reason: null,
+        }
+
+        await supabase
+          .from('ad_order')
+          .update(pendingUpdatePayload)
+          .eq('id', reactivatingOrder.id)
+
+        const targetListingId =
+          reactivateListingId ||
+          reactivatingOrder.listing_id ||
+          (reactivatingOrder.listing as any)?.id
+        const targetListingObj =
+          sellerListings.find((l) => l.id === targetListingId) ||
+          (reactivatingOrder.listing?.id === targetListingId ? reactivatingOrder.listing : null)
+
+        if (targetListingId) {
+          const baseAttrs =
+            targetListingObj && typeof (targetListingObj as any).attrs === 'object'
+              ? { ...(targetListingObj as any).attrs }
+              : {}
+          const prevOverrides =
+            baseAttrs.campaign_overrides && typeof baseAttrs.campaign_overrides === 'object'
+              ? { ...baseAttrs.campaign_overrides }
+              : {}
+
+          const nextAttrs: Record<string, any> = {
+            ...baseAttrs,
+            ad_placement:
+              reactivatePlacement === 'none' ? 'pasarela_temporada' : reactivatePlacement,
+            custom_campaign_image_url: pendingUpdatePayload.image_url,
+            campaign_overrides: {
+              ...prevOverrides,
+              [reactivatingOrder.id]: {
+                ...pendingUpdatePayload,
+                pending_reactivation_payment: true,
+                updated_at: now.toISOString(),
+              },
+            },
+          }
+
+          if (selectedReactivateRunway) {
+            nextAttrs.special_runway_id = selectedReactivateRunway.id
+            nextAttrs.special_runway_title = selectedReactivateRunway.title
+            nextAttrs.special_runway_badge = `${selectedReactivateRunway.icon} ${selectedReactivateRunway.badge}`
+            nextAttrs.special_catalog_cost = selectedReactivateRunway.campaignCostCop
+          }
+
+          await supabase.from('listing').update({ attrs: nextAttrs }).eq('id', targetListingId)
+        }
+
+        // 2. Registrar la solicitud de validación de pago con la etiqueta [REACTIVAR_CAMPANA:<id>]
+        const planSummaryDesc =
+          reactivatePlacement === 'none' && selectedReactivateRunway
+            ? `Solo Pasarela de Temporada: ${rTitle}`
+            : reactivatePlacement !== 'none' && selectedReactivateRunway
+              ? `Plan ${reactivatePlacement.toUpperCase()} + Pasarela: ${rTitle}`
+              : `Plan ${reactivatePlacement.toUpperCase()}`
+
+        const notesParts = [
+          `[REACTIVAR_CAMPANA:${reactivatingOrder.id}]`,
+          seasonalPrefix,
+          `Reactivación "${reactivateHeadline.trim()}" (${planSummaryDesc} - $${totalReactivationCost.toLocaleString('es-CO')} COP)`,
+          reactivateNotes.trim(),
+        ].filter(Boolean)
+
+        const { data: newRechargeReq, error: reqErr } = await supabase
+          .from('ad_recharge_request')
+          .insert({
+            ad_account_id: targetAccountId,
+            seller_id: sellerId,
+            package_id: resolvedPackageId,
+            amount: amountToRequest,
+            payment_method: reactivatePaymentMethod,
+            reference_code: reactivateReferenceCode.trim() || null,
+            proof_url: reactivateProofUrl.trim() || null,
+            notes: notesParts.join(' | '),
+            status: 'pending',
+          })
+          .select('*')
+          .single()
+
+        if (reqErr) throw reqErr
+
+        if (newRechargeReq) {
+          setRechargeRequests((prev) => [newRechargeReq as AdRechargeRequest, ...prev])
+        }
+
+        const updatedOrderPending: AdOrderWithRelations = {
+          ...reactivatingOrder,
+          ...pendingUpdatePayload,
+          daysRemaining: durationDays,
+          hoursRemaining: 0,
+          progressPercent: 0,
+          isExpired: false,
+        }
+
+        setOrders((prev) =>
+          prev.map((item) => (item.id === reactivatingOrder.id ? updatedOrderPending : item))
+        )
+        setReactivatingOrder(updatedOrderPending)
+        setReactivateSuccessMsg(
+          `✅ ¡Comprobante de pago enviado a validación administrativa ($${amountToRequest.toLocaleString('es-CO')} COP) y campaña configurada! Apenas el administrador valide tu pago, la campaña se reactivará automáticamente en las pasarelas seleccionadas.`
+        )
+      }
+    } catch (err: any) {
+      setReactivateErrorMsg(
+        err.message || 'Ocurrió un error al procesar la reactivación de la campaña.'
+      )
+    } finally {
+      setSubmittingReactivation(false)
+    }
+  }
 
   const handleOpenEditModal = (order: AdOrderWithRelations) => {
     setEditingOrder(order)
@@ -504,25 +1062,42 @@ export default function CampaignsList({
               <span className="text-xs font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">
                 {t.campaigns.advertiserAccount}: {advertiserName}
               </span>
-              <div className="flex items-baseline gap-2.5 mt-1">
+              <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
                 <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                   {t.campaigns.availableBalance}:
                 </span>
                 <span className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
-                  ${balance.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')} COP
+                  ${currentBalance.toLocaleString(locale === 'en' ? 'en-US' : 'es-CO')} COP
                 </span>
+                <button
+                  type="button"
+                  onClick={handleRefreshWalletStatus}
+                  disabled={refreshingWallet}
+                  className="rounded-xl border border-purple-200 bg-white px-2.5 py-1 text-[11px] font-bold text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:bg-zinc-800 dark:text-purple-300 transition-colors cursor-pointer"
+                >
+                  {refreshingWallet ? '⏳ Actualizando...' : '🔄 Verificar Saldo / Pagos'}
+                </button>
               </div>
+              {rechargeRequests.some((r) => r.status === 'pending') && (
+                <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-100/90 border border-amber-300 px-2.5 py-1 text-[11px] font-bold text-amber-900 dark:bg-amber-950/60 dark:border-amber-800 dark:text-amber-300">
+                  <span>⏳</span>
+                  <span>
+                    Tienes {rechargeRequests.filter((r) => r.status === 'pending').length}{' '}
+                    validación(es) de pago en revisión administrativa.
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="text-xs text-purple-900 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-950/50 rounded-2xl p-3 border border-purple-200/60 dark:border-purple-800/60 max-w-sm">
             <div className="flex items-center gap-1.5 font-bold">
-              <span>💡</span>
-              <span>Gestión de Saldo:</span>
+              <span>🔄</span>
+              <span>Reactivación e Historial de Campañas:</span>
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed">
-              Recarga saldo o activa nuevos paquetes desde el menú lateral izquierdo en{' '}
-              <strong>Mis Campañas → Recarga de Saldo</strong>.
+              En cualquier campaña de tu historial puedes pulsar{' '}
+              <strong>🔄 Reactivar</strong> para configurar su plan/pasarela y validar el pago con tu saldo o adjuntando comprobante.
             </p>
           </div>
         </div>
@@ -748,7 +1323,7 @@ export default function CampaignsList({
         <>
           {/* Vista Cuadrícula (Tarjetas en Cuadrícula 2 columnas en móvil) */}
           {viewMode === 'grid' && (
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
               {visibleOrders.map((order) => {
                 const badge = statusBadges[order.status] || {
                   label: order.status,
@@ -764,6 +1339,17 @@ export default function CampaignsList({
                         100
                       ).toFixed(1)
                     : '0.0'
+                const needsReactivation =
+                  order.status === 'ended' ||
+                  order.status === 'rejected' ||
+                  order.status === 'cancelled' ||
+                  order.status === 'paused' ||
+                  order.isExpired
+                const hasPendingReactivationPayment = rechargeRequests.some(
+                  (r) =>
+                    r.status === 'pending' &&
+                    r.notes?.includes(`[REACTIVAR_CAMPANA:${order.id}]`)
+                )
 
                 return (
                   <div
@@ -795,6 +1381,11 @@ export default function CampaignsList({
                         <h4 className="mt-1 font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-50 line-clamp-2 sm:truncate">
                           {order.headline}
                         </h4>
+                        {hasPendingReactivationPayment && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                            ⏳ Pago de reactivación en validación
+                          </span>
+                        )}
                         {order.listing && (
                           <div className="mt-0.5 space-y-1">
                             <Link
@@ -867,26 +1458,49 @@ export default function CampaignsList({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="space-y-1.5">
                       <button
                         type="button"
-                        onClick={() => handleOpenEditModal(order)}
-                        className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-purple-300 bg-purple-50/80 py-2 text-[11px] sm:text-xs font-bold text-purple-800 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200 transition-colors cursor-pointer"
+                        onClick={() => handleOpenReactivateModal(order)}
+                        className={`w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] sm:text-xs font-extrabold shadow-2xs transition-colors cursor-pointer ${
+                          needsReactivation
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                            : 'border border-emerald-300 bg-emerald-50/90 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
+                        }`}
                       >
-                        <span>✏️</span>
+                        <span>🔄</span>
                         <span className="truncate">
-                          {locale === 'en' ? 'View / Edit' : 'Ver / Editar'}
+                          {needsReactivation
+                            ? locale === 'en'
+                              ? 'Reactivate Campaign'
+                              : 'Reactivar Campaña'
+                            : locale === 'en'
+                              ? 'Renew / Reactivate'
+                              : 'Renovar / Reactivar'}
                         </span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAnalyticsOrder(order)}
-                        className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-300 bg-white py-2 text-[11px] sm:text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
-                      >
-                        <span>📊</span>
-                        <span className="truncate">{t.campaigns.viewAnalyticsBtn}</span>
-                      </button>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(order)}
+                          className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-purple-300 bg-purple-50/80 py-2 text-[11px] sm:text-xs font-bold text-purple-800 shadow-2xs hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-200 transition-colors cursor-pointer"
+                        >
+                          <span>✏️</span>
+                          <span className="truncate">
+                            {locale === 'en' ? 'View / Edit' : 'Ver / Editar'}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAnalyticsOrder(order)}
+                          className="w-full inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-300 bg-white py-2 text-[11px] sm:text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+                        >
+                          <span>📊</span>
+                          <span className="truncate">{t.campaigns.viewAnalyticsBtn}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -912,6 +1526,12 @@ export default function CampaignsList({
                         100
                       ).toFixed(1)
                     : '0.0'
+                const needsReactivation =
+                  order.status === 'ended' ||
+                  order.status === 'rejected' ||
+                  order.status === 'cancelled' ||
+                  order.status === 'paused' ||
+                  order.isExpired
 
                 return (
                   <div
@@ -963,12 +1583,26 @@ export default function CampaignsList({
                       </div>
                     </div>
 
-                    {/* Botones rápidos de Ver/Editar y Métricas */}
-                    <div className="flex flex-col gap-1.5 shrink-0">
+                    {/* Botones rápidos de Reactivar, Ver/Editar y Métricas */}
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReactivateModal(order)}
+                        className={`rounded-xl px-2.5 py-1.5 text-xs font-extrabold cursor-pointer ${
+                          needsReactivation
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                            : 'border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                        }`}
+                        title={
+                          locale === 'en' ? 'Reactivate Campaign' : 'Reactivar / Renovar Campaña'
+                        }
+                      >
+                        🔄
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(order)}
-                        className="rounded-xl border border-purple-300 bg-purple-50 px-2.5 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200 cursor-pointer"
+                        className="rounded-xl border border-purple-300 bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200 cursor-pointer"
                         title={locale === 'en' ? 'View / Edit Campaign' : 'Ver / Editar Campaña'}
                       >
                         ✏️
@@ -976,7 +1610,7 @@ export default function CampaignsList({
                       <button
                         type="button"
                         onClick={() => setSelectedAnalyticsOrder(order)}
-                        className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 cursor-pointer"
+                        className="rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 cursor-pointer"
                         title={t.campaigns.viewAnalyticsBtn}
                       >
                         📊
@@ -1031,6 +1665,17 @@ export default function CampaignsList({
                               100
                             ).toFixed(1)
                           : '0.0'
+                      const needsReactivation =
+                        order.status === 'ended' ||
+                        order.status === 'rejected' ||
+                        order.status === 'cancelled' ||
+                        order.status === 'paused' ||
+                        order.isExpired
+                      const hasPendingReactivationPayment = rechargeRequests.some(
+                        (r) =>
+                          r.status === 'pending' &&
+                          r.notes?.includes(`[REACTIVAR_CAMPANA:${order.id}]`)
+                      )
 
                       return (
                         <tr key={order.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors">
@@ -1058,6 +1703,11 @@ export default function CampaignsList({
                                   <div className="text-xs text-zinc-500 truncate mt-0.5">
                                     {order.body}
                                   </div>
+                                )}
+                                {hasPendingReactivationPayment && (
+                                  <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                    ⏳ Pago de reactivación en validación administrativa
+                                  </span>
                                 )}
                                 {order.listing && (
                                   <div className="mt-1 space-y-1">
@@ -1152,9 +1802,29 @@ export default function CampaignsList({
                             </div>
                           </td>
 
-                          {/* 6. Botones de Acción (Ver/Editar + Analítica) */}
+                          {/* 6. Botones de Acción (Reactivar + Ver/Editar + Analítica) */}
                           <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReactivateModal(order)}
+                                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold shadow-2xs transition-colors cursor-pointer ${
+                                  needsReactivation
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                                    : 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                                }`}
+                              >
+                                <span>🔄</span>
+                                <span>
+                                  {needsReactivation
+                                    ? locale === 'en'
+                                      ? 'Reactivate'
+                                      : 'Reactivar'
+                                    : locale === 'en'
+                                      ? 'Renew'
+                                      : 'Renovar'}
+                                </span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(order)}
@@ -1343,7 +2013,7 @@ export default function CampaignsList({
               </div>
 
               {/* Vigencia y Fechas */}
-              <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 space-y-3">
+              <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-zinc-800/60 border border-zinc-200/60 dark:target-zinc-700/60 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                     Estado de Vigencia:
@@ -1418,18 +2088,35 @@ export default function CampaignsList({
 
             {/* Pie del Modal */}
             <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const orderToEdit = selectedAnalyticsOrder
-                  setSelectedAnalyticsOrder(null)
-                  handleOpenEditModal(orderToEdit)
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-4 py-2.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200 transition-colors cursor-pointer"
-              >
-                <span>✏️</span>
-                <span>{locale === 'en' ? 'View / Edit Campaign' : 'Ver / Editar Campaña'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const orderToReactivate = selectedAnalyticsOrder
+                    setSelectedAnalyticsOrder(null)
+                    handleOpenReactivateModal(orderToReactivate)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-500 transition-colors cursor-pointer"
+                >
+                  <span>🔄</span>
+                  <span>
+                    {locale === 'en' ? 'Reactivate Campaign' : 'Reactivar / Renovar Campaña'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const orderToEdit = selectedAnalyticsOrder
+                    setSelectedAnalyticsOrder(null)
+                    handleOpenEditModal(orderToEdit)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-4 py-2.5 text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200 transition-colors cursor-pointer"
+                >
+                  <span>✏️</span>
+                  <span>{locale === 'en' ? 'View / Edit Campaign' : 'Ver / Editar Campaña'}</span>
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -1773,30 +2460,532 @@ export default function CampaignsList({
                 </div>
               </div>
 
-              {/* Pie con botones Guardar Cambios y Cerrar */}
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-end gap-3">
+              {/* Pie con botones Reactivar, Guardar Cambios y Cerrar */}
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setEditingOrder(null)}
-                  className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 transition-colors cursor-pointer"
+                  onClick={() => {
+                    const orderToReactivate = editingOrder
+                    setEditingOrder(null)
+                    handleOpenReactivateModal(orderToReactivate)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 transition-colors cursor-pointer"
                 >
-                  {locale === 'en' ? 'Close' : 'Cerrar'}
+                  <span>🔄</span>
+                  <span>
+                    {locale === 'en' ? 'Reactivate / Renew Campaign' : 'Reactivar / Renovar Campaña'}
+                  </span>
+                </button>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingOrder(null)}
+                    className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    {locale === 'en' ? 'Close' : 'Cerrar'}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={savingEditOrder || uploadingEditImage}
+                    className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-black text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    <span>{savingEditOrder ? '⏳' : '💾'}</span>
+                    <span>
+                      {savingEditOrder
+                        ? locale === 'en'
+                          ? 'Saving Changes...'
+                          : 'Guardando cambios...'
+                        : locale === 'en'
+                          ? 'Save Campaign Changes'
+                          : 'Guardar Cambios de la Campaña'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. MODAL DE REACTIVACIÓN DE CAMPAÑA CON CONFIGURACIONES Y VALIDACIÓN DE PAGO */}
+      {/* ========================================================================= */}
+      {reactivatingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-3xl rounded-3xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 max-h-[92vh] overflow-y-auto">
+            {/* Cabecera del Modal */}
+            <div className="flex items-start justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-xl dark:bg-emerald-950 dark:text-emerald-300">
+                  🔄
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-50">
+                    {locale === 'en'
+                      ? 'Reactivate / Renew Campaign & Payment Validation'
+                      : 'Reactivar Campaña del Historial y Validar Pago'}
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {locale === 'en'
+                      ? 'Configure the plan or seasonal runway, review your campaign fields, and validate payment to reactivate.'
+                      : 'Configura el plan o pasarela de temporada, ajusta los datos si lo deseas y valida el pago para volver a activar la campaña.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setReactivatingOrder(null)}
+                className="h-8 w-8 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 flex items-center justify-center font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitCampaignReactivation} className="mt-5 space-y-6">
+              {reactivateErrorMsg && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs font-semibold text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                  ⚠️ {reactivateErrorMsg}
+                </div>
+              )}
+
+              {reactivateSuccessMsg && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 space-y-2">
+                  <div>{reactivateSuccessMsg}</div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setReactivatingOrder(null)}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-500 cursor-pointer"
+                    >
+                      ✓ Volver al Historial de Campañas
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PASO 1: CONFIGURACIÓN DE PLANES ORIGINALES Y PASARELA DE TEMPORADA */}
+              <div className="rounded-2xl border border-purple-200/80 bg-purple-50/40 p-4 dark:border-purple-900/50 dark:bg-purple-950/20 space-y-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-purple-900 dark:text-purple-200">
+                    1. Configuración de Planes y Pasarelas para la Reactivación
+                  </h4>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                    Puedes elegir un Plan Original, combinarlo con una Pasarela de Temporada o seleccionar únicamente una Pasarela de Temporada.
+                  </p>
+                </div>
+
+                {/* Selector de Plan Original */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      id: 'pasarela' as const,
+                      title: '✨ Individual Pasarela',
+                      price: 10000,
+                      desc: '7 días en Pasarela de Rubro + Proveedores',
+                    },
+                    {
+                      id: 'gran_vitrina' as const,
+                      title: '🏆 Individual Gran Vitrina',
+                      price: 20000,
+                      desc: '7 días en Gran Vitrina Principal + Proveedores',
+                    },
+                    {
+                      id: 'combo' as const,
+                      title: '🔥 Plan Combo Total',
+                      price: 25000,
+                      desc: '7 días en Gran Vitrina + Pasarela + Proveedores',
+                    },
+                    {
+                      id: 'none' as const,
+                      title: '🎄 Solo Pasarela Temporada',
+                      price: 0,
+                      desc: 'Sin plan original (usar solo pasarela de temporada)',
+                    },
+                  ].map((planOpt) => {
+                    const isSelected = reactivatePlacement === planOpt.id
+                    return (
+                      <button
+                        key={planOpt.id}
+                        type="button"
+                        onClick={() => setReactivatePlacement(planOpt.id)}
+                        className={`text-left rounded-xl border p-3 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-2 border-purple-600 bg-white shadow-xs dark:border-purple-400 dark:bg-zinc-900'
+                            : 'border-zinc-200 bg-white/70 hover:border-purple-300 dark:border-zinc-800 dark:bg-zinc-900/60'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                            {planOpt.title}
+                          </span>
+                          {isSelected && (
+                            <span className="h-2 w-2 rounded-full bg-purple-600 shrink-0" />
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm font-black text-purple-700 dark:text-purple-400">
+                          ${planOpt.price.toLocaleString('es-CO')} COP
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-zinc-500 leading-snug">
+                          {planOpt.desc}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Selector de Pasarela de Temporada / Catálogo Exclusivo */}
+                {customRunways.length > 0 && (
+                  <div className="pt-3 border-t border-purple-200/60 dark:border-purple-800/50 space-y-2">
+                    <label className="block text-xs font-extrabold text-amber-900 dark:text-amber-300">
+                      ⭐ Pasarela de Temporada / Catálogo Exclusivo (Opcional o Independiente):
+                    </label>
+                    <select
+                      value={reactivateRunwayId}
+                      onChange={(e) => setReactivateRunwayId(e.target.value)}
+                      className="w-full rounded-xl border border-amber-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-900 focus:border-amber-500 focus:outline-hidden dark:border-amber-800 dark:bg-zinc-900 dark:text-zinc-100"
+                    >
+                      <option value="">
+                        -- Sin Pasarela de Temporada adicional ($0 COP) --
+                      </option>
+                      {customRunways.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.icon} {r.title} (+${Number(r.campaignCostCop || 15000).toLocaleString('es-CO')} COP • {r.defaultDurationDays || 7} días)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* PASO 2: REVISIÓN Y EDICIÓN DE LOS CAMPOS E IMAGEN DE LA CAMPAÑA */}
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-800/30 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-100">
+                      2. Datos e Imagen de la Campaña a Reactivar
+                    </h4>
+                    <p className="text-[11px] text-zinc-500">
+                      Conserva los datos originales o actualízalos antes de reactivar.
+                    </p>
+                  </div>
+
+                  <label
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-purple-500 transition-colors cursor-pointer ${
+                      uploadingReactivateImage ? 'opacity-60 pointer-events-none' : ''
+                    }`}
+                  >
+                    <span>{uploadingReactivateImage ? '⏳' : '📤'}</span>
+                    <span>
+                      {uploadingReactivateImage ? 'Subiendo...' : 'Cambiar Imagen'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleReactivateImageUpload}
+                      disabled={uploadingReactivateImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+                  {/* Vista previa de la imagen */}
+                  <div className="relative h-36 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 flex items-center justify-center">
+                    {reactivateImageUrl ? (
+                      <img
+                        src={reactivateImageUrl}
+                        alt={reactivateHeadline}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-xs text-zinc-400">Sin imagen</span>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Titular Principal de la Campaña *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={90}
+                        value={reactivateHeadline}
+                        onChange={(e) => setReactivateHeadline(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Descripción / Oferta Secundaria
+                      </label>
+                      <textarea
+                        rows={2}
+                        maxLength={220}
+                        value={reactivateBody}
+                        onChange={(e) => setReactivateBody(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      🔗 Publicación Vinculada
+                    </label>
+                    <select
+                      value={reactivateListingId}
+                      onChange={(e) => setReactivateListingId(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="">-- Sin publicación --</option>
+                      {sellerListings.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      📍 Ciudad Objetivo
+                    </label>
+                    <input
+                      type="text"
+                      value={reactivateTargetCity}
+                      onChange={(e) => setReactivateTargetCity(e.target.value)}
+                      placeholder="Todas las ciudades"
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      🏷️ Categoría Objetivo
+                    </label>
+                    <input
+                      type="text"
+                      value={reactivateTargetCategory}
+                      onChange={(e) => setReactivateTargetCategory(e.target.value)}
+                      placeholder="General"
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* PASO 3: VALIDACIÓN DE PAGO PARA EL PERFIL DEL VENDEDOR */}
+              <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-4 sm:p-5 dark:border-emerald-800/70 dark:bg-emerald-950/20 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-200/70 pb-3 dark:border-emerald-800/50">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900 dark:text-emerald-200">
+                      3. Validación de Pago para Reactivación (Perfil Vendedor)
+                    </h4>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                      Verifica la liquidación de tu campaña y elige validar con tu saldo disponible o adjuntar comprobante de pago.
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="block text-[10px] font-bold uppercase text-zinc-500">
+                      Costo Total Reactivación:
+                    </span>
+                    <span className="text-xl font-black text-emerald-700 dark:text-emerald-400">
+                      ${totalReactivationCost.toLocaleString('es-CO')} COP
+                    </span>
+                    <span className="block text-[10px] text-zinc-500">
+                      Tu saldo actual: <strong>${currentBalance.toLocaleString('es-CO')} COP</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Selector de Método de Validación de Pago */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReactivatePaymentMode('wallet')}
+                    className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                      reactivatePaymentMode === 'wallet'
+                        ? 'border-2 border-emerald-600 bg-white shadow-xs dark:border-emerald-400 dark:bg-zinc-900'
+                        : 'border-zinc-200 bg-white/70 hover:border-emerald-300 dark:border-zinc-800 dark:bg-zinc-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                        💳 Opción A: Descontar de Saldo Disponible
+                      </span>
+                      {currentBalance >= totalReactivationCost && totalReactivationCost > 0 ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          ✓ Saldo Suficiente
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          Faltan ${missingBalanceForReactivation.toLocaleString('es-CO')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Reactivación inmediata descontando ${totalReactivationCost.toLocaleString('es-CO')} COP de tu billetera publicitaria.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setReactivatePaymentMode('proof')}
+                    className={`text-left rounded-xl border p-3.5 transition-all cursor-pointer ${
+                      reactivatePaymentMode === 'proof'
+                        ? 'border-2 border-purple-600 bg-white shadow-xs dark:border-purple-400 dark:bg-zinc-900'
+                        : 'border-zinc-200 bg-white/70 hover:border-purple-300 dark:border-zinc-800 dark:bg-zinc-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                        🧾 Opción B: Validar Pago con Comprobante
+                      </span>
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                        Nequi / Bre-B / Banco
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Adjunta la referencia o captura de tu transferencia para que Administración valide el pago y active la campaña.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Formulario de Comprobante si eligió Opción B o no tiene saldo suficiente */}
+                {reactivatePaymentMode === 'proof' && (
+                  <div className="rounded-2xl border border-purple-200 bg-white p-4 dark:border-purple-900/60 dark:bg-zinc-900 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                          Método de Pago Utilizado
+                        </label>
+                        <select
+                          value={reactivatePaymentMethod}
+                          onChange={(e) => setReactivatePaymentMethod(e.target.value)}
+                          className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        >
+                          <option value="nequi">📱 Nequi / Bre-B</option>
+                          <option value="daviplata">📲 Daviplata</option>
+                          <option value="bancolombia">🏦 Transferencia Bancolombia</option>
+                          <option value="pse">🌐 PSE / Otra Entidad</option>
+                          <option value="efectivo">💵 Efectivo / Corresponsal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                          Valor Transferido (COP) *
+                        </label>
+                        <input
+                          type="number"
+                          min={totalReactivationCost}
+                          step={1000}
+                          value={reactivateRechargeAmount}
+                          onChange={(e) =>
+                            setReactivateRechargeAmount(Math.max(0, Number(e.target.value) || 0))
+                          }
+                          className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-black text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                          N° Referencia / Comprobante *
+                        </label>
+                        <input
+                          type="text"
+                          value={reactivateReferenceCode}
+                          onChange={(e) => setReactivateReferenceCode(e.target.value)}
+                          placeholder="Ej: M12948302"
+                          className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-2.5">
+                        <label
+                          className={`inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2 text-xs font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200 cursor-pointer ${
+                            uploadingReactivateProof ? 'opacity-60 pointer-events-none' : ''
+                          }`}
+                        >
+                          <span>{uploadingReactivateProof ? '⏳' : '📎'}</span>
+                          <span>
+                            {uploadingReactivateProof
+                              ? 'Subiendo captura...'
+                              : reactivateProofUrl
+                                ? '✓ Captura adjuntada (Cambiar)'
+                                : 'Subir captura del comprobante'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleReactivateProofUpload}
+                            disabled={uploadingReactivateProof}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {reactivateProofUrl && (
+                          <a
+                            href={reactivateProofUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-bold text-emerald-600 underline"
+                          >
+                            Ver comprobante ↗
+                          </a>
+                        )}
+                      </div>
+
+                      <input
+                        type="text"
+                        value={reactivateNotes}
+                        onChange={(e) => setReactivateNotes(e.target.value)}
+                        placeholder="Nota opcional para administración..."
+                        className="flex-1 min-w-[200px] rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pie de confirmación de Reactivación */}
+              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReactivatingOrder(null)}
+                  className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 cursor-pointer"
+                >
+                  Cancelar
                 </button>
 
                 <button
                   type="submit"
-                  disabled={savingEditOrder || uploadingEditImage}
-                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-black text-white shadow-sm hover:bg-purple-500 disabled:opacity-50 transition-colors cursor-pointer"
+                  disabled={
+                    submittingReactivation ||
+                    uploadingReactivateImage ||
+                    uploadingReactivateProof ||
+                    totalReactivationCost <= 0
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-xs font-black text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                  <span>{savingEditOrder ? '⏳' : '💾'}</span>
+                  <span>{submittingReactivation ? '⏳' : '🔄'}</span>
                   <span>
-                    {savingEditOrder
-                      ? locale === 'en'
-                        ? 'Saving Changes...'
-                        : 'Guardando cambios...'
-                      : locale === 'en'
-                        ? 'Save Campaign Changes'
-                        : 'Guardar Cambios de la Campaña'}
+                    {submittingReactivation
+                      ? 'Procesando reactivación...'
+                      : reactivatePaymentMode === 'wallet'
+                        ? `Validar con Saldo ($${totalReactivationCost.toLocaleString('es-CO')} COP) y Reactivar Campaña`
+                        : `Enviar Validación de Pago ($${totalReactivationCost.toLocaleString('es-CO')} COP) y Reactivar`}
                   </span>
                 </button>
               </div>

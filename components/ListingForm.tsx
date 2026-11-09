@@ -23,6 +23,7 @@ import {
   encodeAdPageConfigToSlot,
   isSellerAuthorizedForClassification,
 } from '@/lib/adPageConfig'
+import AvantGardeLoader from './AvantGardeLoader'
 
 interface ListingFormProps {
   categories: Category[]
@@ -714,19 +715,9 @@ export default function ListingForm({
     }
   }
 
-  // If loading auth state
+  // If loading auth state, unify with the global loader so there is no second loading phase
   if (loadingAuth) {
-    return (
-      <div className="flex justify-center items-center py-20">
-        <div className="flex items-center gap-3 text-zinc-500">
-          <svg className="animate-spin h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <span>Verificando sesión...</span>
-        </div>
-      </div>
-    )
+    return <AvantGardeLoader />
   }
 
   // If user is not authenticated

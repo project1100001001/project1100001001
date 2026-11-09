@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSidebar } from '@/components/SidebarContext'
 import { ALL_TEST_PROFILES, ADMIN_PROFILE } from '@/lib/testProfiles'
 import { getListingFreeTrialStatus } from '@/lib/adPolicies'
-import AvantGardeLoader from '@/components/AvantGardeLoader'
+import AvantGardeLoader, { useRegisterGlobalLoadPhase } from '@/components/AvantGardeLoader'
 
 type RoleType = 'buyer' | 'seller' | 'admin'
 
@@ -161,6 +161,8 @@ function WelcomeDashboardContent() {
   const [email, setEmail] = useState<string>('')
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(true)
   const [metrics, setMetrics] = useState<DashboardData>(INITIAL_DATA)
+
+  useRegisterGlobalLoadPhase(loadingMetrics)
 
   useEffect(() => {
     const supabase = createClient()

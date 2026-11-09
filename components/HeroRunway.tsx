@@ -349,9 +349,9 @@ function HeroRunwayComponent({
         </div>
 
         {/* Tarjeta de Exhibición Dinámica Split (Doble Columna con TAMAÑO ESTÁTICO FIJO y DESPLAZAMIENTO AL COSTADO) */}
-        {/* REGLA DESIGN_RULES.md: Mantener altura invariable estática [680px]/[620px]/[490px] sin deformarse */}
+        {/* REGLA DESIGN_RULES.md: Mantener altura invariable estática sin deformarse al rotar diapositivas */}
         <div
-          className="relative rounded-3xl border border-zinc-200/80 bg-white/95 shadow-xl dark:border-zinc-800 dark:bg-zinc-900/95 overflow-hidden h-[680px] sm:h-[620px] lg:h-[490px] flex flex-col justify-between"
+          className="relative rounded-3xl border border-zinc-200/80 bg-white/95 shadow-xl dark:border-zinc-800 dark:bg-zinc-900/95 overflow-hidden h-[680px] sm:h-[620px] lg:h-[500px] xl:h-[520px] flex flex-col justify-between"
           style={{ touchAction: 'pan-y' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -383,11 +383,11 @@ function HeroRunwayComponent({
                 return (
                   <div
                     key={`${item.id}-${slotIdx}`}
-                    className="w-full h-full shrink-0 p-5 sm:p-7 lg:p-8 flex flex-col justify-between select-none"
+                    className="w-full h-full shrink-0 p-5 sm:p-6 lg:px-8 lg:py-6 flex flex-col justify-center select-none overflow-hidden"
                   >
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center flex-1 min-h-0">
-                      {/* Columna Izquierda: Datos Comerciales de la Publicación y Campaña */}
-                      <div className="lg:col-span-7 flex flex-col justify-between h-full space-y-2.5 sm:space-y-3 min-w-0 py-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 xl:gap-10 items-center w-full lg:h-[400px] xl:h-[420px]">
+                      {/* Columna Izquierda: Datos Comerciales de la Publicación y Campaña (Altura acotada exacta para que los botones nunca salgan del recuadro) */}
+                      <div className="lg:col-span-7 xl:col-span-7 flex flex-col justify-between lg:h-[400px] xl:h-[420px] space-y-2 sm:space-y-2.5 min-w-0 overflow-hidden">
                         {/* Badges de Estado y Tipo de Publicación */}
                         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                           {item.isPaidCampaign ? (
@@ -414,7 +414,7 @@ function HeroRunwayComponent({
                         </div>
 
                         {/* Titular Principal y Descripción de la Campaña */}
-                        <div className="min-w-0">
+                        <div className="min-w-0 shrink-0">
                           <h1
                             className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 break-words [overflow-wrap:anywhere]"
                             title={item.headline}
@@ -422,7 +422,7 @@ function HeroRunwayComponent({
                             {item.headline}
                           </h1>
 
-                          <p className="mt-1.5 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">
+                          <p className="mt-1 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">
                             {item.description}
                           </p>
                         </div>
@@ -448,7 +448,7 @@ function HeroRunwayComponent({
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 truncate">
-                              <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                              <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">
                                 {item.sellerName}
                               </span>
                               {item.sellerVerified && (
@@ -460,7 +460,7 @@ function HeroRunwayComponent({
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-zinc-500">
                               <span className="text-amber-500 font-bold">★ {item.sellerRating.toFixed(1)}</span>
                               <span>•</span>
                               <span>Rubro: {item.categoryName}</span>
@@ -469,7 +469,7 @@ function HeroRunwayComponent({
                         </div>
 
                         {/* Atributos Clave Configurados de la Publicación */}
-                        <div className="h-7 flex flex-wrap items-center gap-1.5 text-[10px] overflow-hidden shrink-0">
+                        <div className="h-7 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs overflow-hidden shrink-0">
                           {item.attrs?.tiempo_entrega && (
                             <span className="rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
                               ⏱️ {item.attrs.tiempo_entrega}
@@ -497,8 +497,8 @@ function HeroRunwayComponent({
                           )}
                         </div>
 
-                        {/* Botones de Acción Inmediata (WhatsApp y Detalle) */}
-                        <div className="flex flex-wrap items-center gap-2 pt-1 shrink-0">
+                        {/* Botones de Acción Inmediata (WhatsApp y Detalle) - Siempre dentro del recuadro */}
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5 shrink-0">
                           {item.sellerWhatsapp ? (
                             <a
                               href={getWhatsappUrl(
@@ -519,7 +519,7 @@ function HeroRunwayComponent({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={() => trackAdEvent(item, 'whatsapp')}
-                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
                               <span className="text-sm">💬</span>
                               <span>{t.home.contactWhatsappDirect}</span>
@@ -528,7 +528,7 @@ function HeroRunwayComponent({
                             <Link
                               href={`/catalogo/${item.listingId}`}
                               onClick={() => trackAdEvent(item, 'click')}
-                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-colors"
                             >
                               <span>🛍️</span>
                               <span>{t.home.viewProductDetails}</span>
@@ -538,7 +538,7 @@ function HeroRunwayComponent({
                           <Link
                             href={`/catalogo/${item.listingId}`}
                             onClick={() => trackAdEvent(item, 'click')}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                           >
                             <span>{t.home.viewProductDetails}</span>
                             <span>↗</span>
@@ -546,21 +546,21 @@ function HeroRunwayComponent({
 
                           <Link
                             href={`/catalogo?seller=${item.sellerId}`}
-                            className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:underline"
+                            className="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:underline"
                           >
                             Más ofertas →
                           </Link>
                         </div>
                       </div>
 
-                      {/* Columna Derecha: Imagen Principal con Miniaturas */}
-                      <div className="lg:col-span-5 flex flex-col items-center justify-center h-full min-w-0">
-                        <div className="relative w-full aspect-4/3 max-w-sm max-h-[250px] sm:max-h-[270px] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-lg border border-zinc-200/80 dark:border-zinc-700/80 group flex items-center justify-center">
+                      {/* Columna Derecha: Imagen Cuadriculada con altura fija explícita (no empuja ni desborda el texto) */}
+                      <div className="lg:col-span-5 xl:col-span-5 flex items-center justify-center lg:justify-end w-full min-w-0">
+                        <div className="relative w-full h-[215px] sm:h-[235px] lg:h-[400px] xl:h-[420px] lg:max-w-[430px] xl:max-w-[460px] 2xl:max-w-[490px] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 shadow-lg border border-zinc-200/80 dark:border-zinc-700/80 group flex items-center justify-center shrink-0">
                           {itemPhoto ? (
                             <img
                               src={itemPhoto}
                               alt={item.title}
-                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                             />
                           ) : (
                             <div className="flex flex-col items-center justify-center p-6 text-center select-none text-zinc-400">
@@ -576,42 +576,42 @@ function HeroRunwayComponent({
                           )}
 
                           {/* Top Badges coincidentes con el explorador de catálogo */}
-                          <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-                            <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
+                          <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5">
+                            <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
                               {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
                             </span>
                             {item.isPaidCampaign && (
-                              <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                              <span className="rounded-md bg-purple-600 px-2.5 py-0.5 text-[10px] sm:text-xs font-extrabold text-white shadow-xs">
                                 📢 Patrocinado
                               </span>
                             )}
                           </div>
 
                           {/* Badge Flotante de Precio */}
-                          <div className="absolute bottom-2.5 left-2.5 rounded-lg bg-black/75 px-2.5 py-1 text-xs font-black text-white backdrop-blur-md">
+                          <div className="absolute bottom-3 left-3 z-10 rounded-lg bg-black/75 px-3 py-1 text-xs sm:text-sm font-black text-white backdrop-blur-md">
                             {item.price !== null
                               ? `$ ${item.price.toLocaleString('es-CO')}`
                               : 'Cotización'}
                           </div>
-                        </div>
 
-                        {/* Fila de Miniaturas si la publicación tiene múltiples fotos */}
-                        <div className="h-12 flex items-center justify-center gap-1.5 max-w-sm overflow-x-auto mt-2">
+                          {/* Selector Flotante de Miniaturas integrado en la esquina inferior derecha */}
                           {item.allImages && item.allImages.length > 1 && (
-                            item.allImages.slice(0, 5).map((img, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setSelectedPhotos((prev) => ({ ...prev, [item.id]: idx }))}
-                                className={`h-10 w-10 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
-                                  (selectedPhotos[item.id] ?? 0) === idx
-                                    ? 'border-purple-600 scale-105 shadow-md'
-                                    : 'border-zinc-200 opacity-70 hover:opacity-100 dark:border-zinc-700'
-                                }`}
-                              >
-                                <img src={img} alt="Miniatura" className="h-full w-full object-cover" />
-                              </button>
-                            ))
+                            <div className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5 rounded-xl bg-black/55 p-1.5 backdrop-blur-md border border-white/15 max-w-[70%] overflow-x-auto">
+                              {item.allImages.slice(0, 5).map((img, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setSelectedPhotos((prev) => ({ ...prev, [item.id]: idx }))}
+                                  className={`h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-lg border-2 transition-all cursor-pointer ${
+                                    (selectedPhotos[item.id] ?? 0) === idx
+                                      ? 'border-purple-400 scale-105 shadow-md'
+                                      : 'border-white/40 opacity-75 hover:opacity-100'
+                                  }`}
+                                >
+                                  <img src={img} alt="Miniatura" className="h-full w-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </div>
