@@ -26,26 +26,12 @@ const LOADING_PHASES = [
  */
 export function QuantumGooeyCore({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
   const isSmall = size === 'sm'
-  const boxClass = isSmall ? 'h-14 w-14' : 'h-28 w-28 sm:h-32 sm:w-32'
+  const boxClass = isSmall ? 'h-14 w-14' : 'h-32 w-32'
+  const filterId = React.useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  const gooFilterId = `ic-liquid-gooey-${filterId}`
 
   return (
     <div className={`relative flex items-center justify-center select-none ${boxClass}`}>
-      {/* SVG Filter oculto para efecto Liquid Gooey Metaball */}
-      <svg className="sr-only" aria-hidden="true">
-        <defs>
-          <filter id="ic-liquid-gooey">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"
-              result="goo"
-            />
-            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
-          </filter>
-        </defs>
-      </svg>
-
       {/* Halo de energía ambiental */}
       <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-emerald-500/25 via-purple-500/25 to-indigo-500/25 blur-xl animate-pulse" />
 
@@ -64,27 +50,47 @@ export function QuantumGooeyCore({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
         className="ic-orbit-ring-3 absolute inset-3 rounded-full border-2 border-transparent border-t-indigo-400 border-l-cyan-400/70 shadow-[0_0_12px_rgba(99,102,241,0.4)]"
       />
 
-      {/* Núcleo de electrones orbitando sin insignia central */}
-      <div
-        style={{ filter: 'url(#ic-liquid-gooey)' }}
-        className="relative flex h-full w-full items-center justify-center"
+      {/* Núcleo SVG nativo con filtro Liquid Gooey Metaball interno (100% idéntico en móvil iOS/Android y escritorio) */}
+      <svg
+        viewBox="0 0 120 120"
+        className="relative h-full w-full overflow-visible"
+        aria-hidden="true"
       >
-        <span
-          className={`ic-blob-1 absolute rounded-full bg-emerald-400/90 shadow-[0_0_12px_rgba(16,185,129,0.8)] ${
-            isSmall ? 'h-3 w-3' : 'h-5 w-5'
-          }`}
-        />
-        <span
-          className={`ic-blob-2 absolute rounded-full bg-purple-500/90 shadow-[0_0_12px_rgba(168,85,247,0.8)] ${
-            isSmall ? 'h-3 w-3' : 'h-5 w-5'
-          }`}
-        />
-        <span
-          className={`rounded-full bg-cyan-400/90 shadow-[0_0_14px_rgba(34,211,238,0.9)] animate-pulse ${
-            isSmall ? 'h-2 w-2' : 'h-3.5 w-3.5'
-          }`}
-        />
-      </div>
+        <defs>
+          <filter
+            id={gooFilterId}
+            filterUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            width="120"
+            height="120"
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6.2" result="blur" />
+            <feColorMatrix
+              in="blur"
+              mode="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"
+              result="goo"
+            />
+            <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+          </filter>
+        </defs>
+
+        {/* Resplandor suave detrás de la masa líquida */}
+        <g opacity="0.55" style={{ filter: 'blur(6px)' }}>
+          <circle className="ic-svg-blob-1" cx="60" cy="60" r="12" fill="#10b981" />
+          <circle className="ic-svg-blob-2" cx="60" cy="60" r="12" fill="#a855f7" />
+          <circle className="ic-svg-blob-center" cx="60" cy="60" r="9.5" fill="#22d3ee" />
+        </g>
+
+        {/* Masa líquida fusionada mediante el filtro SVG nativo */}
+        <g filter={`url(#${gooFilterId})`}>
+          <circle className="ic-svg-blob-1" cx="60" cy="60" r="11.5" fill="#34d399" />
+          <circle className="ic-svg-blob-2" cx="60" cy="60" r="11.5" fill="#a855f7" />
+          <circle className="ic-svg-blob-center" cx="60" cy="60" r="9" fill="#22d3ee" />
+        </g>
+      </svg>
     </div>
   )
 }
@@ -158,6 +164,16 @@ export function resolveRouteContext(href: string): RouteContextInfo {
       title: 'Directorio de Vendedores y Comercios',
       description:
         'Perfiles de pymes, emprendedores y profesionales con su calificación, ciudad y catálogo.',
+      guideTip: '',
+    }
+  }
+
+  if (cleanHref.startsWith('/solicitudes')) {
+    return {
+      badge: '🙋‍♂️ Clasificados de Demanda',
+      title: 'Solicitudes de Servicios y Productos',
+      description:
+        'Tablero donde los compradores registran la necesidad de un servicio o producto para que prestadores verificados los atiendan y reciban su calificación.',
       guideTip: '',
     }
   }

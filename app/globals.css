@@ -73,10 +73,10 @@ body {
     transform: translate(0px, 0px) scale(1);
   }
   33% {
-    transform: translate(14px, -10px) scale(1.18);
+    transform: translate(11px, -8px) scale(1.22);
   }
   66% {
-    transform: translate(-12px, 12px) scale(0.88);
+    transform: translate(-10px, 9px) scale(0.92);
   }
 }
 
@@ -85,10 +85,19 @@ body {
     transform: translate(0px, 0px) scale(1);
   }
   33% {
-    transform: translate(-15px, 10px) scale(0.9);
+    transform: translate(-11px, 8px) scale(0.92);
   }
   66% {
-    transform: translate(13px, -12px) scale(1.2);
+    transform: translate(10px, -9px) scale(1.24);
+  }
+}
+
+@keyframes ic-liquid-blob-center {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
   }
 }
 
@@ -116,12 +125,24 @@ body {
   will-change: transform;
 }
 
-.ic-blob-1 {
+.ic-blob-1,
+.ic-svg-blob-1 {
+  transform-box: fill-box;
+  transform-origin: center;
   animation: ic-liquid-blob-1 2.6s ease-in-out infinite;
 }
 
-.ic-blob-2 {
+.ic-blob-2,
+.ic-svg-blob-2 {
+  transform-box: fill-box;
+  transform-origin: center;
   animation: ic-liquid-blob-2 2.6s ease-in-out infinite;
+}
+
+.ic-svg-blob-center {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ic-liquid-blob-center 2s ease-in-out infinite;
 }
 
 .ic-shimmer-bar {

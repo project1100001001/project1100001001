@@ -40,6 +40,7 @@ function SidebarNavContent({
 }: SidebarNavContentProps) {
   // Accordion open/close state for suboptions
   const [catalogOpen, setCatalogOpen] = useState(true)
+  const [requestsOpen, setRequestsOpen] = useState(true)
   const [listingsOpen, setListingsOpen] = useState(true)
   const [campaignsOpen, setCampaignsOpen] = useState(true)
   const [adminOpen, setAdminOpen] = useState(true)
@@ -66,6 +67,11 @@ function SidebarNavContent({
 
   // Directory
   const isDirectoryActive = pathname === '/directorio'
+
+  // Buyer Classified Requests (/solicitudes)
+  const isRequestsBoardActive = pathname === '/solicitudes'
+  const isRequestsBuyerWindowActive = pathname === '/solicitudes/comprador'
+  const isRequestsSellerWindowActive = pathname === '/solicitudes/vendedor'
 
   // Listings / Inventory / Services
   const isInventoryActive = (pathname === '/mis-publicaciones' || pathname === '/inventario') && !currentType
@@ -106,7 +112,26 @@ function SidebarNavContent({
         )}
       </Link>
 
-      {/* OPCIÓN 1.B: Dashboard / Pantalla de Bienvenida (Habilitado solo para usuarios logueados, justo debajo de Inicio) */}
+      {/* OPCIÓN: Directorio de Vendedores (En la misma sección de Inicio, justo debajo de Inicio) */}
+      <Link
+        href="/directorio"
+        onClick={close}
+        className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-all ${
+          isDirectoryActive
+            ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+            : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-base">📇</span>
+          <span>{t.nav.directory}</span>
+        </div>
+        {isDirectoryActive && (
+          <span className="h-2 w-2 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+        )}
+      </Link>
+
+      {/* OPCIÓN 1.B: Dashboard / Pantalla de Bienvenida (Habilitado solo para usuarios logueados) */}
       {isLoggedIn && (
         <Link
           href={role ? `/bienvenida?role=${role}` : '/bienvenida'}
@@ -206,24 +231,104 @@ function SidebarNavContent({
         )}
       </div>
 
-      {/* OPCIÓN: Directorio de Vendedores */}
-      <Link
-        href="/directorio"
-        onClick={close}
-        className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-          isDirectoryActive
-            ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
-            : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
-        }`}
-      >
-        <div className="flex items-center gap-2.5">
-          <span>📇</span>
-          <span>{t.nav.directory}</span>
+      {/* OPCIÓN NUEVA: Directorio de Contratos (Tablero de Solicitudes + Ventanas por Sesión Comprador / Vendedor) */}
+      <div className="pt-1">
+        <div className="flex items-center justify-between rounded-xl px-3 py-2 text-zinc-500 uppercase tracking-wider text-[10px] font-bold">
+          <div className="flex items-center gap-2">
+            <span>📜</span>
+            <span>
+              {locale === 'en'
+                ? 'Contracts Directory'
+                : 'Directorio de Contratos'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRequestsOpen(!requestsOpen)}
+            className="p-1 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+            aria-label={requestsOpen ? 'Colapsar directorio de contratos' : 'Expandir directorio de contratos'}
+          >
+            {requestsOpen ? '▼' : '▶'}
+          </button>
         </div>
-        {isDirectoryActive && (
-          <span className="h-2 w-2 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+
+        {requestsOpen && (
+          <div className="mt-1 ml-3 space-y-1 border-l-2 border-teal-200 pl-2 dark:border-teal-900/60">
+            {/* 1. TABLERO DE SOLICITUDES (SIEMPRE VISIBLE CON Y SIN LOGUEO) */}
+            <Link
+              href="/solicitudes"
+              onClick={close}
+              className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                isRequestsBoardActive
+                  ? 'bg-teal-50 text-teal-800 font-bold dark:bg-teal-950/60 dark:text-teal-300 ring-1 ring-teal-500/30 shadow-2xs'
+                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>📋</span>
+                <span>
+                  {locale === 'en'
+                    ? 'Requests Board'
+                    : 'Tablero de Solicitudes'}
+                </span>
+              </div>
+              {isRequestsBoardActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-400 shrink-0" />
+              )}
+            </Link>
+
+            {/* 2. VENTANA DEL COMPRADOR (SOLO VISIBLE DESDE LA SESIÓN DE COMPRADOR) */}
+            {isLoggedIn && (role === 'buyer' || role === 'admin') && (
+              <Link
+                href="/solicitudes/comprador"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  isRequestsBuyerWindowActive
+                    ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🛒</span>
+                  <span>
+                    {locale === 'en'
+                      ? 'Buyer Window'
+                      : 'Ventana del Comprador'}
+                  </span>
+                </div>
+                {isRequestsBuyerWindowActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+                )}
+              </Link>
+            )}
+
+            {/* 3. VENTANA DEL VENDEDOR (SOLO VISIBLE DESDE LA SESIÓN DE VENDEDOR) */}
+            {isLoggedIn && (role === 'seller' || role === 'admin') && (
+              <Link
+                href="/solicitudes/vendedor"
+                onClick={close}
+                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  isRequestsSellerWindowActive
+                    ? 'bg-purple-50 text-purple-800 font-bold dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-500/30 shadow-2xs'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>🏪</span>
+                  <span>
+                    {locale === 'en'
+                      ? 'Seller Window'
+                      : 'Ventana del Vendedor'}
+                  </span>
+                </div>
+                {isRequestsSellerWindowActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-600 dark:bg-purple-400 shrink-0" />
+                )}
+              </Link>
+            )}
+          </div>
         )}
-      </Link>
+      </div>
 
       {/* OPCIÓN 3: Mis Publicaciones */}
       {hasPermission(role, 'publish_listings') && (

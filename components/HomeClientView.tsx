@@ -11,6 +11,13 @@ import ServicesRunway from '@/components/ServicesRunway'
 import ArticlesRunway from '@/components/ArticlesRunway'
 import ProductsRunway from '@/components/ProductsRunway'
 import MerchantsRunway, { type MerchantShowcase } from '@/components/MerchantsRunway'
+import BuyerRequestsRunway from '@/components/BuyerRequestsRunway'
+import {
+  type BuyerClassifiedRequest,
+  INITIAL_BUYER_REQUESTS,
+  BUYER_REQUESTS_STORAGE_KEY,
+  sanitizeBuyerRequestsList,
+} from '@/lib/buyerRequests'
 import {
   resolveAdOrderPlacement,
   extractSeasonalRunwayMeta,
@@ -296,6 +303,7 @@ interface HomeClientViewProps {
   campaignAds: any[]
   allPublishedListings: ListingWithRelations[]
   initialAdPageConfig?: AdPageConfig
+  initialBuyerRequests?: BuyerClassifiedRequest[]
 }
 
 // Filtra rigurosamente imágenes de prueba externas para mostrar íconos/emojis reales como en el catálogo
@@ -321,10 +329,14 @@ export default function HomeClientView({
   campaignAds,
   allPublishedListings,
   initialAdPageConfig,
+  initialBuyerRequests,
 }: HomeClientViewProps) {
   const { t, locale } = useTranslation()
   const [adPageConfig, setAdPageConfig] = useState<AdPageConfig>(() =>
     sanitizeAdPageConfig(initialAdPageConfig || DEFAULT_AD_PAGE_CONFIG)
+  )
+  const [buyerRequests, setBuyerRequests] = useState<BuyerClassifiedRequest[]>(() =>
+    sanitizeBuyerRequestsList(initialBuyerRequests || INITIAL_BUYER_REQUESTS)
   )
   const [viewerRole, setViewerRole] = useState<'guest' | 'buyer' | 'seller' | 'admin'>('guest')
   const [selectedExclusiveRunwayId, setSelectedExclusiveRunwayId] = useState<string>('all')
@@ -336,6 +348,18 @@ export default function HomeClientView({
       if (saved) {
         const parsed = JSON.parse(saved)
         setAdPageConfig(sanitizeAdPageConfig(parsed))
+      }
+    } catch {
+      // Ignorar errores de almacenamiento local
+    }
+
+    try {
+      const savedRequests = localStorage.getItem(BUYER_REQUESTS_STORAGE_KEY)
+      if (savedRequests) {
+        const parsedReqs = JSON.parse(savedRequests)
+        if (Array.isArray(parsedReqs) && parsedReqs.length > 0) {
+          setBuyerRequests(sanitizeBuyerRequestsList(parsedReqs))
+        }
       }
     } catch {
       // Ignorar errores de almacenamiento local
@@ -372,8 +396,17 @@ export default function HomeClientView({
         setAdPageConfig(sanitizeAdPageConfig(e.detail))
       }
     }
+    const handleRequestsUpdate = (e: any) => {
+      if (e?.detail) {
+        setBuyerRequests(sanitizeBuyerRequestsList(e.detail))
+      }
+    }
     window.addEventListener('ad-page-config-updated', handleConfigUpdate)
-    return () => window.removeEventListener('ad-page-config-updated', handleConfigUpdate)
+    window.addEventListener('buyer-requests-updated', handleRequestsUpdate)
+    return () => {
+      window.removeEventListener('ad-page-config-updated', handleConfigUpdate)
+      window.removeEventListener('buyer-requests-updated', handleRequestsUpdate)
+    }
   }, [])
 
   // 1. Transformar y unificar las campañas y publicaciones en elementos de pasarela
@@ -941,6 +974,15 @@ export default function HomeClientView({
           scrollSpeed={effectiveScrollSpeed}
         />
       )}
+
+      {/* ========================================================================= */}
+      {/* 7. PASARELA DE SOLICITUDES DE COMPRADORES (DEBAJO DE VENDEDORES)          */}
+      {/* ========================================================================= */}
+      <BuyerRequestsRunway
+        requests={buyerRequests}
+        locale={locale}
+        scrollSpeed={effectiveScrollSpeed}
+      />
 
       {/* ========================================================================= */}
       {/* 6. ACCESO RÁPIDO POR CATÁLOGOS: SERVICIOS, USADOS Y NUEVOS               */}

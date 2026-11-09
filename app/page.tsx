@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import HomeClientView from '@/components/HomeClientView'
 import type { Category, ListingWithRelations } from '@/lib/types'
 import { decodeAdPageConfigFromSlots } from '@/lib/adPageConfig'
+import { decodeBuyerRequestsFromSlots } from '@/lib/buyerRequests'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -20,6 +21,7 @@ export default async function HomePage() {
     // Usar valores por defecto si ad_slot aún no está disponible
   }
   const adPageConfig = decodeAdPageConfigFromSlots(adSlotsData)
+  const initialBuyerRequests = decodeBuyerRequestsFromSlots(adSlotsData)
 
   // 1. Obtener categorías
   const { data: categoriesData } = await supabase
@@ -83,6 +85,7 @@ export default async function HomePage() {
       campaignAds={campaignAdsData}
       allPublishedListings={allPublishedListings}
       initialAdPageConfig={adPageConfig}
+      initialBuyerRequests={initialBuyerRequests}
     />
   )
 }
