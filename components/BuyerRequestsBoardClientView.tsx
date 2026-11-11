@@ -1462,25 +1462,23 @@ export default function BuyerRequestsBoardClientView({
                   <button
                     type="button"
                     onClick={() => setViewMode('list')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
                       viewMode === 'list'
                         ? 'bg-teal-600 text-white shadow-2xs'
                         : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                     }`}
                   >
-                    <span>☰</span>
                     <span>{locale === 'en' ? 'List' : 'Lista'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMode('grid')}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
                       viewMode === 'grid'
                         ? 'bg-teal-600 text-white shadow-2xs'
                         : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                     }`}
                   >
-                    <span>⊞</span>
                     <span>{locale === 'en' ? 'Grid' : 'Cuadrícula'}</span>
                   </button>
                 </div>
@@ -1488,9 +1486,8 @@ export default function BuyerRequestsBoardClientView({
             </div>
 
             {visibleRequests.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <span className="text-4xl">📋</span>
-                <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50">
+              <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
                   {locale === 'en'
                     ? 'No requests match your filters'
                     : 'No se encontraron solicitudes con los filtros seleccionados'}
@@ -1500,8 +1497,8 @@ export default function BuyerRequestsBoardClientView({
               <div
                 className={
                   viewMode === 'list'
-                    ? 'flex flex-col gap-3'
-                    : 'grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'
+                    ? 'flex flex-col gap-1.5 sm:gap-2'
+                    : 'grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3'
                 }
               >
                 {visibleRequests.map((req) => {
@@ -1512,14 +1509,94 @@ export default function BuyerRequestsBoardClientView({
                     ? buildOrGetContract(req, primaryProposal)
                     : req.contract || null
 
+                  if (viewMode === 'list') {
+                    return (
+                      <article
+                        key={req.id}
+                        className="flex items-center justify-between gap-2 sm:gap-5 rounded-xl border border-zinc-200/90 bg-white px-2.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs transition-all hover:border-teal-300 dark:border-zinc-800 dark:bg-zinc-900"
+                      >
+                        {/* Izquierda: 3 líneas expandidas horizontalmente en móvil y con margen amplio antes de la derecha en web */}
+                        <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6">
+                          {/* Línea 1: Tipo + Título + Código */}
+                          <div className="min-w-0 flex items-center gap-1.5 sm:gap-2">
+                            <span
+                              className={`shrink-0 rounded border px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none ${
+                                isService
+                                  ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200'
+                                  : 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200'
+                              }`}
+                            >
+                              {isService ? 'Servicio' : 'Producto'}
+                            </span>
+                            <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate min-w-0 flex-1">
+                              {req.title}
+                            </h2>
+                            <span className="hidden sm:inline-block shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                              {req.referenceCode}
+                            </span>
+                          </div>
+
+                          {/* Línea 2: Línea adicional de texto informativo / descripción de la solicitud */}
+                          <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
+                            {req.description}
+                          </p>
+
+                          {/* Línea 3: Metadatos redistribuidos con buen espaciado */}
+                          <div className="w-full flex items-center justify-between gap-2 sm:gap-4 text-[11px] text-zinc-500 dark:text-zinc-400">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate min-w-0">
+                              {req.buyerName}
+                            </span>
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                              <span className="font-semibold text-teal-600 dark:text-teal-400">
+                                {req.buyerCity}
+                              </span>
+                              {req.categoryName && (
+                                <span className="hidden xs:inline sm:inline truncate max-w-[120px]">{req.categoryName}</span>
+                              )}
+                              <span className="hidden md:inline">{req.urgencyLabel}</span>
+                              <span className="hidden lg:inline text-zinc-400">{req.modalityLabel}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Derecha: En móvil presupuesto sobre estado/acciones; en web en fila */}
+                        <div className="flex flex-col items-end justify-center gap-1 sm:flex-row sm:items-center sm:gap-2.5 shrink-0 pl-2 sm:pl-4 border-l border-zinc-100 dark:border-zinc-800/80">
+                          <span className="text-[11px] sm:text-xs font-extrabold text-teal-600 dark:text-teal-400 whitespace-nowrap leading-tight">
+                            {req.budgetMaxCop !== null
+                              ? req.budgetMinCop
+                                ? `$${req.budgetMinCop.toLocaleString('es-CO')} - $${req.budgetMaxCop.toLocaleString('es-CO')}`
+                                : `Hasta $${req.budgetMaxCop.toLocaleString('es-CO')}`
+                              : 'Cotizar'}
+                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="hidden sm:inline-block rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 whitespace-nowrap">
+                              {req.proposals.length} {req.proposals.length === 1 ? 'postulación' : 'postulaciones'}
+                            </span>
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${
+                                req.status === 'open'
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                  : req.status === 'in_attention'
+                                  ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                              }`}
+                            >
+                              {req.status === 'open'
+                                ? 'Abierta'
+                                : req.status === 'in_attention'
+                                ? 'En Contrato'
+                                : 'Atendida'}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  }
+
                   return (
                     <article
                       key={req.id}
-                      className={`rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-xs transition-all dark:border-zinc-800 dark:bg-zinc-900 ${
-                        viewMode === 'list'
-                          ? 'flex flex-col md:flex-row md:items-start md:justify-between gap-5'
-                          : 'flex flex-col justify-between'
-                      }`}
+                      className="rounded-2xl border border-zinc-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
                     >
                       <div className="space-y-3 flex-1 min-w-0">
                         {/* Etiquetas de Tipo, Referencia y Estado */}
@@ -1532,7 +1609,7 @@ export default function BuyerRequestsBoardClientView({
                                   : 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200'
                               }`}
                             >
-                              {isService ? '🛠️ Solicitud de Servicio' : '📦 Solicitud de Producto'}
+                              {isService ? 'Solicitud de Servicio' : 'Solicitud de Producto'}
                             </span>
                             <span className="rounded-lg bg-zinc-100 px-2 py-0.5 font-mono text-[11px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                               {req.referenceCode}
@@ -1542,7 +1619,7 @@ export default function BuyerRequestsBoardClientView({
                             </span>
                             {activeContract && (
                               <span className="rounded-lg bg-teal-50 border border-teal-200 px-2 py-0.5 font-mono text-[11px] font-bold text-teal-800 dark:bg-teal-950/60 dark:border-teal-800 dark:text-teal-300">
-                                📜 {activeContract.contractCode}
+                                {activeContract.contractCode}
                               </span>
                             )}
                           </div>
@@ -1557,10 +1634,10 @@ export default function BuyerRequestsBoardClientView({
                             }`}
                           >
                             {req.status === 'open'
-                              ? '🟢 Abierta para Atención'
+                              ? 'Abierta para Atención'
                               : req.status === 'in_attention'
-                              ? '📜 En Contrato / Atención'
-                              : '⭐ Atendida y Calificada'}
+                              ? 'En Contrato / Atención'
+                              : 'Atendida y Calificada'}
                           </span>
                         </div>
 
@@ -1578,11 +1655,10 @@ export default function BuyerRequestsBoardClientView({
                             </span>
                             <span>•</span>
                             <span className="font-semibold text-teal-600 dark:text-teal-400">
-                              📍 {req.buyerCity}
+                              {req.buyerCity}
                             </span>
                             <span>•</span>
                             <span>
-                              📅{' '}
                               {new Date(req.createdAt).toLocaleDateString('es-CO', {
                                 day: '2-digit',
                                 month: 'short',
@@ -1593,7 +1669,7 @@ export default function BuyerRequestsBoardClientView({
                         </div>
 
                         {/* Descripción */}
-                        <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                        <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-2">
                           {req.description}
                         </p>
 
@@ -1623,7 +1699,7 @@ export default function BuyerRequestsBoardClientView({
                               className="text-zinc-800 dark:text-zinc-200 mt-0.5 block truncate"
                               title={req.preferredSchedule}
                             >
-                              🕒 {req.preferredSchedule}
+                              {req.preferredSchedule}
                             </strong>
                           </div>
                           <div>
@@ -1643,7 +1719,7 @@ export default function BuyerRequestsBoardClientView({
                         {req.review && (
                           <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs dark:border-amber-900/60 dark:bg-amber-950/30 flex flex-wrap items-center justify-between gap-2">
                             <span className="text-amber-900 dark:text-amber-200 font-semibold">
-                              🏆 Atendido por <strong>{req.review.sellerBusinessName}</strong> — &ldquo;
+                              Atendido por <strong>{req.review.sellerBusinessName}</strong> — &ldquo;
                               {req.review.comment}&rdquo;
                             </span>
                             <span className="font-black text-amber-500">
@@ -1654,13 +1730,7 @@ export default function BuyerRequestsBoardClientView({
                       </div>
 
                       {/* Columna derecha / inferior: Presupuesto e Indicador de Postulaciones (Sin botones ni enlaces) */}
-                      <div
-                        className={`shrink-0 flex flex-col justify-between ${
-                          viewMode === 'list'
-                            ? 'md:w-56 md:border-l md:border-zinc-100 md:pl-5 dark:md:border-zinc-800'
-                            : 'mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800'
-                        }`}
-                      >
+                      <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 shrink-0 flex flex-col justify-between">
                         <div>
                           <span className="text-[10px] font-bold uppercase text-zinc-400 block">
                             Presupuesto ({req.budgetUnit})
@@ -1676,14 +1746,14 @@ export default function BuyerRequestsBoardClientView({
 
                         <div className="mt-3 space-y-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                           <div className="rounded-lg bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                            🙋 {req.proposals.length}{' '}
+                            {req.proposals.length}{' '}
                             {req.proposals.length === 1
                               ? 'postulación registrada'
                               : 'postulaciones registradas'}
                           </div>
                           {activeContract && (
                             <div className="rounded-lg bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                              📊 Avance contrato: {activeContract.progressPercent}%
+                              Avance contrato: {activeContract.progressPercent}%
                             </div>
                           )}
                         </div>

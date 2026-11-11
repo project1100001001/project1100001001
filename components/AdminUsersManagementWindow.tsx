@@ -878,25 +878,23 @@ export default function AdminUsersManagementWindow({
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
                     viewMode === 'list'
                       ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                   }`}
                 >
-                  <span>☰</span>
                   <span>Lista</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
                     viewMode === 'grid'
                       ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                   }`}
                 >
-                  <span>⊞</span>
                   <span>Cuadrícula</span>
                 </button>
               </div>

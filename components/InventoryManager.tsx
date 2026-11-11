@@ -1463,28 +1463,26 @@ export default function InventoryManager({
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     viewMode === 'list'
                       ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                       : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                   }`}
                   title="Modo de visualización en lista"
                 >
-                  <span>☰</span>
                   <span>Lista</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     viewMode === 'grid'
                       ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                       : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                   }`}
                   title="Modo de visualización en cuadrícula"
                 >
-                  <span>⊞</span>
-                  <span className="hidden sm:inline">Cuadrícula</span>
+                  <span>Cuadrícula</span>
                 </button>
               </div>
             </div>
@@ -1492,11 +1490,8 @@ export default function InventoryManager({
 
           {/* Listado / Tabla de Artículos con Ajustes */}
           {filteredListings.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-              <span className="text-4xl">
-                {macroTypeScope === 'services' ? '🛠️' : macroTypeScope === 'articles' ? '📦' : '🛍️'}
-              </span>
-              <p className="mt-3 text-sm text-zinc-500">
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
+              <p className="text-sm text-zinc-500">
                 {macroTypeScope === 'services'
                   ? (locale === 'en' ? 'No services found matching the active filters.' : 'No se encontraron servicios con los filtros activos.')
                   : macroTypeScope === 'articles'
@@ -1507,7 +1502,7 @@ export default function InventoryManager({
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-3'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-1.5'}>
               {visibleListings.map((item) => {
                 const isService = item.type === 'service'
                 const rawStock = item.stock ?? 0
@@ -1529,6 +1524,191 @@ export default function InventoryManager({
                 const condition = item.attrs?.condition || 'Nuevo'
                 const deliveryMethod = item.attrs?.delivery_method || 'Entrega estándar / Envío'
                 const adTrialStatus = getListingFreeTrialStatus(item)
+
+                if (viewMode === 'list') {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-5 rounded-xl border bg-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-2xs transition-all dark:bg-zinc-900 ${
+                        isService
+                          ? 'border-purple-200/70 dark:border-purple-950/70 hover:border-purple-300'
+                          : rawStock === 0
+                          ? 'border-red-200 dark:border-red-950/60 bg-red-50/10'
+                          : rawStock <= 3
+                          ? 'border-amber-200 dark:border-amber-950/60'
+                          : 'border-zinc-200 dark:border-zinc-800'
+                      }`}
+                    >
+                      {/* Izquierda: Miniatura + 3 líneas de información bien distribuidas con margen hacia los botones */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2 lg:pr-6">
+                        <Link
+                          href={`/catalogo/${item.id}`}
+                          className="relative h-12 w-12 sm:h-13 sm:w-13 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700"
+                          title={locale === 'en' ? 'View ad in catalog' : 'Ver anuncio en catálogo'}
+                        >
+                          {coverImage ? (
+                            <Image
+                              src={coverImage}
+                              alt={item.title}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-zinc-400">
+                              {isService ? 'SRV' : item.type === 'article' ? 'ART' : 'PRD'}
+                            </div>
+                          )}
+                        </Link>
+
+                        <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                          {/* Línea 1: Tipo + Título */}
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span
+                              className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none ${
+                                isService
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                  : item.type === 'article'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                              }`}
+                            >
+                              {isService ? 'Servicio' : item.type === 'article' ? 'Usado' : 'Nuevo'}
+                            </span>
+
+                            <Link
+                              href={`/catalogo/${item.id}`}
+                              className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate min-w-0 flex-1"
+                              title={item.title}
+                            >
+                              {item.title}
+                            </Link>
+                          </div>
+
+                          {/* Línea 2: Línea adicional de texto informativo / descripción */}
+                          <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
+                            {item.description?.trim() || (isService ? `Atención ${serviceMod} • Tiempo de respuesta: ${serviceLead}` : `${condition} • Método de entrega: ${deliveryMethod}`)}
+                          </p>
+
+                          {/* Línea 3: Metadatos redistribuidos con buen espaciado */}
+                          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                            {item.category && (
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                                {item.category.name}
+                              </span>
+                            )}
+                            <span>{item.city}</span>
+                            {isService ? (
+                              <span className="text-purple-600 dark:text-purple-400 font-medium">
+                                {serviceMod} ({serviceTime})
+                              </span>
+                            ) : (
+                              <span>
+                                Stock: <strong className={rawStock === 0 ? 'text-red-600' : 'text-zinc-700 dark:text-zinc-300'}>{rawStock}</strong>
+                              </span>
+                            )}
+                            <span className="hidden md:inline text-zinc-400">
+                              {adTrialStatus.isFreeTrialActive
+                                ? `Publicidad: ${adTrialStatus.daysRemaining}d ${adTrialStatus.hoursRemaining}h`
+                                : 'Publicidad inicial finalizada'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Derecha: En móvil precio sobre controles de acción; en web en fila */}
+                      <div className="flex flex-col items-end justify-center gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 shrink-0 ml-auto pl-2 lg:pl-4 border-l border-zinc-100 dark:border-zinc-800/80">
+                        <span className="text-[11px] sm:text-sm font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap leading-tight">
+                          ${Number(item.price || 0).toLocaleString('es-CO')}
+                        </span>
+
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                          <select
+                            value={item.status}
+                            disabled={updatingStatusId === item.id}
+                            onChange={(e) => handleQuickStatusChange(item, e.target.value as ListingStatus)}
+                            className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+                              item.status === 'published'
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : item.status === 'draft'
+                                ? 'border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                                : item.status === 'paused'
+                                ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                : 'border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
+                            }`}
+                            title="Cambiar estado del anuncio"
+                          >
+                            <option value="published">En Catálogo</option>
+                            <option value="draft">Borrador</option>
+                            <option value="paused">Pausado</option>
+                            <option value="submitted">En Revisión</option>
+                            <option value="archived">Archivado</option>
+                          </select>
+
+                          {!isService ? (
+                            <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-lg dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                              <button
+                                type="button"
+                                onClick={() => handleStepStock(item, -1)}
+                                className="h-6 w-6 rounded bg-white font-bold text-xs text-zinc-700 shadow-2xs hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-200 flex items-center justify-center"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={editedStock}
+                                onChange={(e) =>
+                                  handleStockChange(item.id, parseInt(e.target.value, 10) || 0)
+                                }
+                                className="h-6 w-11 rounded bg-white px-1 text-center font-bold text-[11px] text-zinc-900 focus:outline-none dark:bg-zinc-900 dark:text-zinc-100"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleStepStock(item, 1)}
+                                className="h-6 w-6 rounded bg-white font-bold text-xs text-zinc-700 shadow-2xs hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-200 flex items-center justify-center"
+                              >
+                                +
+                              </button>
+                              {isDirty && (
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={() => handleSaveStock(item)}
+                                  className="rounded bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+                                >
+                                  {isSaving ? '...' : 'Guardar'}
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenServiceModal(item)}
+                              className="rounded-lg border border-purple-300 bg-purple-50 px-2 sm:px-2.5 py-1 text-[11px] font-semibold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300"
+                            >
+                              Tiempos ({serviceCap}/día)
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFullEditModal(item)}
+                            className="rounded-lg border border-purple-300 bg-purple-50 px-2 sm:px-2.5 py-1 text-[11px] font-semibold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
+                          >
+                            Editar
+                          </button>
+
+                          <Link
+                            href={`/catalogo/${item.id}`}
+                            className="hidden sm:inline-flex rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                          >
+                            Ver
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
 
                 return (
                   <div
@@ -1560,13 +1740,10 @@ export default function InventoryManager({
                                 className="object-cover group-hover:scale-105 transition-transform"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                                {isService ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
+                              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-400">
+                                {isService ? 'Servicio' : item.type === 'article' ? 'Usado' : 'Nuevo'}
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold">
-                              👁️
-                            </div>
                           </Link>
                         </div>
 
@@ -1582,10 +1759,10 @@ export default function InventoryManager({
                               }`}
                             >
                               {isService
-                                ? '🛠️ Servicio'
+                                ? 'Servicio'
                                 : item.type === 'article'
-                                ? '📦 Artículo (Usado)'
-                                : '🛍️ Producto (Nuevo)'}
+                                ? 'Artículo (Usado)'
+                                : 'Producto (Nuevo)'}
                             </span>
                             {item.category && (
                               <span className="text-[11px] text-zinc-400">
@@ -1610,7 +1787,6 @@ export default function InventoryManager({
                               }`}
                               title="Información exclusiva para el vendedor: Tiempo restante de publicidad activa"
                             >
-                              <span>⏱️</span>
                               <span>
                                 {adTrialStatus.isFreeTrialActive
                                   ? `Publicidad: ${adTrialStatus.daysRemaining}d ${adTrialStatus.hoursRemaining}h restantes`
@@ -1627,42 +1803,35 @@ export default function InventoryManager({
                             >
                               {item.title}
                             </Link>
-                            <span className="text-[10px] text-zinc-400 font-semibold shrink-0">↗</span>
                           </div>
 
-                          {/* 🌟 CARACTERÍSTICAS ESPECÍFICAS SEGÚN TIPO */}
+                          {/* CARACTERÍSTICAS ESPECÍFICAS SEGÚN TIPO */}
                           {isService ? (
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                               <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80">
-                                <span>⏱️</span>
                                 <span>{t.inventory.executionDuration}: <strong>{serviceTime}</strong></span>
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80">
-                                <span>⚡</span>
                                 <span>{t.inventory.responseTimeLead}: <strong>{serviceLead}</strong></span>
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80">
-                                <span>👥</span>
                                 <span>{serviceCap} {locale === 'en' ? 'daily slots' : 'cupos/día'}</span>
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                                <span>📍</span>
                                 <span>{serviceMod}</span>
                               </span>
                               {serviceNotes && (
                                 <p className="w-full text-[11px] text-zinc-500 italic mt-0.5">
-                                  📝 {serviceNotes}
+                                  {serviceNotes}
                                 </p>
                               )}
                             </div>
                           ) : (
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                               <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
-                                <span>🏷️</span>
                                 <span>{t.inventory.conditionLabel}: <strong>{condition}</strong></span>
                               </span>
                               <span className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
-                                <span>🚚</span>
                                 <span>{t.inventory.deliveryMethodLabel}: <strong>{deliveryMethod}</strong></span>
                               </span>
                             </div>
@@ -1672,7 +1841,7 @@ export default function InventoryManager({
                           <div className="mt-2.5 flex flex-wrap items-center gap-2">
                             <div className="flex items-baseline gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
                               <span className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-                                🔒 Precio Maestro:
+                                Precio Maestro:
                               </span>
                               <span className="text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-300">
                                 ${Number(item.price || 0).toLocaleString('es-CO')} COP
@@ -1682,18 +1851,16 @@ export default function InventoryManager({
                               </span>
                             </div>
 
-                            {/* 👁️ Ver Anuncio en 1 Clic */}
+                            {/* Ver Anuncio en 1 Clic */}
                             <Link
                               href={`/catalogo/${item.id}`}
                               className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors flex items-center gap-1 shadow-2xs shrink-0"
                               title={locale === 'en' ? 'Open ad in catalog' : 'Ver anuncio en el catálogo público'}
                             >
-                              <span>👁️</span>
                               <span>{t.myListings.viewBtn || 'Ver Anuncio'}</span>
-                              <span className="text-[10px]">↗</span>
                             </Link>
 
-                            {/* 🔍 Vista Rápida Modal */}
+                            {/* Vista Rápida Modal */}
                             <button
                               type="button"
                               onClick={() => {
@@ -1703,30 +1870,27 @@ export default function InventoryManager({
                               className="rounded-lg border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1 shadow-2xs shrink-0"
                               title={locale === 'en' ? 'Quick preview modal' : 'Vista rápida del anuncio sin salir de esta ventana'}
                             >
-                              <span>🔍</span>
                               <span>{locale === 'en' ? 'Quick View' : 'Vista Rápida'}</span>
                             </button>
 
-                            {/* 🚀 Promocionar (si está publicado) */}
+                            {/* Promocionar (si está publicado) */}
                             {item.status === 'published' && (
                               <Link
                                 href={`/promocionar?listing_id=${item.id}`}
                                 className="rounded-lg bg-purple-600 hover:bg-purple-500 px-2.5 py-1 text-[11px] font-bold text-white transition-colors flex items-center gap-1 shadow-2xs shrink-0"
                                 title={locale === 'en' ? 'Promote this listing' : 'Destacar este anuncio en campañas publicitarias'}
                               >
-                                <span>🚀</span>
                                 <span>{t.myListings.promoteBtn || 'Promocionar'}</span>
                               </Link>
                             )}
 
-                            {/* 🛠️ Editar Artículo Completo */}
+                            {/* Editar Artículo Completo */}
                             <button
                               type="button"
                               onClick={() => handleOpenFullEditModal(item)}
                               className="rounded-lg border border-purple-300 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center gap-1.5 shadow-2xs"
                               title="Modificar precio, existencias, fotos, especificaciones e historial del artículo"
                             >
-                              <span>🛠️</span>
                               <span>{t.inventory.editItem}</span>
                               {Array.isArray(item.attrs?.price_history) && item.attrs.price_history.length > 1 && (
                                 <span
@@ -1755,15 +1919,12 @@ export default function InventoryManager({
                                 }`}
                                 title="Cambiar estado del anuncio rápidamente"
                               >
-                                <option value="published">✓ En Catálogo</option>
-                                <option value="draft">📦 Borrador</option>
-                                <option value="paused">⏸️ Pausado</option>
-                                <option value="submitted">⏳ En Revisión</option>
-                                <option value="archived">📁 Archivado</option>
+                                <option value="published">En Catálogo</option>
+                                <option value="draft">Borrador</option>
+                                <option value="paused">Pausado</option>
+                                <option value="submitted">En Revisión</option>
+                                <option value="archived">Archivado</option>
                               </select>
-                              {updatingStatusId === item.id && (
-                                <span className="text-[10px] animate-spin">⏳</span>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -1778,17 +1939,14 @@ export default function InventoryManager({
                             <div className="flex items-center gap-2">
                               {rawStock === 0 ? (
                                 <span className="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-bold text-red-800 dark:bg-red-950/80 dark:text-red-300 border border-red-200 dark:border-red-900 flex items-center gap-1">
-                                  <span>🚫</span>
                                   <span>{t.inventory.outOfStock}</span>
                                 </span>
                               ) : rawStock <= 3 ? (
                                 <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-900 flex items-center gap-1">
-                                  <span>⚠️</span>
                                   <span>{t.inventory.lowStock}: {rawStock}</span>
                                 </span>
                               ) : (
                                 <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 flex items-center gap-1">
-                                  <span>✓</span>
                                   <span>{t.inventory.inStock}: {rawStock}</span>
                                 </span>
                               )}
@@ -1842,7 +2000,6 @@ export default function InventoryManager({
                               className="rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2 text-xs font-bold text-purple-800 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-300 dark:hover:bg-purple-900 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
                               title="Configurar duración, tiempo de respuesta y cupos diarios"
                             >
-                              <span>⚙️</span>
                               <span>{t.inventory.editServiceTimes || 'Configurar Tiempos & Cupos'}</span>
                             </button>
                           </div>

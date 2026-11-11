@@ -454,7 +454,7 @@ function HeroRunwayComponent({
                               {item.sellerVerified && (
                                 <span
                                   title="Comercio Verificado Oficialmente"
-                                  className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  className="hidden sm:inline rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                 >
                                   ✓ Verificado
                                 </span>

@@ -18,9 +18,11 @@ interface PageProps {
 export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams
   const rawType = typeof params.type === 'string' ? params.type.trim() : ''
+  const sellerFilter = typeof params.seller === 'string' ? params.seller.trim() : ''
+  const exclusiveCatalog = typeof params.exclusive_catalog === 'string' ? params.exclusive_catalog.trim() : ''
 
-  // Si no se especifica tipo o viene el antiguo 'products', redirigir a su ventana correspondiente
-  if (!rawType || rawType === 'products') {
+  // Si no se especifica tipo (y no se está consultando el catálogo completo de un vendedor ni un catálogo exclusivo), redirigir a su ventana correspondiente
+  if ((!rawType && !sellerFilter && !exclusiveCatalog) || rawType === 'products') {
     const nextParams = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
       if (typeof v === 'string') nextParams.set(k, v)
@@ -29,7 +31,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     redirect(`/catalogo?${nextParams.toString()}`)
   }
 
-  const typeFilter = rawType
+  const typeFilter = rawType === 'products' ? 'product' : rawType
 
   const q = typeof params.q === 'string' ? params.q.trim() : ''
   const categorySlug = typeof params.category === 'string' ? params.category.trim() : ''
@@ -42,7 +44,6 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const conditionFilter = typeof params.condition === 'string' ? params.condition.trim() : ''
   const deliveryFilter = typeof params.delivery === 'string' ? params.delivery.trim() : ''
   const subTypeFilter = typeof params.subType === 'string' ? params.subType.trim() : ''
-  const exclusiveCatalog = typeof params.exclusive_catalog === 'string' ? params.exclusive_catalog.trim() : ''
 
   const supabase = await createClient()
 
@@ -80,13 +81,12 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
     }
   }
 
-  // Filtro por tipo estricto (service | article | product), salvo que se esté consultando un Catálogo Exclusivo transversal
+  // Filtro por tipo estricto (service | article | product), salvo que se esté consultando un Catálogo Exclusivo transversal o el catálogo completo de un vendedor
   if (!exclusiveCatalog && ['product', 'service', 'article'].includes(typeFilter)) {
     query = query.eq('type', typeFilter)
   }
 
   // Filtro por vendedor
-  const sellerFilter = typeof params.seller === 'string' ? params.seller.trim() : ''
   if (sellerFilter) {
     query = query.eq('seller_id', sellerFilter)
   }

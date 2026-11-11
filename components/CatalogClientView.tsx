@@ -112,17 +112,30 @@ export default function CatalogClientView({
   const isServiceScope = currentFilters.type === 'service'
   const isArticleScope = currentFilters.type === 'article'
   const isProductScope = currentFilters.type === 'product'
+  const activeSellerName = currentFilters.seller
+    ? listings[0]?.seller?.business_name || null
+    : null
 
   const catalogTitle = activeExclusiveCatalog
-    ? `⭐ Catálogo Exclusivo: ${activeExclusiveCatalog.title}`
+    ? `Catálogo Exclusivo: ${activeExclusiveCatalog.title}`
+    : currentFilters.seller
+    ? activeSellerName
+      ? `Catálogo de ${activeSellerName}`
+      : locale === 'en'
+      ? 'Seller Catalog'
+      : 'Catálogo del Vendedor'
     : isServiceScope
-    ? (locale === 'en' ? '🛠️ Professional Services Catalog' : '🛠️ Catálogo de Servicios Profesionales')
+    ? (locale === 'en' ? 'Professional Services Catalog' : 'Catálogo de Servicios Profesionales')
     : isArticleScope
-    ? (locale === 'en' ? '📦 Used Articles Catalog' : '📦 Catálogo de Artículos Usados')
-    : (locale === 'en' ? '✨ New Products Catalog' : '✨ Catálogo de Productos Nuevos')
+    ? (locale === 'en' ? 'Used Articles Catalog' : 'Catálogo de Artículos Usados')
+    : (locale === 'en' ? 'New Products Catalog' : 'Catálogo de Productos Nuevos')
 
   const catalogSubtitle = activeExclusiveCatalog
     ? activeExclusiveCatalog.subtitle
+    : currentFilters.seller
+    ? locale === 'en'
+      ? 'Explore all published products, used articles, and services from this business.'
+      : 'Explora todos los productos nuevos, artículos usados y servicios publicados por este comercio.'
     : isServiceScope
     ? (locale === 'en'
         ? 'Specialized services, direct quotes and on-site or remote assistance modalities.'
@@ -180,28 +193,33 @@ export default function CatalogClientView({
       {/* Results Section */}
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {currentFilters.seller && (
-          <div className="mb-6 flex items-center justify-between rounded-2xl bg-purple-50 p-4 text-xs font-semibold text-purple-900 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl bg-purple-50 px-3.5 py-2.5 text-xs font-semibold text-purple-900 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+            <span>
+              {activeSellerName
+                ? `Mostrando el catálogo completo de ${activeSellerName} (${filteredListings.length} publicaciones)`
+                : `Mostrando ofertas del comercio seleccionado (${filteredListings.length} publicaciones)`}
+            </span>
             <div className="flex items-center gap-2">
-              <span>🏪</span>
-              <span>Mostrando ofertas del comercio seleccionado en el Directorio</span>
+              <Link
+                href="/directorio"
+                className="rounded-lg border border-purple-300 bg-white px-3 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:bg-zinc-900 dark:text-purple-300 transition-colors"
+              >
+                Volver al Directorio
+              </Link>
+              <Link
+                href={`/catalogo?type=${currentFilters.type || 'product'}`}
+                className="rounded-lg bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-500 font-semibold transition-colors shadow-2xs"
+              >
+                Ver catálogo general
+              </Link>
             </div>
-            <Link
-              href={`/catalogo?type=${currentFilters.type || 'service'}`}
-              className="rounded-xl bg-purple-600 px-3.5 py-1.5 text-xs text-white hover:bg-purple-500 font-bold transition-colors shadow-xs"
-            >
-              {isServiceScope
-                ? (locale === 'en' ? 'View all services' : 'Ver todos los servicios')
-                : isArticleScope
-                ? (locale === 'en' ? 'View all used articles' : 'Ver todos los artículos usados')
-                : (locale === 'en' ? 'View all new products' : 'Ver todos los productos nuevos')}
-            </Link>
           </div>
         )}
 
         {/* Barra superior de resultados con Selector de Cantidad de Ítems y Modo de Visualización (Lista vs Cuadrícula) */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            <span className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-400">
               {filteredListings.length === 0
                 ? `0 ${t.catalog.resultsCount}`
                 : locale === 'en'
@@ -244,28 +262,26 @@ export default function CatalogClientView({
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'list'
                     ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                     : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`}
-                title="Modo de visualización en lista con imagen compacta"
+                title="Modo de visualización en lista compacta"
               >
-                <span>☰</span>
                 <span>Lista</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'grid'
                     ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                     : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`}
                 title="Modo de visualización en cuadrícula"
               >
-                <span>⊞</span>
-                <span className="hidden sm:inline">Cuadrícula</span>
+                <span>Cuadrícula</span>
               </button>
             </div>
           </div>
@@ -273,10 +289,7 @@ export default function CatalogClientView({
 
         {filteredListings.length === 0 ? (
           <div className="my-12 rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 text-3xl dark:bg-zinc-800">
-              🔍
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-zinc-900 dark:text-zinc-50">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
               {t.catalog.emptyTitle}
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
@@ -302,8 +315,8 @@ export default function CatalogClientView({
             </div>
           </div>
         ) : viewMode === 'list' ? (
-          /* MODO LISTA (PREDETERMINADO CON IMAGEN PEQUEÑA LATERAL E INFORMACIÓN COMPACTA) */
-          <div className="flex flex-col gap-3 sm:gap-4">
+          /* MODO LISTA COMPACTA EN UNA LÍNEA */
+          <div className="flex flex-col gap-1.5 sm:gap-2">
             {visibleListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} viewMode="list" />
             ))}
@@ -335,7 +348,7 @@ export default function CatalogClientView({
                 }
                 className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors cursor-pointer"
               >
-                ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredListings.length - visibleListings.length)} más
+                Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredListings.length - visibleListings.length)} más
               </button>
               <button
                 type="button"

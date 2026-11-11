@@ -35,13 +35,15 @@ export default function CatalogFilters({
   const [isPending, startTransition] = useTransition()
   const { t, locale } = useTranslation()
 
-  // Normalizar tipo de búsqueda
+  // Normalizar tipo de búsqueda (permitir '' cuando se consulta el catálogo completo de un vendedor)
   const initialType =
     currentFilters.type === 'article'
       ? 'article'
       : currentFilters.type === 'product'
       ? 'product'
-      : 'service'
+      : currentFilters.type === 'service'
+      ? 'service'
+      : ''
 
   const [q, setQ] = useState(currentFilters.q || '')
   const [selectedCategory, setSelectedCategory] = useState(currentFilters.category || '')
@@ -68,7 +70,9 @@ export default function CatalogFilters({
         ? 'article'
         : currentFilters.type === 'product'
         ? 'product'
-        : 'service'
+        : currentFilters.type === 'service'
+        ? 'service'
+        : ''
     setSelectedType(normType)
 
     setSelectedCity(currentFilters.city || '')

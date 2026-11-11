@@ -26,6 +26,12 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Indie Clasificados | Economía en Circulación',
   description: 'Indie Clasificados — Economía en Circulación. Catálogo comercial mobile-first para conectar compradores con pequeñas empresas, servicios y emprendedores locales.',
+  formatDetection: {
+    telephone: false,
+    date: false,
+    email: false,
+    address: false,
+  },
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -60,10 +66,10 @@ export default function RootLayout({
             <AppSidebar />
 
             {/* Central Workspace: Clean content area without navigation links */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <AppMobileHeader />
+            <div className="flex-1 flex flex-col min-w-0 pb-14 md:pb-0">
               <div className="flex-1 flex flex-col">{children}</div>
               <Footer />
+              <AppMobileHeader />
             </div>
           </div>
         </ClientProviders>

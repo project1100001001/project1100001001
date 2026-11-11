@@ -126,7 +126,7 @@ function MerchantsRunwayComponent({ merchants, locale, t, scrollSpeed = 0.65 }: 
                         {merchant.name}
                       </h4>
                       {merchant.adBadge && (
-                        <span className="shrink-0 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
+                        <span className="hidden sm:inline shrink-0 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
                           {merchant.adBadge}
                         </span>
                       )}

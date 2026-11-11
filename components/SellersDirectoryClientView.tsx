@@ -422,28 +422,26 @@ export default function SellersDirectoryClientView({
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'list'
                   ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                   : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               }`}
-              title="Modo de visualización en lista con imagen compacta"
+              title="Modo de visualización en lista compacta"
             >
-              <span>☰</span>
               <span>Lista</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'grid'
                   ? 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-900 dark:text-emerald-400 ring-1 ring-zinc-200 dark:ring-zinc-700'
                   : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               }`}
               title="Modo de visualización en cuadrícula"
             >
-              <span>⊞</span>
-              <span className="hidden sm:inline">Cuadrícula</span>
+              <span>Cuadrícula</span>
             </button>
           </div>
         </div>
@@ -452,8 +450,7 @@ export default function SellersDirectoryClientView({
       {/* 3. Listado / Cuadrícula de Vendedores */}
       {filteredSellers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-          <span className="text-5xl">🔍</span>
-          <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50">
+          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">
             {t.directory.noSellersFound}
           </h3>
           <p className="mt-1 text-xs text-zinc-500 max-w-md mx-auto">
@@ -470,19 +467,26 @@ export default function SellersDirectoryClientView({
           )}
         </div>
       ) : viewMode === 'list' ? (
-        /* MODO LISTA (PREDETERMINADO CON IMAGEN PEQUEÑA LATERAL E INFORMACIÓN COMPACTA) */
-        <div className="flex flex-col gap-3 sm:gap-4">
+        /* MODO LISTA COMPACTA CON 3 LÍNEAS DISTRIBUIDAS A LO ANCHO */
+        <div className="flex flex-col gap-2 sm:gap-2.5">
           {visibleSellers.map((seller) => {
             const initial = seller.business_name ? seller.business_name[0].toUpperCase() : 'C'
             const whatsappUrl = formatWhatsappUrl(seller.whatsapp, seller.business_name)
             const thumbnail = seller.listings?.find((l) => l.listing_media && l.listing_media.length > 0)?.listing_media?.[0]?.url
+            const sampleTitles =
+              seller.listings && seller.listings.length > 0
+                ? seller.listings
+                    .slice(0, 2)
+                    .map((l) => l.title)
+                    .join('  •  ')
+                : null
 
             return (
               <div
                 key={seller.id}
-                className="group relative flex flex-row items-start md:items-stretch rounded-2xl border border-zinc-200 bg-white p-3 sm:p-4 shadow-xs hover:shadow-md hover:border-purple-500/50 transition-all dark:border-zinc-800 dark:bg-zinc-900 gap-3 sm:gap-4"
+                className="group flex items-center justify-between gap-2 sm:gap-6 rounded-xl border border-zinc-200 bg-white px-2.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs hover:border-purple-500/50 transition-all dark:border-zinc-800 dark:bg-zinc-900"
               >
-                {/* Imagen Pequeña (Thumbnail Compacto Horizontal en Móvil y Desktop) */}
+                {/* Avatar / Miniatura */}
                 <div
                   role="button"
                   tabIndex={0}
@@ -490,7 +494,7 @@ export default function SellersDirectoryClientView({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') setSelectedSellerModal(seller)
                   }}
-                  className="relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 aspect-square shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center self-start md:self-center border border-zinc-200/70 dark:border-zinc-800 cursor-pointer"
+                  className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200/70 dark:border-zinc-800 cursor-pointer"
                 >
                   {thumbnail ? (
                     <img
@@ -499,192 +503,159 @@ export default function SellersDirectoryClientView({
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-2 text-center select-none">
-                      <span className="text-2xl sm:text-3xl font-black">{initial}</span>
-                      <span className="mt-0.5 text-[9px] sm:text-[10px] font-bold opacity-80">🏪 Comercio</span>
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-sm font-bold select-none">
+                      {initial}
                     </div>
                   )}
-
-                  {/* Badge superpuesto en miniatura */}
-                  <div className="absolute top-1 left-1 sm:top-1.5 sm:left-1.5 flex flex-wrap gap-1">
-                    {seller.verified ? (
-                      <span className="rounded-md bg-emerald-500/90 text-white px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-black shadow-xs backdrop-blur-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="rounded-md bg-zinc-900/70 text-white px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-bold backdrop-blur-xs">
-                        🏪
-                      </span>
-                    )}
-                  </div>
                 </div>
 
-                {/* Contenedor Derecho: Info + Acciones */}
-                <div className="flex flex-1 flex-col md:flex-row items-stretch justify-between min-w-0 gap-2.5 md:gap-4">
-                  {/* Zona Central: Información Completa del Comercio */}
-                  <div className="flex flex-1 flex-col justify-between min-w-0">
-                    <div className="space-y-1 sm:space-y-1.5">
-                      {/* Fila 1: Título, Badges y Ubicación */}
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedSellerModal(seller)}
-                            className="text-left font-bold text-zinc-900 group-hover:text-purple-600 dark:text-zinc-50 dark:group-hover:text-purple-400 transition-colors text-sm sm:text-lg truncate max-w-[180px] sm:max-w-md cursor-pointer"
-                          >
-                            {seller.business_name}
-                          </button>
-
-                          {seller.verified ? (
-                            <span
-                              title={t.directory.verifiedBadge}
-                              className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800"
-                            >
-                              ✓ Verificado
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full bg-zinc-100 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                              En validación
-                            </span>
-                          )}
-
-                          {seller.business_type && (
-                            <span className="rounded-md bg-purple-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                              🏷️ {seller.business_type}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Ciudad */}
-                        {seller.city && (
-                          <span className="text-[10px] sm:text-xs font-semibold text-zinc-500 dark:text-zinc-400 shrink-0">
-                            📍 {seller.city}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Fila 2: Rating, Opiniones y Conteo de Publicaciones */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs flex-wrap">
-                        <span className="font-bold text-amber-500">★</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                          {seller.rating_avg > 0 ? Number(seller.rating_avg).toFixed(1) : '5.0'}
-                        </span>
-                        <span className="text-[10px] sm:text-[11px] text-zinc-400">
-                          ({seller.rating_count || 0})
-                        </span>
-
-                        {seller.listingsCount !== undefined && (
-                          <>
-                            <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                            <span className="text-[10px] sm:text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
-                              📦 {seller.listingsCount} {t.directory.activeOffers}
-                            </span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Fila 3: Descripción del Comercio */}
-                      {seller.description ? (
-                        <p className="text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400 line-clamp-1 sm:line-clamp-2 leading-relaxed">
-                          {seller.description}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] sm:text-xs italic text-zinc-400">
-                          Comercio registrado en la plataforma.
-                        </p>
-                      )}
-
-                      {/* Fila 4: Mini-preview de publicaciones destacadas */}
-                      {seller.listings && seller.listings.length > 0 && (
-                        <div className="hidden sm:flex pt-1.5 items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider shrink-0">
-                            Ofertas:
-                          </span>
-                          {seller.listings.slice(0, 3).map((l) => (
-                            <Link
-                              key={l.id}
-                              href={`/catalogo/${l.id}`}
-                              className="rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors truncate max-w-[180px]"
-                            >
-                              {l.type === 'service' ? '🛠️' : l.type === 'article' ? '📦' : '🛍️'} {l.title}
-                            </Link>
-                          ))}
-                          {seller.listings.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSellerModal(seller)}
-                              className="rounded-lg bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 cursor-pointer"
-                            >
-                              +{seller.listings.length - 3} más
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Columna Derecha: Canales de Contacto Directo y Acciones */}
-                  <div className="flex flex-row md:flex-col justify-between md:justify-center items-center md:items-stretch gap-1.5 sm:gap-2 md:w-44 shrink-0 md:border-l md:border-zinc-100 md:dark:border-zinc-800/80 md:pl-4 pt-2 md:pt-0 border-t border-zinc-100 md:border-t-0 dark:border-zinc-800/80">
-                    {/* Botón WhatsApp */}
-                    {seller.whatsapp ? (
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 rounded-lg sm:rounded-xl bg-emerald-600 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
-                      >
-                        <span>💬</span>
-                        <span>WhatsApp</span>
-                      </a>
-                    ) : (
-                      <button
-                        disabled
-                        className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 rounded-lg sm:rounded-xl bg-zinc-100 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-semibold text-zinc-400 cursor-not-allowed dark:bg-zinc-800"
-                      >
-                        <span>💬</span>
-                        <span>Sin WA</span>
-                      </button>
-                    )}
-
-                    {/* Botón Ver Catálogo del Vendedor */}
-                    <Link
-                      href={`/catalogo?seller=${seller.id}`}
-                      className="flex-1 md:flex-none inline-flex items-center justify-center gap-1 rounded-lg sm:rounded-xl border border-purple-200 bg-purple-50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 dark:hover:bg-purple-900/60 transition-colors text-center"
-                    >
-                      <span>🛍️</span>
-                      <span className="truncate">{t.directory.viewCatalog}</span>
-                    </Link>
-
-                    {/* Acciones Secundarias */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSellerModal(seller)}
-                      className="md:hidden rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] font-bold text-purple-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-purple-400 cursor-pointer shrink-0"
-                    >
-                      Ficha ↗
-                    </button>
-
-                    <div className="hidden md:flex items-center justify-between gap-1 pt-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyContact(seller)}
-                        className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                        title={t.directory.copyContact}
-                      >
-                        <span>📋</span>
-                        <span>Copiar</span>
-                      </button>
-
+                {/* Bloque central en 3 líneas expandidas horizontalmente en móvil y con margen amplio en web */}
+                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6 lg:pr-10">
+                  {/* Línea 1: Nombre principal a la izquierda y métricas clave distribuidas a la derecha del bloque central */}
+                  <div className="w-full min-w-0 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedSellerModal(seller)}
-                        className="font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 text-[11px] flex items-center gap-1 cursor-pointer"
+                        className="min-w-0 truncate text-left font-bold text-zinc-900 group-hover:text-purple-600 dark:text-zinc-50 dark:group-hover:text-purple-400 transition-colors text-xs sm:text-sm cursor-pointer"
                       >
-                        <span>Ficha</span>
-                        <span>↗</span>
+                        {seller.business_name}
                       </button>
+
+                      {seller.verified ? (
+                        <span
+                          title={t.directory.verifiedBadge}
+                          className="hidden sm:inline shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800 leading-none"
+                        >
+                          Verificado
+                        </span>
+                      ) : (
+                        <span className="hidden sm:inline shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 leading-none">
+                          En validación
+                        </span>
+                      )}
+
+                      {seller.business_type && (
+                        <span className="hidden md:inline-block shrink-0 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                          {seller.business_type}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="hidden md:flex items-center gap-4 text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">
+                      {seller.city && (
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                          {seller.city}
+                        </span>
+                      )}
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">
+                        ★ {seller.rating_avg > 0 ? Number(seller.rating_avg).toFixed(1) : '5.0'}{' '}
+                        <span className="text-zinc-400 font-normal">({seller.rating_count || 0} opiniones)</span>
+                      </span>
+                      {seller.listingsCount !== undefined && (
+                        <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                          {seller.listingsCount} {t.directory.activeOffers}
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  {/* Línea 2: Descripción del negocio aprovechando todo el ancho central */}
+                  <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
+                    {seller.description?.trim() || 'Comercio local registrado con atención directa a compradores y catálogo disponible.'}
+                  </p>
+
+                  {/* Línea 3: Información complementaria / ofertas destacadas distribuida en el ancho */}
+                  <div className="w-full flex items-center justify-between gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {/* Vista móvil de metadatos distribuidos */}
+                    <div className="flex md:hidden items-center justify-between w-full gap-2 truncate">
+                      <span className="truncate font-semibold text-purple-700 dark:text-purple-300">
+                        {seller.business_type || 'Comercio'}
+                      </span>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        {seller.city && (
+                          <span className="font-medium text-zinc-600 dark:text-zinc-300">{seller.city}</span>
+                        )}
+                        <span className="font-semibold text-amber-600 dark:text-amber-400">
+                          ★ {seller.rating_avg > 0 ? Number(seller.rating_avg).toFixed(1) : '5.0'}
+                        </span>
+                        {seller.listingsCount !== undefined && (
+                          <span>{seller.listingsCount} of.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vista web de línea 3: Ofertas destacadas a la izquierda y canales a la derecha */}
+                    <div className="hidden md:flex items-center justify-between w-full gap-4 min-w-0">
+                      <div className="min-w-0 flex-1 truncate">
+                        {sampleTitles ? (
+                          <span className="text-zinc-500 dark:text-zinc-400">
+                            <strong className="font-semibold text-zinc-700 dark:text-zinc-300">Destacados:</strong>{' '}
+                            {sampleTitles}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-400">
+                            Atención comercial personalizada y cotizaciones directas
+                          </span>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-3 text-[11px] text-zinc-400">
+                        {seller.whatsapp && (
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            WhatsApp directo
+                          </span>
+                        )}
+                        {seller.phone && (
+                          <span>Atención telefónica</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Acciones a la derecha: apiladas en móvil para dar más ancho al texto; en fila en web */}
+                <div className="shrink-0 flex flex-col items-end justify-center gap-1 sm:flex-row sm:items-center sm:gap-2.5 pl-2 sm:pl-5 border-l border-zinc-200/80 dark:border-zinc-800">
+                  {seller.whatsapp ? (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Contactar por WhatsApp"
+                      title="Contactar por WhatsApp"
+                      className="inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shrink-0 shadow-2xs"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                        aria-hidden="true"
+                      >
+                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-14.416c-6.627 0-12 5.373-12 12 0 2.625.846 5.059 2.284 7.033l-1.494 5.457 5.601-1.469c1.911 1.253 4.195 1.979 6.609 1.979 6.627 0 12-5.373 12-12s-5.373-12-12-12z" />
+                      </svg>
+                    </a>
+                  ) : (
+                    <button
+                      disabled
+                      className="hidden sm:inline-flex items-center justify-center rounded-lg bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-400 cursor-not-allowed dark:bg-zinc-800"
+                    >
+                      Sin WA
+                    </button>
+                  )}
+
+                  <Link
+                    href={`/catalogo?seller=${seller.id}`}
+                    className="hidden sm:inline-flex items-center justify-center rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300 transition-colors"
+                  >
+                    Catálogo
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSellerModal(seller)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 cursor-pointer"
+                  >
+                    Ficha
+                  </button>
                 </div>
               </div>
             )
@@ -716,12 +687,12 @@ export default function SellersDirectoryClientView({
                         {seller.verified ? (
                           <span
                             title={t.directory.verifiedBadge}
-                            className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800"
+                            className="hidden sm:inline-flex items-center rounded-full bg-emerald-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800"
                           >
-                            ✓ Verificado
+                            Verificado
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                          <span className="hidden sm:inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                             En validación
                           </span>
                         )}
@@ -730,11 +701,11 @@ export default function SellersDirectoryClientView({
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                         {seller.business_type && (
                           <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                            🏷️ {seller.business_type}
+                            {seller.business_type}
                           </span>
                         )}
                         {seller.city && (
-                          <span className="text-[11px] text-zinc-500">📍 {seller.city}</span>
+                          <span className="text-[11px] text-zinc-500">{seller.city}</span>
                         )}
                       </div>
                     </div>
@@ -753,7 +724,7 @@ export default function SellersDirectoryClientView({
                       <>
                         <span className="text-zinc-300 dark:text-zinc-700">•</span>
                         <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
-                          📦 {seller.listingsCount} {t.directory.activeOffers}
+                          {seller.listingsCount} {t.directory.activeOffers}
                         </span>
                       </>
                     )}
@@ -783,7 +754,7 @@ export default function SellersDirectoryClientView({
                             href={`/catalogo/${l.id}`}
                             className="rounded-lg bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors truncate max-w-[200px]"
                           >
-                            🛍️ {l.title}
+                            {l.title}
                           </Link>
                         ))}
                         {seller.listings.length > 2 && (
@@ -811,7 +782,6 @@ export default function SellersDirectoryClientView({
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
                       >
-                        <span>💬</span>
                         <span>WhatsApp</span>
                       </a>
                     ) : (
@@ -819,7 +789,6 @@ export default function SellersDirectoryClientView({
                         disabled
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-400 cursor-not-allowed dark:bg-zinc-800"
                       >
-                        <span>💬</span>
                         <span>Sin WhatsApp</span>
                       </button>
                     )}
@@ -830,7 +799,6 @@ export default function SellersDirectoryClientView({
                         href={`tel:${seller.phone}`}
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                       >
-                        <span>📞</span>
                         <span>Llamar</span>
                       </a>
                     ) : (
@@ -838,7 +806,6 @@ export default function SellersDirectoryClientView({
                         disabled
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-400 cursor-not-allowed dark:bg-zinc-800"
                       >
-                        <span>📞</span>
                         <span>Sin Teléfono</span>
                       </button>
                     )}
@@ -851,7 +818,6 @@ export default function SellersDirectoryClientView({
                       onClick={() => handleCopyContact(seller)}
                       className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 font-semibold text-[11px] flex items-center gap-1"
                     >
-                      <span>📋</span>
                       <span>{t.directory.copyContact}</span>
                     </button>
 
@@ -861,7 +827,6 @@ export default function SellersDirectoryClientView({
                       className="font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-[11px] flex items-center gap-1"
                     >
                       <span>{t.directory.viewDetailBtn}</span>
-                      <span>↗</span>
                     </button>
                   </div>
                 </div>
@@ -889,7 +854,7 @@ export default function SellersDirectoryClientView({
               }
               className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-500 transition-colors cursor-pointer"
             >
-              ➕ Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredSellers.length - visibleSellers.length)} más
+              Cargar {Math.min(itemsPerPage > 0 ? itemsPerPage : 10, filteredSellers.length - visibleSellers.length)} más
             </button>
             <button
               type="button"
@@ -1021,25 +986,28 @@ export default function SellersDirectoryClientView({
               </div>
 
               {selectedSellerModal.listings && selectedSellerModal.listings.length > 0 ? (
-                <div className="mt-3 space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                <div className="mt-3 space-y-2.5 max-h-64 overflow-y-auto pr-1">
                   {selectedSellerModal.listings.map((l) => (
                     <div
                       key={l.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 p-2.5 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-800/40"
+                      className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 px-3.5 py-2.5 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-800/40"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-purple-600 dark:text-purple-400">
-                            {l.type === 'service' ? 'Servicio' : 'Producto'}
+                      <div className="min-w-0 flex-1 flex flex-col gap-0.5 pr-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <h5 className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                            {l.title}
+                          </h5>
+                          <span className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] uppercase font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                            {l.type === 'service' ? 'Servicio' : l.type === 'article' ? 'Usado' : 'Producto'}
                           </span>
                         </div>
-                        <h5 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">
-                          {l.title}
-                        </h5>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                          Publicado por {selectedSellerModal.business_name} • {selectedSellerModal.city || 'Disponible en catálogo'}
+                        </p>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <span className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100">
+                      <div className="text-right shrink-0 pl-3 border-l border-zinc-200/80 dark:border-zinc-700">
+                        <span className="block font-extrabold text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
                           {l.price !== null
                             ? `$ ${l.price.toLocaleString('es-CO')} ${l.price_unit ? `/${l.price_unit}` : ''}`
                             : 'Cotización'}
@@ -1047,9 +1015,9 @@ export default function SellersDirectoryClientView({
                         <Link
                           href={`/catalogo/${l.id}`}
                           onClick={() => setSelectedSellerModal(null)}
-                          className="block text-[11px] font-bold text-purple-600 hover:underline dark:text-purple-400"
+                          className="mt-0.5 inline-block text-[11px] font-bold text-purple-600 hover:underline dark:text-purple-400"
                         >
-                          Ver detalle ↗
+                          Ver detalle
                         </Link>
                       </div>
                     </div>
