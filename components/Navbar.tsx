@@ -92,10 +92,13 @@ export default function Navbar() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
           {/* Brand */}
           <div className="flex items-center gap-4 sm:gap-6">
-            <Link href="/" className="flex items-center gap-2 group">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 text-base shadow-sm transition-transform group-hover:scale-105">
-                🛠️
-              </span>
+            <Link href="/" className="flex items-center gap-2.5 group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/img/logo.png"
+                alt="Indie Clasificados"
+                className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105"
+              />
               <div className="flex flex-col">
                 <span className="text-base sm:text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
                   Indie Clasificados
@@ -244,11 +247,15 @@ export default function Navbar() {
                 {/* Header of Drawer */}
                 <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 font-black text-white text-xs">
-                      IC
-                    </span>
-                    <span className="text-base font-bold text-zinc-900 dark:text-zinc-50">
-                      Indie Clasificados
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/img/logo.png"
+                      alt="Indie Clasificados"
+                      className="h-8 w-8 shrink-0 object-contain"
+                    />
+                    <span className="flex flex-col text-sm font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
+                      <span className="block">Indie</span>
+                      <span className="block">Clasificados</span>
                     </span>
                   </div>
                   <button

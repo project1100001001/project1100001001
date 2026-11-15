@@ -509,40 +509,37 @@ export default function SellersDirectoryClientView({
                   )}
                 </div>
 
-                {/* Bloque central en 3 líneas expandidas horizontalmente en móvil y con margen amplio en web */}
+                {/* Bloque central con prioridad para el título y descripción del comercio */}
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6 lg:pr-10">
-                  {/* Línea 1: Nombre principal a la izquierda y métricas clave distribuidas a la derecha del bloque central */}
+                  {/* Línea 1: Nombre principal expandido a todo el ancho sin etiquetas que lo recorten */}
                   <div className="w-full min-w-0 flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSellerModal(seller)}
-                        className="min-w-0 truncate text-left font-bold text-zinc-900 group-hover:text-purple-600 dark:text-zinc-50 dark:group-hover:text-purple-400 transition-colors text-xs sm:text-sm cursor-pointer"
-                      >
-                        {seller.business_name}
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSellerModal(seller)}
+                      title={seller.business_name}
+                      className="min-w-0 flex-1 line-clamp-1 sm:line-clamp-2 leading-snug break-words text-left font-bold text-zinc-900 group-hover:text-purple-600 dark:text-zinc-50 dark:group-hover:text-purple-400 transition-colors text-xs sm:text-sm cursor-pointer"
+                    >
+                      {seller.business_name}
+                    </button>
 
+                    <div className="hidden md:flex items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">
                       {seller.verified ? (
                         <span
                           title={t.directory.verifiedBadge}
-                          className="hidden sm:inline shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800 leading-none"
+                          className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800 leading-none"
                         >
                           Verificado
                         </span>
                       ) : (
-                        <span className="hidden sm:inline shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 leading-none">
+                        <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 leading-none">
                           En validación
                         </span>
                       )}
-
                       {seller.business_type && (
-                        <span className="hidden md:inline-block shrink-0 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                        <span className="shrink-0 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
                           {seller.business_type}
                         </span>
                       )}
-                    </div>
-
-                    <div className="hidden md:flex items-center gap-4 text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">
                       {seller.city && (
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">
                           {seller.city}
@@ -550,7 +547,7 @@ export default function SellersDirectoryClientView({
                       )}
                       <span className="font-semibold text-amber-600 dark:text-amber-400">
                         ★ {seller.rating_avg > 0 ? Number(seller.rating_avg).toFixed(1) : '5.0'}{' '}
-                        <span className="text-zinc-400 font-normal">({seller.rating_count || 0} opiniones)</span>
+                        <span className="text-zinc-400 font-normal">({seller.rating_count || 0})</span>
                       </span>
                       {seller.listingsCount !== undefined && (
                         <span className="font-medium text-zinc-600 dark:text-zinc-300">
@@ -561,7 +558,10 @@ export default function SellersDirectoryClientView({
                   </div>
 
                   {/* Línea 2: Descripción del negocio aprovechando todo el ancho central */}
-                  <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
+                  <p
+                    className="w-full line-clamp-1 sm:line-clamp-2 leading-relaxed break-words text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400"
+                    title={seller.description?.trim() || 'Comercio local registrado con atención directa a compradores y catálogo disponible.'}
+                  >
                     {seller.description?.trim() || 'Comercio local registrado con atención directa a compradores y catálogo disponible.'}
                   </p>
 
@@ -673,34 +673,35 @@ export default function SellersDirectoryClientView({
                 className="flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-3.5 sm:p-5 shadow-xs hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <div>
-                  {/* Cabecera de la Tarjeta */}
+                  {/* Cabecera de la Tarjeta (Título con prioridad total de lectura sin etiquetas en la misma línea) */}
                   <div className="flex items-start gap-2.5 sm:gap-3.5">
                     <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-base sm:text-lg font-black text-white shadow-sm">
                       {initial}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-xs sm:text-base truncate">
-                          {seller.business_name}
-                        </h3>
+                      <h3
+                        className="w-full font-bold text-zinc-900 dark:text-zinc-50 text-xs sm:text-base leading-snug line-clamp-2 break-words"
+                        title={seller.business_name}
+                      >
+                        {seller.business_name}
+                      </h3>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-zinc-500">
                         {seller.verified ? (
                           <span
                             title={t.directory.verifiedBadge}
-                            className="hidden sm:inline-flex items-center rounded-full bg-emerald-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800"
+                            className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800 leading-none"
                           >
                             Verificado
                           </span>
                         ) : (
-                          <span className="hidden sm:inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] sm:text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 leading-none">
                             En validación
                           </span>
                         )}
-                      </div>
-
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                         {seller.business_type && (
-                          <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                          <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
                             {seller.business_type}
                           </span>
                         )}
@@ -732,7 +733,10 @@ export default function SellersDirectoryClientView({
 
                   {/* Descripción del Negocio */}
                   {seller.description ? (
-                    <p className="mt-2.5 text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                    <p
+                      className="mt-2.5 text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words"
+                      title={seller.description}
+                    >
                       {seller.description}
                     </p>
                   ) : (
@@ -747,12 +751,13 @@ export default function SellersDirectoryClientView({
                       <span className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
                         Ofertas destacadas:
                       </span>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-col gap-1.5">
                         {seller.listings.slice(0, 2).map((l) => (
                           <Link
                             key={l.id}
                             href={`/catalogo/${l.id}`}
-                            className="rounded-lg bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors truncate max-w-[200px]"
+                            title={l.title}
+                            className="w-full rounded-lg bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-700 hover:bg-purple-50 hover:text-purple-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-purple-950/40 dark:hover:text-purple-300 transition-colors truncate"
                           >
                             {l.title}
                           </Link>
@@ -761,7 +766,7 @@ export default function SellersDirectoryClientView({
                           <button
                             type="button"
                             onClick={() => setSelectedSellerModal(seller)}
-                            className="rounded-lg bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                            className="self-start rounded-lg bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
                           >
                             +{seller.listings.length - 2} más
                           </button>

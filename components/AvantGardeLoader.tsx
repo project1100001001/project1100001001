@@ -445,6 +445,12 @@ function FullScreenDescriptiveLoaderOverlay({
         {/* Cabecera de Telemetría */}
         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-3 mb-6">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/img/logo.png"
+              alt="Indie Clasificados"
+              className="h-5 w-5 shrink-0 object-contain"
+            />
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
             <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
               INDIE CLASIFICADOS • ARCKT ENGINE

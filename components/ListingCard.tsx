@@ -121,29 +121,52 @@ export default function ListingCard({
           )}
         </Link>
 
-        {/* Bloque central en 3 líneas expandidas horizontalmente en móvil y con margen amplio en web */}
+        {/* Bloque central con prioridad absoluta para el título y descripción en todo el ancho disponible */}
         <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6 lg:pr-10">
-          {/* Línea 1: Título principal expandido al 100% del ancho sin etiquetas que resten espacio en móvil */}
-          <div className="w-full min-w-0 flex items-center justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex items-center gap-1.5 sm:gap-2 flex-1">
-              <Link
-                href={`/catalogo/${listing.id}`}
-                className="min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-emerald-600 dark:text-zinc-50 dark:group-hover:text-emerald-400 transition-colors"
-                title={listing.title}
-              >
-                {listing.title}
-              </Link>
+          {/* Línea 1: Título principal expandido al 100% del ancho sin etiquetas ni categorías que le quiten espacio */}
+          <div className="w-full min-w-0 flex items-start justify-between gap-2">
+            <Link
+              href={`/catalogo/${listing.id}`}
+              className="min-w-0 flex-1 line-clamp-1 sm:line-clamp-2 leading-snug break-words text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-emerald-600 dark:text-zinc-50 dark:group-hover:text-emerald-400 transition-colors"
+              title={listing.title}
+            >
+              {listing.title}
+            </Link>
 
-              {showSellerStatus && listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${statusBadges[listing.status].color}`}>
-                  {statusBadges[listing.status].label}
-                </span>
-              )}
+            {showSellerStatus && listing.status && listing.status !== 'published' && statusBadges[listing.status] && (
+              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${statusBadges[listing.status].color}`}>
+                {statusBadges[listing.status].label}
+              </span>
+            )}
+          </div>
+
+          {/* Línea 2: Descripción del ítem expandida al 100% del ancho disponible */}
+          <p
+            className="w-full line-clamp-1 sm:line-clamp-2 leading-relaxed break-words text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400"
+            title={descriptionLine}
+          >
+            {descriptionLine}
+          </p>
+
+          {/* Línea 3: Metadatos y etiquetas secundarias agrupados abajo para no interferir con título ni descripción */}
+          <div className="w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+              <span
+                className="font-semibold text-zinc-700 dark:text-zinc-300 truncate"
+                title={listing.seller?.business_name || t.common.seller}
+              >
+                {listing.seller?.business_name || t.common.seller}
+              </span>
             </div>
 
-            <div className="hidden md:flex items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {listing.seller?.verified && (
+                <span className="hidden sm:inline text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
+                  Verificado
+                </span>
+              )}
               {listing.category && (
-                <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                <span className="truncate max-w-[140px] sm:max-w-[180px] font-medium text-zinc-600 dark:text-zinc-300">
                   {listing.category.name}
                 </span>
               )}
@@ -152,40 +175,8 @@ export default function ListingCard({
                   {listing.city}
                 </span>
               )}
-            </div>
-          </div>
-
-          {/* Línea 2: Línea adicional de texto informativo / descripción expandida en todo el ancho disponible */}
-          <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
-            {descriptionLine}
-          </p>
-
-          {/* Línea 3: Metadatos redistribuidos a lo ancho del bloque central */}
-          <div className="w-full flex items-center justify-between gap-2 sm:gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 truncate">
-              <span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate">
-                {listing.seller?.business_name || t.common.seller}
-              </span>
-              {listing.seller?.verified && (
-                <span className="hidden sm:inline text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
-                  Verificado
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {listing.category && (
-                <span className="md:hidden truncate max-w-[140px]">
-                  {listing.category.name}
-                </span>
-              )}
-              {listing.city && (
-                <span className="md:hidden font-medium text-zinc-600 dark:text-zinc-300">
-                  {listing.city}
-                </span>
-              )}
               {extraDetail && (
-                <span className="hidden sm:inline text-zinc-500 dark:text-zinc-400">
+                <span className="hidden md:inline text-zinc-500 dark:text-zinc-400">
                   {extraDetail}
                 </span>
               )}
@@ -301,9 +292,12 @@ export default function ListingCard({
       </div>
 
       {/* Card Content */}
-      <div className="flex flex-1 flex-col p-3 sm:p-4">
+      <div className="flex flex-1 flex-col p-3 sm:p-4 min-w-0">
         {/* Title */}
-        <h3 className="text-xs sm:text-sm font-semibold text-zinc-900 line-clamp-2 group-hover:text-emerald-600 transition-colors dark:text-zinc-50 dark:group-hover:text-emerald-400">
+        <h3
+          className="text-xs sm:text-sm font-semibold text-zinc-900 leading-snug line-clamp-2 break-words group-hover:text-emerald-600 transition-colors dark:text-zinc-50 dark:group-hover:text-emerald-400"
+          title={listing.title}
+        >
           {listing.title}
         </h3>
 
@@ -319,39 +313,47 @@ export default function ListingCard({
 
         {/* Description snippet */}
         {listing.description && (
-          <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 dark:text-zinc-400">
+          <p
+            className="mt-1 text-[11px] sm:text-xs text-zinc-600 leading-relaxed line-clamp-2 break-words dark:text-zinc-400"
+            title={listing.description}
+          >
             {listing.description}
           </p>
         )}
 
-        {/* Rating Badge */}
-        {listing.seller?.rating_avg && Number(listing.seller.rating_avg) > 0 ? (
-          <div className="mt-1.5 flex items-center gap-1 text-[11px]">
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-              {Number(listing.seller.rating_avg).toFixed(1)}
-            </span>
-            <span className="text-[10px] text-zinc-400">
-              ({listing.seller.rating_count || 0})
-            </span>
-          </div>
-        ) : null}
-
-        <div className="mt-auto pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-1 text-[10px] sm:text-xs text-zinc-500">
-          {/* Seller / Business */}
-          <div className="flex items-center gap-1 truncate max-w-[65%]">
-            <span className="truncate font-medium text-zinc-700 dark:text-zinc-300">
-              {listing.seller?.business_name || t.common.seller}
-            </span>
+        {/* Rating & Verification Badge */}
+        {(listing.seller?.rating_avg && Number(listing.seller.rating_avg) > 0) || listing.seller?.verified ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            {listing.seller?.rating_avg && Number(listing.seller.rating_avg) > 0 ? (
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  {Number(listing.seller.rating_avg).toFixed(1)}
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  ({listing.seller.rating_count || 0})
+                </span>
+              </div>
+            ) : null}
             {listing.seller?.verified && (
-              <span className="hidden sm:inline text-emerald-600 dark:text-emerald-400 font-semibold" title={t.common.verified}>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold" title={t.common.verified}>
                 Verificado
               </span>
             )}
           </div>
+        ) : null}
+
+        <div className="mt-auto pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-[10px] sm:text-xs text-zinc-500">
+          {/* Seller / Business (con todo el ancho libre sin que la etiqueta Verificado lo recorte) */}
+          <span
+            className="min-w-0 flex-1 truncate font-medium text-zinc-700 dark:text-zinc-300"
+            title={listing.seller?.business_name || t.common.seller}
+          >
+            {listing.seller?.business_name || t.common.seller}
+          </span>
 
           {/* Location */}
           {listing.city && (
-            <span className="truncate text-zinc-500">{listing.city}</span>
+            <span className="shrink-0 text-zinc-500">{listing.city}</span>
           )}
         </div>
       </div>

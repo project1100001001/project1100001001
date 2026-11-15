@@ -438,7 +438,10 @@ function HeroRunwayComponent({
                             {item.headline}
                           </h1>
 
-                          <p className="mt-1 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">
+                          <p
+                            className="mt-1 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]"
+                            title={item.description}
+                          >
                             {item.description}
                           </p>
                         </div>
@@ -463,23 +466,24 @@ function HeroRunwayComponent({
                             {item.sellerName[0]?.toUpperCase() || 'C'}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">
-                                {item.sellerName}
-                              </span>
+                            <span
+                              className="block w-full font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate"
+                              title={item.sellerName}
+                            >
+                              {item.sellerName}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs text-zinc-500 truncate">
+                              <span className="text-amber-600 dark:text-amber-400 font-bold">Calificación {item.sellerRating.toFixed(1)}</span>
+                              <span>•</span>
+                              <span className="truncate">Rubro: {item.categoryName}</span>
                               {item.sellerVerified && (
                                 <span
                                   title="Comercio Verificado Oficialmente"
-                                  className="hidden sm:inline rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                  className="hidden sm:inline shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                 >
                                   Verificado
                                 </span>
                               )}
-                            </div>
-                            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-zinc-500">
-                              <span className="text-amber-600 dark:text-amber-400 font-bold">Calificación {item.sellerRating.toFixed(1)}</span>
-                              <span>•</span>
-                              <span>Rubro: {item.categoryName}</span>
                             </div>
                           </div>
                         </div>

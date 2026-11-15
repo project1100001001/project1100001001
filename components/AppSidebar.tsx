@@ -823,25 +823,34 @@ export default function AppSidebar() {
     <div className="flex h-full flex-col justify-between overflow-y-auto p-4 select-none">
       {/* 1. Header / Brand & Collapse Control */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-zinc-800">
           <Link
             href="/"
             onClick={close}
-            className="flex flex-col group"
+            className="flex items-center gap-2.5 group min-w-0"
           >
-            <span className="text-sm sm:text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
-              Indie Clasificados
-            </span>
-            <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-              {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/img/logo.png"
+              alt="Indie Clasificados"
+              className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm sm:text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                <span className="block">Indie</span>
+                <span className="block">Clasificados</span>
+              </span>
+              <span className="mt-0.5 text-[9px] text-zinc-500 font-semibold uppercase tracking-wider leading-tight">
+                {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Collapse Button */}
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="hidden md:flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-bold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+            className="hidden md:flex shrink-0 items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] font-bold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
             title={t.nav.collapseSidebar}
             aria-label={t.nav.collapseSidebar}
           >
@@ -981,18 +990,27 @@ export default function AppSidebar() {
   const mobileSidebarContent = (
     <div className="flex flex-col w-full max-h-[calc(100dvh-3.5rem)] overflow-hidden select-none">
       {/* 1. Cabecera compacta móvil */}
-      <div className="shrink-0 mx-auto w-full max-w-md px-4 pt-3 pb-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+      <div className="shrink-0 mx-auto w-full max-w-md px-4 pt-3 pb-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
         <Link
           href="/"
           onClick={close}
-          className="flex flex-col group"
+          className="flex items-center gap-2.5 group min-w-0"
         >
-          <span className="text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
-            Indie Clasificados
-          </span>
-          <span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider">
-            {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/img/logo.png"
+            alt="Indie Clasificados"
+            className="h-8 w-8 shrink-0 object-contain"
+          />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+              <span className="block sm:inline">Indie </span>
+              <span className="block sm:inline">Clasificados</span>
+            </span>
+            <span className="mt-0.5 text-[9px] text-zinc-500 font-semibold uppercase tracking-wider leading-tight">
+              {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
+            </span>
+          </div>
         </Link>
 
         <button

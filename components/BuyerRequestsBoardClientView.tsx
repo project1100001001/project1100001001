@@ -1527,26 +1527,29 @@ export default function BuyerRequestsBoardClientView({
                           <span className="h-1 w-1 rounded-full bg-current opacity-60 shrink-0" />
                         </span>
 
-                        {/* Izquierda: 3 líneas expandidas horizontalmente en móvil y con margen amplio antes de la derecha en web */}
+                        {/* Izquierda: Prioridad total para el título y descripción en todo el ancho disponible */}
                         <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6">
-                          {/* Línea 1: Título expandido al 100% del ancho + Código */}
-                          <div className="min-w-0 flex items-center gap-1.5 sm:gap-2">
-                            <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate min-w-0 flex-1">
+                          {/* Línea 1: Título expandido al 100% del ancho sin códigos que le resten espacio */}
+                          <div className="min-w-0 w-full">
+                            <h2
+                              className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-50 line-clamp-1 sm:line-clamp-2 leading-snug break-words"
+                              title={req.title}
+                            >
                               {req.title}
                             </h2>
-                            <span className="hidden sm:inline-block shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                              {req.referenceCode}
-                            </span>
                           </div>
 
-                          {/* Línea 2: Línea adicional de texto informativo / descripción de la solicitud */}
-                          <p className="w-full truncate text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400">
+                          {/* Línea 2: Descripción de la solicitud con prioridad de lectura */}
+                          <p
+                            className="w-full line-clamp-1 sm:line-clamp-2 leading-relaxed break-words text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400"
+                            title={req.description}
+                          >
                             {req.description}
                           </p>
 
-                          {/* Línea 3: Metadatos redistribuidos con buen espaciado */}
+                          {/* Línea 3: Metadatos y código de referencia agrupados abajo */}
                           <div className="w-full flex items-center justify-between gap-2 sm:gap-4 text-[11px] text-zinc-500 dark:text-zinc-400">
-                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate min-w-0">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate min-w-0" title={req.buyerName}>
                               {req.buyerName}
                             </span>
                             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -1554,10 +1557,10 @@ export default function BuyerRequestsBoardClientView({
                                 {req.buyerCity}
                               </span>
                               {req.categoryName && (
-                                <span className="hidden xs:inline sm:inline truncate max-w-[120px]">{req.categoryName}</span>
+                                <span className="hidden xs:inline sm:inline truncate max-w-[140px]">{req.categoryName}</span>
                               )}
                               <span className="hidden md:inline">{req.urgencyLabel}</span>
-                              <span className="hidden lg:inline text-zinc-400">{req.modalityLabel}</span>
+                              <span className="hidden lg:inline font-mono text-[10px] text-zinc-400">{req.referenceCode}</span>
                             </div>
                           </div>
                         </div>

@@ -75,26 +75,27 @@ function MerchantsRunwayComponent({ merchants, locale, t, scrollSpeed = 0.65 }: 
               key={`${merchant.sellerId}-${idx}`}
               onMouseEnter={control.pause}
               onMouseLeave={control.resume}
-              className="w-72 shrink-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
+              className="w-72 sm:w-80 shrink-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-xs hover:shadow-md transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 text-base font-black text-white shadow-xs">
                     {merchant.name[0]?.toUpperCase() || 'C'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 truncate">
-                        {merchant.name}
-                      </h4>
+                    <h4
+                      className="w-full font-bold text-sm text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 break-words"
+                      title={merchant.name}
+                    >
+                      {merchant.name}
+                    </h4>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                      <span>{merchant.city || 'Colombia'}</span>
                       {merchant.adBadge && (
-                        <span className="hidden sm:inline shrink-0 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
+                        <span className="shrink-0 rounded-md bg-purple-50 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300 leading-none">
                           {merchant.adBadge}
                         </span>
                       )}
-                    </div>
-                    <div className="text-[11px] text-zinc-500">
-                      {merchant.city || 'Colombia'}
                     </div>
                   </div>
                 </div>

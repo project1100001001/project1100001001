@@ -14,9 +14,12 @@ export default function Footer() {
         {/* Brand and tagline */}
         <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-zinc-200 dark:border-zinc-700 text-xs shadow-2xs">
-              🛠️
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/img/logo.png"
+              alt="Indie Clasificados"
+              className="h-7 w-7 shrink-0 object-contain"
+            />
             <span className="font-bold text-zinc-900 dark:text-zinc-100">
               Indie Clasificados
             </span>

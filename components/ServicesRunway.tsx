@@ -114,8 +114,8 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                       {item.title}
                     </h3>
 
-                    <div className="flex items-center justify-between text-xs text-zinc-500 pt-0.5">
-                      <span className="truncate max-w-[75%]">
+                    <div className="flex items-center justify-between gap-2 text-xs text-zinc-500 pt-0.5">
+                      <span className="min-w-0 flex-1 truncate" title={item.sellerName}>
                         Por: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{item.sellerName}</strong>
                       </span>
                       <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">
@@ -125,7 +125,10 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                   </div>
 
                   {/* 3. Descripción del Servicio */}
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed break-words">
+                  <p
+                    className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-3 leading-relaxed break-words"
+                    title={item.description}
+                  >
                     {item.description}
                   </p>
 

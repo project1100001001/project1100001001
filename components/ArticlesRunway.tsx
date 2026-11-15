@@ -130,19 +130,25 @@ function ArticlesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Artic
                   </div>
 
                   {/* Datos de la Oferta */}
-                  <div className="mt-3 space-y-1">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                      <span className="font-semibold text-amber-700 dark:text-amber-400">
+                  <div className="mt-3 space-y-1.5 min-w-0">
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-500">
+                      <span className="font-semibold text-amber-700 dark:text-amber-400 truncate">
                         {item.categoryName}
                       </span>
-                      <span className="font-semibold text-amber-600 dark:text-amber-400">{item.sellerRating.toFixed(1)}</span>
+                      <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">{item.sellerRating.toFixed(1)}</span>
                     </div>
 
-                    <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">
+                    <h3
+                      className="font-bold text-zinc-900 dark:text-zinc-50 text-sm leading-snug line-clamp-2 min-h-[2.5rem] break-words"
+                      title={item.title}
+                    >
                       {item.title}
                     </h3>
 
-                    <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
+                    <p
+                      className="text-xs text-zinc-500 line-clamp-2 leading-relaxed break-words"
+                      title={item.description}
+                    >
                       {item.description}
                     </p>
                   </div>

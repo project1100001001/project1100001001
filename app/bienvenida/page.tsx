@@ -540,9 +540,12 @@ function WelcomeDashboardContent() {
         <section className="rounded-3xl border border-zinc-200/90 bg-white p-5 sm:p-7 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white border border-zinc-200 dark:border-zinc-700 text-2xl shadow-2xs">
-                🛠️
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/img/logo.png"
+                alt="Indie Clasificados"
+                className="h-12 w-12 shrink-0 object-contain"
+              />
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">

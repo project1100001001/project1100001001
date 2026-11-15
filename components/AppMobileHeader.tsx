@@ -12,10 +12,17 @@ export default function AppMobileHeader() {
 
   return (
     <header className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-t border-zinc-200 bg-white/95 px-3 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.12)] md:hidden">
-      {/* Costado izquierdo: Nombre institucional */}
-      <Link href="/" onClick={close} className="flex items-center z-10">
-        <span className="font-extrabold text-sm tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
-          Indie Clasificados
+      {/* Costado izquierdo: Logo y Nombre institucional completo (Clasificados debajo de Indie para máxima legibilidad) */}
+      <Link href="/" onClick={close} className="flex items-center gap-2 z-10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/logo.png"
+          alt="Indie Clasificados"
+          className="h-7 w-7 shrink-0 object-contain"
+        />
+        <span className="flex flex-col font-extrabold text-xs tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+          <span className="block">Indie</span>
+          <span className="block">Clasificados</span>
         </span>
       </Link>
 

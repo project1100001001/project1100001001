@@ -151,8 +151,8 @@ function BuyerRequestsRunwayComponent({
                       {req.title}
                     </h3>
 
-                    <div className="flex items-center justify-between text-xs text-zinc-500 pt-0.5">
-                      <span className="truncate max-w-[70%]">
+                    <div className="flex items-center justify-between gap-2 text-xs text-zinc-500 pt-0.5">
+                      <span className="min-w-0 flex-1 truncate" title={req.buyerName}>
                         Solicita:{' '}
                         <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">
                           {req.buyerName}
@@ -165,7 +165,10 @@ function BuyerRequestsRunwayComponent({
                   </div>
 
                   {/* 3. Descripción de la necesidad */}
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words">
+                  <p
+                    className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed break-words"
+                    title={req.description}
+                  >
                     {req.description}
                   </p>
 

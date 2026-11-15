@@ -153,9 +153,22 @@ function LoginForm() {
   return (
     <div className="w-full max-w-lg space-y-6 rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <div className="text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 text-2xl shadow-xs">
-          🛠️
-        </span>
+        <div className="mx-auto inline-flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/img/logo.png"
+            alt="Indie Clasificados"
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <div className="text-left">
+            <span className="block text-sm font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+              Indie Clasificados
+            </span>
+            <span className="block text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+              {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
+            </span>
+          </div>
+        </div>
         <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {mode === 'login' ? t.auth.loginTitle : t.auth.signupTitle}
         </h2>

@@ -212,7 +212,10 @@ function ExclusiveCatalogRunwayTrack({
 
                     {/* Vendedor, Ciudad y Calificación */}
                     <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-200/90 border-t border-white/15 pt-2">
-                      <span className="truncate">
+                      <span
+                        className="min-w-0 flex-1 truncate"
+                        title={`${item.sellerName}${item.city ? ` • ${item.city}` : ''}`}
+                      >
                         <strong className="font-semibold text-white">{item.sellerName}</strong>
                         {item.city ? ` • ${item.city}` : ''}
                       </span>
