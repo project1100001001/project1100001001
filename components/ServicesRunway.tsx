@@ -31,55 +31,17 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🛠️</span>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              {t.home.servicesRunwayTitle}
-            </h2>
-          </div>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {t.home.servicesRunwaySubtitle}
-          </p>
-        </div>
-
-        {/* Controles de Desplazamiento y Estado de Rotación */}
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
-              control.isPaused
-                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
-                : 'text-purple-700 bg-purple-50 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-900'
-            }`}
-            title={control.isPaused ? 'Desplazamiento pausado por cursor sobre publicación' : 'Desplazamiento continuo fluido activo'}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${control.isPaused ? 'bg-amber-500' : 'bg-purple-500 animate-pulse'}`} />
-            <span className="hidden sm:inline">{control.isPaused ? 'Pausado' : 'Continuo'}</span>
-          </span>
-
-          <button
-            type="button"
-            onClick={() => control.stepManual('left')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la izquierda"
-            title="Servicio anterior"
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onClick={() => control.stepManual('right')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la derecha"
-            title="Siguiente servicio"
-          >
-            ▶
-          </button>
-        </div>
+      {/* Cabecera centrada sin íconos ni controles de botones */}
+      <div className="flex flex-col items-center justify-center text-center mb-5">
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          {t.home.servicesRunwayTitle}
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+          {t.home.servicesRunwaySubtitle}
+        </p>
       </div>
 
-      {/* Contenedor Viewport con GPU translate3d y flujo continuo en móvil */}
+      {/* Contenedor Viewport con GPU translate3d y manipulación directa de la pasarela */}
       <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
         <div
           ref={trackRef}
@@ -127,11 +89,11 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       <span className="inline-flex items-center rounded-lg border border-purple-300 bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200">
-                        🛠️ Servicio Profesional
+                        Servicio Profesional
                       </span>
                       {item.isPaidCampaign && (
                         <span className="inline-flex items-center rounded-lg bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
-                          📢 Patrocinado
+                          Patrocinado
                         </span>
                       )}
                     </div>
@@ -156,8 +118,8 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                       <span className="truncate max-w-[75%]">
                         Por: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{item.sellerName}</strong>
                       </span>
-                      <span className="shrink-0 font-semibold text-amber-500">
-                        ★ {item.sellerRating.toFixed(1)}
+                      <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">
+                        {item.sellerRating.toFixed(1)}
                       </span>
                     </div>
                   </div>
@@ -174,7 +136,7 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                         Tiempo de Respuesta:
                       </span>
                       <strong className="text-zinc-800 dark:text-zinc-200 block truncate font-semibold text-xs mt-0.5">
-                        ⏱️ {item.attrs?.tiempo_entrega || 'Inmediata'}
+                        {item.attrs?.tiempo_entrega || 'Inmediata'}
                       </strong>
                     </div>
                     <div className="min-w-0">
@@ -182,7 +144,7 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                         Modalidad de Atención:
                       </span>
                       <strong className="text-zinc-800 dark:text-zinc-200 block truncate font-semibold text-xs mt-0.5">
-                        📍 {item.attrs?.modalidad || 'A Domicilio / Virtual'}
+                        {item.attrs?.modalidad || 'A Domicilio / Virtual'}
                       </strong>
                     </div>
                   </div>
@@ -202,7 +164,7 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
 
                     {item.city && (
                       <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                        📍 {item.city}
+                        {item.city}
                       </span>
                     )}
                   </div>
@@ -216,9 +178,8 @@ function ServicesRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Servi
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackAdEvent(item, 'whatsapp')}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                      className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
                     >
-                      <span>💬</span>
                       <span>{t.home.quoteService || 'Cotizar Servicio'}</span>
                     </a>
                   ) : null}

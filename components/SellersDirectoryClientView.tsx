@@ -986,20 +986,31 @@ export default function SellersDirectoryClientView({
               </div>
 
               {selectedSellerModal.listings && selectedSellerModal.listings.length > 0 ? (
-                <div className="mt-3 space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                <div className="mt-3 space-y-3 max-h-64 overflow-y-auto pt-1.5 pr-1">
                   {selectedSellerModal.listings.map((l) => (
                     <div
                       key={l.id}
-                      className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 px-3.5 py-2.5 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-800/40"
+                      className="group relative flex items-center justify-between gap-4 rounded-xl border border-zinc-200 px-3.5 py-2.5 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-800/40"
                     >
+                      {/* Etiqueta tipo regalo adherida al borde superior derecho del recuadro */}
+                      <span
+                        className={`pointer-events-none select-none absolute -top-2 right-2.5 z-10 inline-flex items-center gap-1 rounded-l-md rounded-tr-md rounded-br-xs border px-1.5 py-0.5 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider leading-none shadow-2xs rotate-2 group-hover:rotate-0 transition-transform duration-200 ${
+                          l.type === 'service'
+                            ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-200'
+                            : l.type === 'article'
+                            ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200'
+                            : 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                        }`}
+                      >
+                        <span>{l.type === 'service' ? 'Servicio' : l.type === 'article' ? 'Usado' : 'Nuevo'}</span>
+                        <span className="h-1 w-1 rounded-full bg-current opacity-60 shrink-0" />
+                      </span>
+
                       <div className="min-w-0 flex-1 flex flex-col gap-0.5 pr-4">
                         <div className="flex items-center justify-between gap-2">
-                          <h5 className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                          <h5 className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate min-w-0 flex-1">
                             {l.title}
                           </h5>
-                          <span className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-[10px] uppercase font-bold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
-                            {l.type === 'service' ? 'Servicio' : l.type === 'article' ? 'Usado' : 'Producto'}
-                          </span>
                         </div>
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
                           Publicado por {selectedSellerModal.business_name} • {selectedSellerModal.city || 'Disponible en catálogo'}

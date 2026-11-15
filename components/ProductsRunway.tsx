@@ -31,55 +31,17 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🛍️</span>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              {t.home.productsRunwayTitle}
-            </h2>
-          </div>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {t.home.productsRunwaySubtitle}
-          </p>
-        </div>
-
-        {/* Controles de Desplazamiento y Estado de Rotación */}
-        <div className="flex items-center gap-2">
-          <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
-              control.isPaused
-                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
-                : 'text-blue-700 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900'
-            }`}
-            title={control.isPaused ? 'Desplazamiento pausado por cursor sobre publicación' : 'Desplazamiento continuo fluido activo'}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${control.isPaused ? 'bg-amber-500' : 'bg-blue-500 animate-pulse'}`} />
-            <span className="hidden sm:inline">{control.isPaused ? 'Pausado' : 'Continuo'}</span>
-          </span>
-
-          <button
-            type="button"
-            onClick={() => control.stepManual('left')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la izquierda"
-            title="Producto anterior"
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onClick={() => control.stepManual('right')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la derecha"
-            title="Siguiente producto"
-          >
-            ▶
-          </button>
-        </div>
+      {/* Cabecera centrada sin íconos ni controles de botones */}
+      <div className="flex flex-col items-center justify-center text-center mb-5">
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          {t.home.productsRunwayTitle}
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+          {t.home.productsRunwaySubtitle}
+        </p>
       </div>
 
-      {/* Contenedor Viewport con GPU translate3d y flujo continuo en móvil */}
+      {/* Contenedor Viewport con GPU translate3d y manipulación directa de la pasarela */}
       <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
         <div
           ref={trackRef}
@@ -130,11 +92,12 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                         src={item.imageUrl}
                         alt={item.title}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        draggable={false}
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none">
-                        <span className="text-4xl transition-transform duration-300 group-hover:scale-110">
-                          🛍️
+                      <div className="flex h-full w-full items-center justify-center text-zinc-400 select-none p-4 text-center">
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          Producto Nuevo
                         </span>
                       </div>
                     )}
@@ -142,11 +105,11 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                     {/* Top Badges */}
                     <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
                       <span className="rounded-md border border-blue-300 bg-blue-50/95 px-2 py-0.5 text-[10px] font-bold backdrop-blur-md text-blue-800 dark:border-blue-800 dark:bg-blue-950/90 dark:text-blue-200">
-                        🛍️ Producto (Nuevo)
+                        Producto (Nuevo)
                       </span>
                       {item.isPaidCampaign && (
                         <span className="rounded-md bg-purple-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
-                          📢 Patrocinado
+                          Patrocinado
                         </span>
                       )}
                     </div>
@@ -154,13 +117,13 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                     {/* Bottom Nuevo Badge */}
                     <div className="absolute bottom-2.5 left-2.5">
                       <span className="rounded-md bg-blue-600/90 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
-                        ✨ Nuevo de Fábrica
+                        Nuevo de Fábrica
                       </span>
                     </div>
 
                     {item.city && (
                       <div className="absolute bottom-2.5 right-2.5 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-md">
-                        📍 {item.city}
+                        {item.city}
                       </div>
                     )}
                   </div>
@@ -171,7 +134,7 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                       <span className="font-semibold text-blue-700 dark:text-blue-400">
                         {item.categoryName}
                       </span>
-                      <span>★ {item.sellerRating.toFixed(1)}</span>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">{item.sellerRating.toFixed(1)}</span>
                     </div>
 
                     <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm truncate">
@@ -192,7 +155,7 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                     </span>
                     {item.attrs?.tiempo_entrega && (
                       <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                        ⏱️ {item.attrs.tiempo_entrega}
+                        {item.attrs.tiempo_entrega}
                       </span>
                     )}
                   </div>
@@ -206,9 +169,8 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackAdEvent(item, 'whatsapp')}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
+                      className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition-colors"
                     >
-                      <span>💬</span>
                       <span>WhatsApp</span>
                     </a>
                   ) : (
@@ -226,7 +188,7 @@ function ProductsRunwayComponent({ items, locale, t, scrollSpeed = 0.65 }: Produ
                     onClick={() => trackAdEvent(item, 'click')}
                     className="inline-flex items-center justify-center rounded-xl border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
                   >
-                    Ficha ↗
+                    Ficha
                   </Link>
                 </div>
               </div>

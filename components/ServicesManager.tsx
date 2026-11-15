@@ -502,7 +502,7 @@ export default function ServicesManager({
           </div>
         </div>
       ) : (
-        <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-1.5'}>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-2.5 pt-1'}>
           {visibleServices.map((service) => {
             const coverImage = service.listing_media && service.listing_media.length > 0 ? service.listing_media[0].url : null
             const serviceTime = service.attrs?.tiempo_estimado || service.attrs?.duracion || '45 min'
@@ -516,8 +516,14 @@ export default function ServicesManager({
               return (
                 <div
                   key={service.id}
-                  className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-5 rounded-xl border border-purple-200/80 bg-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-2xs transition-all hover:border-purple-400 dark:border-purple-900/60 dark:bg-zinc-900 dark:hover:border-purple-700"
+                  className="group relative flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-5 rounded-xl border border-purple-200/80 bg-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-2xs transition-all hover:border-purple-400 dark:border-purple-900/60 dark:bg-zinc-900 dark:hover:border-purple-700"
                 >
+                  {/* Etiqueta tipo regalo adherida al borde superior derecho del recuadro (fuera de la zona de texto) */}
+                  <span className="pointer-events-none select-none absolute -top-2 right-2.5 z-10 inline-flex items-center gap-1 rounded-l-md rounded-tr-md rounded-br-xs border border-purple-300 bg-purple-50 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider leading-none text-purple-800 shadow-2xs rotate-2 group-hover:rotate-0 transition-transform duration-200 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-200">
+                    <span>Servicio</span>
+                    <span className="h-1 w-1 rounded-full bg-current opacity-60 shrink-0" />
+                  </span>
+
                   {/* Izquierda: Miniatura + 3 líneas de información bien distribuidas con margen hacia los botones */}
                   <div className="flex items-center gap-3 min-w-0 flex-1 pr-2 lg:pr-6">
                     <Link

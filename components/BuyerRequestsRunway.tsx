@@ -42,18 +42,18 @@ function BuyerRequestsRunwayComponent({
     switch (req.status) {
       case 'open':
         return {
-          text: locale === 'en' ? '🟢 Looking for Provider' : '🟢 Buscando Quién Atienda',
+          text: locale === 'en' ? 'Looking for Provider' : 'Buscando Quién Atienda',
           cls: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
         }
       case 'in_attention':
         return {
-          text: locale === 'en' ? '⚙️ In Service Attention' : '⚙️ En Proceso de Atención',
+          text: locale === 'en' ? 'In Service Attention' : 'En Proceso de Atención',
           cls: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800',
         }
       case 'rated':
       case 'completed':
         return {
-          text: locale === 'en' ? '⭐ Attended & Rated' : '⭐ Atendido y Calificado',
+          text: locale === 'en' ? 'Attended & Rated' : 'Atendido y Calificado',
           cls: 'bg-purple-50 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800',
         }
       default:
@@ -66,77 +66,29 @@ function BuyerRequestsRunwayComponent({
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-2xs">
-              📜 {locale === 'en' ? 'Contracts Directory' : 'Directorio de Contratos'}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
-              🛠️ {locale === 'en' ? 'Service Priority + Rating System' : 'Prioridad Servicios • Con Calificación Verificada'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📋</span>
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              {locale === 'en'
-                ? 'Buyer Classified Requests Runway (Services & Products Needed)'
-                : 'Pasarela de Solicitudes de Compradores (Servicios y Productos Requeridos)'}
-            </h2>
-          </div>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {locale === 'en'
-              ? 'Active service and product requests registered in the Contracts Directory.'
-              : 'Solicitudes activas de servicios y productos registradas en el Directorio de Contratos.'}
-          </p>
-        </div>
-
-        {/* Controles de Desplazamiento Continuo */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
-              control.isPaused
-                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
-                : 'text-teal-700 bg-teal-50 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-900'
-            }`}
-            title={
-              control.isPaused
-                ? 'Desplazamiento pausado por cursor sobre solicitud'
-                : 'Desplazamiento continuo fluido activo'
-            }
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                control.isPaused ? 'bg-amber-500' : 'bg-teal-500 animate-pulse'
-              }`}
-            />
-            <span className="hidden sm:inline">
-              {control.isPaused ? 'Pausado' : 'Continuo'}
-            </span>
+      {/* Cabecera centrada sin íconos ni controles manuales */}
+      <div className="flex flex-col items-center justify-center text-center mb-5">
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-1.5">
+          <span className="inline-flex items-center rounded-full bg-teal-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-2xs">
+            {locale === 'en' ? 'Contracts Directory' : 'Directorio de Contratos'}
           </span>
-
-          <button
-            type="button"
-            onClick={() => control.stepManual('left')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la izquierda"
-            title="Solicitud anterior"
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onClick={() => control.stepManual('right')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la derecha"
-            title="Siguiente solicitud"
-          >
-            ▶
-          </button>
+          <span className="inline-flex items-center rounded-full bg-purple-50 border border-purple-200 px-2.5 py-0.5 text-[10px] font-bold text-purple-800 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300">
+            {locale === 'en' ? 'Service Priority + Rating System' : 'Prioridad Servicios • Con Calificación Verificada'}
+          </span>
         </div>
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          {locale === 'en'
+            ? 'Buyer Classified Requests Runway (Services & Products Needed)'
+            : 'Pasarela de Solicitudes de Compradores (Servicios y Productos Requeridos)'}
+        </h2>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+          {locale === 'en'
+            ? 'Active service and product requests registered in the Contracts Directory.'
+            : 'Solicitudes activas de servicios y productos registradas en el Directorio de Contratos.'}
+        </p>
       </div>
 
-      {/* Carrusel GPU de Solicitudes Clasificadas */}
+      {/* Carrusel GPU de Solicitudes Clasificadas con manipulación directa */}
       <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
         <div
           ref={trackRef}
@@ -170,13 +122,13 @@ function BuyerRequestsRunwayComponent({
                   {/* 1. Fila Superior: Tipo Prioritario (Servicio / Producto) + Estado */}
                   <div className="flex items-center justify-between gap-2">
                     <span
-                      className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-bold ${
+                      className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-bold ${
                         isService
                           ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200'
                           : 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200'
                       }`}
                     >
-                      <span>{isService ? '🛠️ Solicitud de Servicio' : '📦 Solicitud de Producto'}</span>
+                      <span>{isService ? 'Solicitud de Servicio' : 'Solicitud de Producto'}</span>
                     </span>
 
                     <span
@@ -189,7 +141,7 @@ function BuyerRequestsRunwayComponent({
                   {/* 2. Referencia, Título y Comprador Solicitante */}
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-400">
-                      <span>📌 {req.referenceCode}</span>
+                      <span>{req.referenceCode}</span>
                       <span>{req.categoryName}</span>
                     </div>
                     <h3
@@ -207,7 +159,7 @@ function BuyerRequestsRunwayComponent({
                         </strong>
                       </span>
                       <span className="shrink-0 font-semibold text-teal-600 dark:text-teal-400">
-                        📍 {req.buyerCity}
+                        {req.buyerCity}
                       </span>
                     </div>
                   </div>
@@ -241,10 +193,10 @@ function BuyerRequestsRunwayComponent({
                   {req.review && (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] dark:border-amber-900/60 dark:bg-amber-950/30 flex items-center justify-between gap-2">
                       <span className="truncate text-amber-900 dark:text-amber-200 font-semibold">
-                        🏆 Atendido por: <strong>{req.review.sellerBusinessName}</strong>
+                        Atendido por: <strong>{req.review.sellerBusinessName}</strong>
                       </span>
-                      <span className="shrink-0 font-black text-amber-500">
-                        ★ {req.review.rating.toFixed(1)}
+                      <span className="shrink-0 font-black text-amber-600 dark:text-amber-400">
+                        {req.review.rating.toFixed(1)}
                       </span>
                     </div>
                   )}
@@ -265,7 +217,7 @@ function BuyerRequestsRunwayComponent({
                     </div>
 
                     <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
-                      🙋 {req.proposals.length}{' '}
+                      {req.proposals.length}{' '}
                       {req.proposals.length === 1 ? 'postulación' : 'postulaciones'}
                     </span>
                   </div>

@@ -1502,7 +1502,7 @@ export default function InventoryManager({
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-1.5'}>
+            <div className={viewMode === 'grid' ? 'grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4' : 'space-y-2.5 pt-1'}>
               {visibleListings.map((item) => {
                 const isService = item.type === 'service'
                 const rawStock = item.stock ?? 0
@@ -1529,7 +1529,7 @@ export default function InventoryManager({
                   return (
                     <div
                       key={item.id}
-                      className={`flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-5 rounded-xl border bg-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-2xs transition-all dark:bg-zinc-900 ${
+                      className={`group relative flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 sm:gap-5 rounded-xl border bg-white px-3 sm:px-4 py-2.5 sm:py-3 shadow-2xs transition-all dark:bg-zinc-900 ${
                         isService
                           ? 'border-purple-200/70 dark:border-purple-950/70 hover:border-purple-300'
                           : rawStock === 0
@@ -1539,6 +1539,20 @@ export default function InventoryManager({
                           : 'border-zinc-200 dark:border-zinc-800'
                       }`}
                     >
+                      {/* Etiqueta tipo regalo adherida al borde superior derecho del recuadro (fuera de la zona de texto) */}
+                      <span
+                        className={`pointer-events-none select-none absolute -top-2 right-2.5 z-10 inline-flex items-center gap-1 rounded-l-md rounded-tr-md rounded-br-xs border px-1.5 py-0.5 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider leading-none shadow-2xs rotate-2 group-hover:rotate-0 transition-transform duration-200 ${
+                          isService
+                            ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-200'
+                            : item.type === 'article'
+                            ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200'
+                            : 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                        }`}
+                      >
+                        <span>{isService ? 'Servicio' : item.type === 'article' ? 'Usado' : 'Nuevo'}</span>
+                        <span className="h-1 w-1 rounded-full bg-current opacity-60 shrink-0" />
+                      </span>
+
                       {/* Izquierda: Miniatura + 3 líneas de información bien distribuidas con margen hacia los botones */}
                       <div className="flex items-center gap-3 min-w-0 flex-1 pr-2 lg:pr-6">
                         <Link
@@ -1561,20 +1575,8 @@ export default function InventoryManager({
                         </Link>
 
                         <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                          {/* Línea 1: Tipo + Título */}
+                          {/* Línea 1: Título expandido al 100% del ancho sin etiquetas que resten espacio */}
                           <div className="min-w-0 flex items-center gap-2">
-                            <span
-                              className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none ${
-                                isService
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                                  : item.type === 'article'
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                              }`}
-                            >
-                              {isService ? 'Servicio' : item.type === 'article' ? 'Usado' : 'Nuevo'}
-                            </span>
-
                             <Link
                               href={`/catalogo/${item.id}`}
                               className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors truncate min-w-0 flex-1"

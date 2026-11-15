@@ -249,6 +249,51 @@ function HeroRunwayComponent({
     finishTransition()
   }
 
+  // Soporte de arrastre directo con puntero (mouse/touchpad) para manipular la pasarela directamente
+  const pointerStartXRef = useRef<number | null>(null)
+  const isPointerDraggingRef = useRef<boolean>(false)
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('a, button')) return
+    pointerStartXRef.current = e.clientX
+    isPointerDraggingRef.current = false
+  }, [])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch' || pointerStartXRef.current === null) return
+    const dx = e.clientX - pointerStartXRef.current
+    if (!isPointerDraggingRef.current && Math.abs(dx) > 6 && heroItems.length > 1) {
+      if (isTransitioningRef.current) finishTransition()
+      isPointerDraggingRef.current = true
+      setIsTransitioning(false)
+    }
+    if (isPointerDraggingRef.current) {
+      setTouchDragOffset(dx)
+    }
+  }, [finishTransition, heroItems.length])
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch' || pointerStartXRef.current === null) return
+    const dx = e.clientX - pointerStartXRef.current
+    const wasDragging = isPointerDraggingRef.current
+    pointerStartXRef.current = null
+    isPointerDraggingRef.current = false
+    setTouchDragOffset(0)
+
+    if (wasDragging && Math.abs(dx) > 35) {
+      if (dx < 0) {
+        handleNextHero()
+      } else {
+        handlePrevHero()
+      }
+    } else {
+      setIsTransitioning(true)
+    }
+  }, [handleNextHero, handlePrevHero])
+
   // Rotación automática de la Gran Vitrina según intervalo configurado por el administrador
   // Aislada en este componente para NO provocar re-render en las pasarelas continuas
   useEffect(() => {
@@ -307,52 +352,25 @@ function HeroRunwayComponent({
       <div className="absolute top-1/2 right-1/4 -z-10 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Cabecera sutil de la Gran Vitrina */}
-        <div className="flex items-center justify-between pb-6">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 text-sm dark:bg-purple-950 dark:text-purple-300">
-              ✨
-            </span>
-            <div>
-              <h2 className="text-xs font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
-                {t.home.featuredRunwayBadge}
-              </h2>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                {t.home.runwaySubtitle}
-              </p>
-            </div>
-          </div>
-
-          {/* Controles de diapositiva (Anterior / Siguiente) */}
-          {heroItems.length > 1 && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handlePrevHero}
-                aria-label="Anterior"
-                title="Publicación anterior"
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-              >
-                ◀
-              </button>
-              <button
-                type="button"
-                onClick={handleNextHero}
-                aria-label="Siguiente"
-                title="Siguiente publicación"
-                className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-              >
-                ▶
-              </button>
-            </div>
-          )}
+        {/* Cabecera centrada de la Gran Vitrina sin íconos ni botones de control */}
+        <div className="flex flex-col items-center justify-center text-center pb-6">
+          <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
+            {t.home.featuredRunwayBadge}
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+            {t.home.runwaySubtitle}
+          </p>
         </div>
 
         {/* Tarjeta de Exhibición Dinámica Split (Doble Columna con TAMAÑO ESTÁTICO FIJO y DESPLAZAMIENTO AL COSTADO) */}
         {/* REGLA DESIGN_RULES.md: Mantener altura invariable estática sin deformarse al rotar diapositivas */}
         <div
-          className="relative rounded-3xl border border-zinc-200/80 bg-white/95 shadow-xl dark:border-zinc-800 dark:bg-zinc-900/95 overflow-hidden h-[680px] sm:h-[620px] lg:h-[500px] xl:h-[520px] flex flex-col justify-between"
+          className="relative rounded-3xl border border-zinc-200/80 bg-white/95 shadow-xl dark:border-zinc-800 dark:bg-zinc-900/95 overflow-hidden h-[680px] sm:h-[620px] lg:h-[500px] xl:h-[520px] flex flex-col justify-between cursor-grab active:cursor-grabbing"
           style={{ touchAction: 'pan-y' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -391,24 +409,22 @@ function HeroRunwayComponent({
                         {/* Badges de Estado y Tipo de Publicación */}
                         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                           {item.isPaidCampaign ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-600 px-3 py-1 text-xs font-black text-white shadow-xs">
-                              <span>📢</span>
+                            <span className="inline-flex items-center rounded-full bg-purple-600 px-3 py-1 text-xs font-black text-white shadow-xs">
                               <span>{t.home.sponsoredBadge}</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white shadow-xs">
-                              <span>✨</span>
+                            <span className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1 text-xs font-black text-white shadow-xs">
                               <span>{t.home.campaignActiveBadge}</span>
                             </span>
                           )}
 
                           <span className="rounded-md bg-zinc-100 px-2.5 py-0.5 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                            {item.type === 'service' ? '🔧 Servicio' : '📦 Producto'}
+                            {item.type === 'service' ? 'Servicio' : item.type === 'article' ? 'Usado' : 'Producto'}
                           </span>
 
                           {item.city && (
                             <span className="text-xs font-medium text-zinc-500">
-                              📍 {item.city}
+                              {item.city}
                             </span>
                           )}
                         </div>
@@ -456,12 +472,12 @@ function HeroRunwayComponent({
                                   title="Comercio Verificado Oficialmente"
                                   className="hidden sm:inline rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                 >
-                                  ✓ Verificado
+                                  Verificado
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[10px] sm:text-xs text-zinc-500">
-                              <span className="text-amber-500 font-bold">★ {item.sellerRating.toFixed(1)}</span>
+                              <span className="text-amber-600 dark:text-amber-400 font-bold">Calificación {item.sellerRating.toFixed(1)}</span>
                               <span>•</span>
                               <span>Rubro: {item.categoryName}</span>
                             </div>
@@ -472,27 +488,27 @@ function HeroRunwayComponent({
                         <div className="h-7 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs overflow-hidden shrink-0">
                           {item.attrs?.tiempo_entrega && (
                             <span className="rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
-                              ⏱️ {item.attrs.tiempo_entrega}
+                              {item.attrs.tiempo_entrega}
                             </span>
                           )}
                           {item.attrs?.disponibilidad && (
                             <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                              ✅ {item.attrs.disponibilidad}
+                              {item.attrs.disponibilidad}
                             </span>
                           )}
                           {item.attrs?.modalidad && (
                             <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                              📍 {item.attrs.modalidad}
+                              {item.attrs.modalidad}
                             </span>
                           )}
                           {item.attrs?.garantia && (
                             <span className="rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                              🛡️ {item.attrs.garantia}
+                              {item.attrs.garantia}
                             </span>
                           )}
                           {(!item.attrs || Object.keys(item.attrs).length === 0) && (
                             <span className="rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                              ⭐ Garantía y soporte directo del comercio
+                              Garantía y soporte directo del comercio
                             </span>
                           )}
                         </div>
@@ -521,7 +537,6 @@ function HeroRunwayComponent({
                               onClick={() => trackAdEvent(item, 'whatsapp')}
                               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
-                              <span className="text-sm">💬</span>
                               <span>{t.home.contactWhatsappDirect}</span>
                             </a>
                           ) : (
@@ -530,7 +545,6 @@ function HeroRunwayComponent({
                               onClick={() => trackAdEvent(item, 'click')}
                               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-500 transition-colors"
                             >
-                              <span>🛍️</span>
                               <span>{t.home.viewProductDetails}</span>
                             </Link>
                           )}
@@ -541,14 +555,13 @@ function HeroRunwayComponent({
                             className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                           >
                             <span>{t.home.viewProductDetails}</span>
-                            <span>↗</span>
                           </Link>
 
                           <Link
                             href={`/catalogo?seller=${item.sellerId}`}
                             className="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 hover:underline"
                           >
-                            Más ofertas →
+                            Más ofertas
                           </Link>
                         </div>
                       </div>
@@ -561,14 +574,15 @@ function HeroRunwayComponent({
                               src={itemPhoto}
                               alt={item.title}
                               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                              draggable={false}
                             />
                           ) : (
                             <div className="flex flex-col items-center justify-center p-6 text-center select-none text-zinc-400">
-                              <span className="text-6xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110">
-                                {item.type === 'service' ? '🛠️' : item.type === 'article' ? '📦' : '🛍️'}
+                              <span className="text-sm font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                                {item.type === 'service' ? 'Servicio' : item.type === 'article' ? 'Artículo Usado' : 'Producto Nuevo'}
                               </span>
                               {item.categoryName && (
-                                <span className="mt-2 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                                <span className="mt-1 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                                   {item.categoryName}
                                 </span>
                               )}
@@ -578,11 +592,11 @@ function HeroRunwayComponent({
                           {/* Top Badges coincidentes con el explorador de catálogo */}
                           <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5">
                             <span className="rounded-md border border-zinc-200/80 bg-white/90 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold backdrop-blur-md text-zinc-700 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-200">
-                              {item.type === 'service' ? '🛠️ Servicio' : item.type === 'article' ? '📦 Artículo (Usado)' : '🛍️ Producto (Nuevo)'}
+                              {item.type === 'service' ? 'Servicio' : item.type === 'article' ? 'Artículo (Usado)' : 'Producto (Nuevo)'}
                             </span>
                             {item.isPaidCampaign && (
                               <span className="rounded-md bg-purple-600 px-2.5 py-0.5 text-[10px] sm:text-xs font-extrabold text-white shadow-xs">
-                                📢 Patrocinado
+                                Patrocinado
                               </span>
                             )}
                           </div>
@@ -624,22 +638,7 @@ function HeroRunwayComponent({
 
           {/* Barra HUD de Transición Vanguardista (Segmentos de progreso láser con altura estática fija) */}
           {heroItems.length > 1 && (
-            <div className="h-9 px-5 sm:px-7 border-t border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-between gap-4 shrink-0 bg-zinc-50/75 dark:bg-zinc-900/75 backdrop-blur-md">
-              {/* Contador numérico digital de diapositiva activa */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <span className="font-mono text-[10px] font-black tracking-widest text-zinc-700 dark:text-zinc-300">
-                  {String(activeHeroIndex + 1).padStart(2, '0')}
-                  <span className="mx-1 text-zinc-400 dark:text-zinc-600">/</span>
-                  <span className="text-zinc-400 dark:text-zinc-500">
-                    {String(heroItems.length).padStart(2, '0')}
-                  </span>
-                </span>
-              </div>
-
+            <div className="h-9 px-5 sm:px-7 border-t border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-center gap-4 shrink-0 bg-zinc-50/75 dark:bg-zinc-900/75 backdrop-blur-md">
               {/* Rieles de progreso láser continuo sin puntos centrales */}
               <div className="flex flex-1 max-w-md items-center gap-2">
                 {heroItems.map((slideItem, idx) => {
@@ -680,12 +679,6 @@ function HeroRunwayComponent({
                     </button>
                   )
                 })}
-              </div>
-
-              {/* Etiqueta de estado de flujo en tiempo real */}
-              <div className="hidden sm:flex items-center gap-1.5 shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                <span className="text-purple-500 dark:text-purple-400">⚡</span>
-                <span>FLUJO ACTIVO</span>
               </div>
             </div>
           )}

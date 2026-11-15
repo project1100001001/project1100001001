@@ -65,71 +65,31 @@ function ExclusiveCatalogRunwayTrack({
 
   const rTitle = customRunway.title
   const rSubtitle = customRunway.subtitle
-  const rBadge = customRunway.badge
+  const rBadge = (customRunway.badge || '').replace(/^[^\p{L}\p{N}#]+/u, '').trim() || customRunway.badge
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
-      {/* Cabecera Sutil y Exclusiva de la Pasarela de Temporada / Ofertas */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5 pb-3 border-b border-zinc-200/70 dark:border-zinc-800/80">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-900 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-300 dark:bg-amber-400/15 dark:text-amber-300 dark:border dark:border-amber-400/30">
-              ✦ Exclusivo #{exclusivePosition}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/90 border border-amber-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300">
-              <span>{rBadge}</span>
-            </span>
-          </div>
-          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-            <span>{customRunway.icon}</span>
-            <span>{rTitle}</span>
-          </h2>
-          {rSubtitle && (
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              {rSubtitle}
-            </p>
-          )}
-        </div>
-
-        {/* Controles de Desplazamiento Continuo y Manual */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-all select-none border ${
-              control.isPaused
-                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900'
-                : 'text-zinc-700 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                control.isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'
-              }`}
-            />
-            <span className="hidden sm:inline">
-              {control.isPaused ? 'Pausado' : 'Continuo'}
-            </span>
+      {/* Cabecera Centrada de la Pasarela de Temporada / Ofertas (sin íconos ni controles manuales) */}
+      <div className="flex flex-col items-center justify-center text-center mb-5 pb-3 border-b border-zinc-200/70 dark:border-zinc-800/80">
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-1.5">
+          <span className="inline-flex items-center rounded-full bg-zinc-900 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-300 dark:bg-amber-400/15 dark:text-amber-300 dark:border dark:border-amber-400/30">
+            Exclusivo #{exclusivePosition}
           </span>
-
-          <button
-            type="button"
-            onClick={() => control.stepManual('left')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la izquierda"
-          >
-            ◀
-          </button>
-          <button
-            type="button"
-            onClick={() => control.stepManual('right')}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 shadow-xs hover:bg-zinc-100 hover:scale-105 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-            aria-label="Desplazar a la derecha"
-          >
-            ▶
-          </button>
+          <span className="inline-flex items-center rounded-full bg-amber-50/90 border border-amber-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-300">
+            <span>{rBadge}</span>
+          </span>
         </div>
+        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          {rTitle}
+        </h2>
+        {rSubtitle && (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+            {rSubtitle}
+          </p>
+        )}
       </div>
 
-      {/* Carrusel Continuo con Tarjetas Full-Bleed (Imagen al 100% del recuadro + Textos y Botones superpuestos) */}
+      {/* Carrusel Continuo con Tarjetas Full-Bleed (Manipulación directa en la pasarela) */}
       <div className="relative w-full overflow-hidden pb-4 pt-1 select-none">
         <div
           ref={trackRef}
@@ -174,7 +134,7 @@ function ExclusiveCatalogRunwayTrack({
                 onMouseLeave={control.resume}
                 className="group relative h-[350px] sm:h-[370px] w-72 sm:w-80 shrink-0 overflow-hidden rounded-2xl border border-zinc-200/80 bg-zinc-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-amber-400/70 dark:border-zinc-800"
               >
-                {/* 1. Imagen cubriendo el 100% del recuadro de presentación */}
+                {/* 1. Fondo del recuadro de presentación */}
                 <Link
                   href={`/catalogo/${item.listingId}`}
                   onClick={() => trackAdEvent(item, 'click')}
@@ -190,18 +150,18 @@ function ExclusiveCatalogRunwayTrack({
                       draggable={false}
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-950 to-purple-950 text-6xl">
-                      <span className="opacity-35 transition-transform duration-500 group-hover:scale-110">
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-indigo-950 to-purple-950 p-6 text-center">
+                      <span className="text-xs font-black uppercase tracking-widest text-white/40">
                         {item.type === 'service'
-                          ? '🛠️'
+                          ? 'Servicio'
                           : item.type === 'article'
-                          ? '📦'
-                          : '🛍️'}
+                          ? 'Artículo Usado'
+                          : 'Producto Nuevo'}
                       </span>
                     </div>
                   )}
 
-                  {/* Velos de contraste multicapa para garantizar legibilidad perfecta sobre cualquier foto */}
+                  {/* Velos de contraste multicapa para garantizar legibilidad perfecta */}
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72%] bg-gradient-to-t from-black/95 via-black/75 to-transparent" />
                 </Link>
@@ -210,12 +170,11 @@ function ExclusiveCatalogRunwayTrack({
                 <div className="pointer-events-none relative z-10 flex h-full flex-col justify-between p-4">
                   {/* Fila Superior: Insignia de Temporada y Código de Referencia */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-extrabold text-amber-300 backdrop-blur-md border border-white/15 shadow-2xs truncate max-w-[65%]">
-                      <span>{customRunway.icon}</span>
+                    <span className="inline-flex items-center rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-extrabold text-amber-300 backdrop-blur-md border border-white/15 shadow-2xs truncate max-w-[65%]">
                       <span className="truncate">{rBadge}</span>
                     </span>
                     <span className="shrink-0 rounded-full bg-black/55 px-2.5 py-1 font-mono text-[10px] font-bold text-white/95 backdrop-blur-md border border-white/15 shadow-2xs">
-                      📌 {refCode}
+                      {refCode}
                     </span>
                   </div>
 
@@ -254,11 +213,11 @@ function ExclusiveCatalogRunwayTrack({
                     {/* Vendedor, Ciudad y Calificación */}
                     <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-200/90 border-t border-white/15 pt-2">
                       <span className="truncate">
-                        🏪 <strong className="font-semibold text-white">{item.sellerName}</strong>
+                        <strong className="font-semibold text-white">{item.sellerName}</strong>
                         {item.city ? ` • ${item.city}` : ''}
                       </span>
                       <span className="shrink-0 font-bold text-amber-400">
-                        ★ {item.sellerRating.toFixed(1)}
+                        {item.sellerRating.toFixed(1)}
                       </span>
                     </div>
 
@@ -270,21 +229,19 @@ function ExclusiveCatalogRunwayTrack({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => trackAdEvent(item, 'whatsapp')}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500/95 px-3 text-xs font-extrabold text-white shadow-sm backdrop-blur-md hover:bg-emerald-400 transition-all"
+                          className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-500/95 px-3 text-xs font-extrabold text-white shadow-sm backdrop-blur-md hover:bg-emerald-400 transition-all"
                         >
-                          <span>💬</span>
                           <span>WhatsApp</span>
                         </a>
                       ) : null}
                       <Link
                         href={`/catalogo/${item.listingId}`}
                         onClick={() => trackAdEvent(item, 'click')}
-                        className={`inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-white/30 bg-white/15 px-3 text-xs font-bold text-white backdrop-blur-md hover:bg-white/25 transition-all ${
+                        className={`inline-flex h-9 items-center justify-center rounded-xl border border-white/30 bg-white/15 px-3 text-xs font-bold text-white backdrop-blur-md hover:bg-white/25 transition-all ${
                           !whatsappUrl ? 'col-span-2' : ''
                         }`}
                       >
                         <span>Ver ficha</span>
-                        <span>↗</span>
                       </Link>
                     </div>
                   </div>
@@ -742,9 +699,9 @@ export default function HomeClientView({
           isPromoted: isPromotedSeller,
           // Etiqueta comercial pública (sin exponer tiempos de publicidad ni planes internos del vendedor)
           adBadge: item.sellerVerified
-            ? '✓ Verificado'
+            ? 'Verificado'
             : item.isPaidCampaign
-            ? '⭐ Destacado'
+            ? 'Destacado'
             : undefined,
         })
       } else {
@@ -802,32 +759,28 @@ export default function HomeClientView({
               adPageConfig.customRunways.filter((r) => r.active).length > 1 && (
                 <div className="w-full px-4 pt-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                        <span>⭐</span>
-                        <span>
-                          Posición Exclusiva Post-Gran Vitrina: Catálogos Exclusivos de Pasarela
-                        </span>
+                    <div className="flex flex-col items-center justify-center text-center gap-1.5 mb-3">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                        Posición Exclusiva Post-Gran Vitrina: Catálogos Exclusivos de Pasarela
                       </span>
                       {(viewerRole === 'seller' || viewerRole === 'admin') && (
                         <span className="text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-950/60 px-2.5 py-0.5 rounded-full">
                           {viewerRole === 'admin'
-                            ? '⚙️ Orden consecutivo administrable en Control Página Publicidad'
-                            : '🏪 Habilitado según campaña activa'}
+                            ? 'Orden consecutivo administrable en Control Página Publicidad'
+                            : 'Habilitado según campaña activa'}
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedExclusiveRunwayId('all')}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                        className={`inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                           selectedExclusiveRunwayId === 'all'
                             ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
                             : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-800'
                         }`}
                       >
-                        <span>🌐</span>
                         <span>Todas las Pasarelas Exclusivas Consecutivas</span>
                       </button>
                       {adPageConfig.customRunways
@@ -846,7 +799,6 @@ export default function HomeClientView({
                               }`}
                             >
                               <span>#{idx + 1}</span>
-                              <span>{cat.icon}</span>
                               <span>{cat.title}</span>
                             </button>
                           )
@@ -989,16 +941,13 @@ export default function HomeClientView({
       {/* ========================================================================= */}
       {adPageConfig.showCatalogQuickCards && (
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-5">
-          <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-            <span>🏷️</span>
-            <span>
-              {locale === 'en'
-                ? 'Explore by Catalog: Services, Used & New'
-                : 'Explora por Catálogo: Servicios, Usados y Nuevos'}
-            </span>
+        <div className="flex flex-col items-center justify-center text-center mb-5">
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            {locale === 'en'
+              ? 'Explore by Catalog: Services, Used & New'
+              : 'Explora por Catálogo: Servicios, Usados y Nuevos'}
           </h2>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
             {locale === 'en'
               ? 'Direct access to independent catalogs with specialized filters and modalities.'
               : 'Acceso directo a las ventanas independientes de catálogo con sus propios filtros y modalidades especializadas.'}
@@ -1013,14 +962,11 @@ export default function HomeClientView({
           >
             <div>
               <div className="flex items-center justify-between">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 text-2xl transition-transform group-hover:scale-110 dark:bg-purple-950/60">
-                  🛠️
-                </span>
                 <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800">
                   {locale === 'en' ? 'Services' : 'Servicios'}
                 </span>
               </div>
-              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
+              <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
                 {locale === 'en' ? 'Professional Services' : 'Servicios Profesionales'}
               </h3>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -1031,7 +977,6 @@ export default function HomeClientView({
             </div>
             <div className="mt-5 pt-3 border-t border-purple-100 dark:border-purple-900/30 flex items-center justify-between text-xs font-bold text-purple-700 dark:text-purple-300">
               <span>{locale === 'en' ? 'Explore Services' : 'Ver Catálogo de Servicios'}</span>
-              <span className="transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
 
@@ -1042,14 +987,11 @@ export default function HomeClientView({
           >
             <div>
               <div className="flex items-center justify-between">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-2xl transition-transform group-hover:scale-110 dark:bg-amber-950/60">
-                  📦
-                </span>
                 <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
                   {locale === 'en' ? 'Used Articles' : 'Artículos Usados'}
                 </span>
               </div>
-              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors">
+              <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-amber-700 dark:group-hover:text-amber-300 transition-colors">
                 {locale === 'en' ? 'Used Articles' : 'Artículos Usados'}
               </h3>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -1060,7 +1002,6 @@ export default function HomeClientView({
             </div>
             <div className="mt-5 pt-3 border-t border-amber-100 dark:border-amber-900/30 flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-300">
               <span>{locale === 'en' ? 'Explore Used Articles' : 'Ver Catálogo de Usados'}</span>
-              <span className="transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
 
@@ -1071,14 +1012,11 @@ export default function HomeClientView({
           >
             <div>
               <div className="flex items-center justify-between">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-2xl transition-transform group-hover:scale-110 dark:bg-blue-950/60">
-                  ✨
-                </span>
                 <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
                   {locale === 'en' ? 'New Products' : 'Productos Nuevos'}
                 </span>
               </div>
-              <h3 className="mt-4 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+              <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                 {locale === 'en' ? 'New Products' : 'Productos Nuevos'}
               </h3>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -1089,7 +1027,6 @@ export default function HomeClientView({
             </div>
             <div className="mt-5 pt-3 border-t border-blue-100 dark:border-blue-900/30 flex items-center justify-between text-xs font-bold text-blue-700 dark:text-blue-300">
               <span>{locale === 'en' ? 'Explore New Products' : 'Ver Catálogo de Nuevos'}</span>
-              <span className="transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
         </div>
@@ -1102,10 +1039,9 @@ export default function HomeClientView({
       {adPageConfig.showPromotionalBanner && (
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           {viewerRole === 'seller' || viewerRole === 'admin' ? (
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 p-6 sm:p-10 text-white shadow-xl">
-              <div className="relative z-10 max-w-2xl space-y-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
-                  <span>🚀</span>
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 p-6 sm:p-10 text-white shadow-xl text-center flex flex-col items-center">
+              <div className="relative z-10 max-w-2xl space-y-3 flex flex-col items-center">
+                <span className="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
                   <span>Exclusivo Vendedor • Campañas & Vitrina Comercial</span>
                 </span>
 
@@ -1117,8 +1053,8 @@ export default function HomeClientView({
                   {t.home.boostYourProductDesc}
                 </p>
 
-                <div className="pt-2 flex items-center gap-2 text-xs text-purple-200">
-                  <span className="font-semibold">💡 Gestión de vendedor:</span>
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-xs text-purple-200">
+                  <span className="font-semibold">Gestión de vendedor:</span>
                   <span>
                     Administra el tiempo de publicidad y tus campañas patrocinadas desde{' '}
                     <strong className="text-white">Mis Campañas → Configurar Campaña</strong>.
@@ -1127,10 +1063,9 @@ export default function HomeClientView({
               </div>
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-900 p-6 sm:p-10 text-white shadow-xl">
-              <div className="relative z-10 max-w-2xl space-y-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
-                  <span>💬</span>
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-900 p-6 sm:p-10 text-white shadow-xl text-center flex flex-col items-center">
+              <div className="relative z-10 max-w-2xl space-y-3 flex flex-col items-center">
+                <span className="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white">
                   <span>Compra Directa sin Registro Obligatorio</span>
                 </span>
 

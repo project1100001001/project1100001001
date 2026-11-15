@@ -316,7 +316,7 @@ export default function CatalogClientView({
           </div>
         ) : viewMode === 'list' ? (
           /* MODO LISTA COMPACTA EN UNA LÍNEA */
-          <div className="flex flex-col gap-1.5 sm:gap-2">
+          <div className="flex flex-col gap-2.5 sm:gap-3 pt-1">
             {visibleListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} viewMode="list" />
             ))}

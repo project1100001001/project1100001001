@@ -1497,7 +1497,7 @@ export default function BuyerRequestsBoardClientView({
               <div
                 className={
                   viewMode === 'list'
-                    ? 'flex flex-col gap-1.5 sm:gap-2'
+                    ? 'flex flex-col gap-2.5 sm:gap-3 pt-1'
                     : 'grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3'
                 }
               >
@@ -1513,21 +1513,24 @@ export default function BuyerRequestsBoardClientView({
                     return (
                       <article
                         key={req.id}
-                        className="flex items-center justify-between gap-2 sm:gap-5 rounded-xl border border-zinc-200/90 bg-white px-2.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs transition-all hover:border-teal-300 dark:border-zinc-800 dark:bg-zinc-900"
+                        className="group relative flex items-center justify-between gap-2 sm:gap-5 rounded-xl border border-zinc-200/90 bg-white px-2.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs transition-all hover:border-teal-300 dark:border-zinc-800 dark:bg-zinc-900"
                       >
+                        {/* Etiqueta tipo regalo adherida al borde superior derecho del recuadro (fuera de la zona de texto) */}
+                        <span
+                          className={`pointer-events-none select-none absolute -top-2 right-2.5 z-10 inline-flex items-center gap-1 rounded-l-md rounded-tr-md rounded-br-xs border px-1.5 py-0.5 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider leading-none shadow-2xs rotate-2 group-hover:rotate-0 transition-transform duration-200 ${
+                            isService
+                              ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-200'
+                              : 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                          }`}
+                        >
+                          <span>{isService ? 'Servicio' : 'Producto'}</span>
+                          <span className="h-1 w-1 rounded-full bg-current opacity-60 shrink-0" />
+                        </span>
+
                         {/* Izquierda: 3 líneas expandidas horizontalmente en móvil y con margen amplio antes de la derecha en web */}
                         <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pr-1 sm:pr-6">
-                          {/* Línea 1: Tipo + Título + Código */}
+                          {/* Línea 1: Título expandido al 100% del ancho + Código */}
                           <div className="min-w-0 flex items-center gap-1.5 sm:gap-2">
-                            <span
-                              className={`shrink-0 rounded border px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold leading-none ${
-                                isService
-                                  ? 'border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-200'
-                                  : 'border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200'
-                              }`}
-                            >
-                              {isService ? 'Servicio' : 'Producto'}
-                            </span>
                             <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-50 truncate min-w-0 flex-1">
                               {req.title}
                             </h2>
