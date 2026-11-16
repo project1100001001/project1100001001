@@ -54,8 +54,28 @@ Este documento registra los fundamentos y decisiones de diseño aprobadas por el
 
 ---
 
-## 3. Modo Claro / Modo Oscuro
-- Todas las superficies, bordes, textos e iconos deben utilizar clases adaptables de Tailwind CSS (ej. `bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50`).
+## 3. Identidad Cromática Corporativa (Color Dorado Oficial) y Teoría del Color
+- **Color Corporativo Oficial (Dorado — Imagen del Producto)**:
+  - El **Dorado (`Amber / Gold`: `#f59e0b` `amber-500`, `#fbbf24` `amber-400`, `#d97706` `amber-600`)** es el color corporativo oficial que representa la identidad visual del producto **Indie Clasificados**, en sintonía directa con la esfera geodésica dorada del logo (`/img/logo.png` y `/img/icon.ico`).
+  - Todo elemento institucional (esfera de carga 3D, barras de progreso, indicadores principales de navegación activa en Inicio/Dashboard, subtítulos de marca `"Economía en Circulación"`, selección de texto, bordes destacados y destellos de luz) debe emplear la paleta dorada corporativa.
+- **Armonización por Teoría del Color (Títulos, Textos, Fondos y Categorías)**:
+  - Tomando el **Dorado Corporativo (`~43° HSL`)** como eje cromático central, todos los colores de la interfaz se combinan bajo reglas estrictas de compatibilidad visual y contraste:
+    1. **Fondos y Superficies (Contraste Acromático Cálido / Obsidiana)**:
+       - **Modo Claro**: Fondos en Marfil/Alabastro neutro (`#fafafa` / `bg-zinc-50`) y tarjetas blancas (`#ffffff` / `bg-white`) con bordes sutiles (`border-zinc-200/80` y realces `border-amber-300/60`), permitiendo que los acentos dorados destaquen con limpieza sin saturar la vista.
+       - **Modo Oscuro**: Fondos en Obsidiana/Carbón profundo (`#09090b` / `bg-zinc-950` y `#18181b` / `bg-zinc-900`) con halos ambientales dorados (`bg-amber-500/10`, `border-amber-500/30`), generando el contraste de máximo prestigio (**Oro sobre Obsidiana**) donde la luz dorada proyecta profundidad y legibilidad inmediata.
+    2. **Títulos y Textos (Jerarquía Tipográfica Compatible)**:
+       - **Títulos Principales (`h1`, `h2`, `h3`)**: Carbón profundo (`text-zinc-900`) en modo claro y Blanco Marfil (`text-zinc-50`) en modo oscuro, combinados con acentos de sección y etiquetas superiores en Dorado Corporativo (`text-amber-700 dark:text-amber-400`).
+       - **Textos Descriptivos y Secundarios**: Gris Pizarra equilibrado (`text-zinc-600 dark:text-zinc-300` para cuerpo de lectura y `text-zinc-500 dark:text-zinc-400` para metadatos), garantizando contraste WCAG AAA sin competir con el dorado ni con los distintivos semánticos.
+    3. **Compatibilidad con la Codificación Semántica de Objetos (Nuevos, Usados, Servicios y Usuarios)**:
+       - Se conserva la identificación visual de cada línea de negocio, armonizada geométricamente en el círculo cromático respecto al **Dorado Corporativo (`43°`)**:
+         - **Marca Corporativa, Vitrina Principal y Barras de Carga**: **Dorado Luminoso (`amber-400` / `amber-500`, `#fbbf24` / `#f59e0b`)** con efectos de sombra de luz dorada.
+         - **Artículos Usados (`type=article`)**: **Ámbar Bronce (`amber-600` / `amber-700` en claro, `amber-400` en oscuro)** — *Armonía Análoga* que conecta la economía en circulación directamente con el ADN dorado de la marca.
+         - **Productos Nuevos (`type=product`)**: **Azul Zafiro (`blue-600` / `blue-400`)** — *Armonía Complementaria Directa (`~215°` vs `43°`)*, creando el equilibrio cálido-frío más armónico junto al dorado.
+         - **Servicios Profesionales (`type=service`)**: **Púrpura Amatista (`purple-600` / `purple-400`)** — *Armonía Complementaria Dividida (`~270°` vs `43°`)*, proyectando especialización y valor premium junto al dorado.
+         - **Usuarios y Solicitudes (`users` / `/solicitudes`)**: **Índigo y Turquesa (`indigo-600` / `teal-600`)** — *Armonía Triádica Equilibrada*, diferenciando perfiles de comunidad y demandas de compradores.
+         - **Acción Transaccional y Verificación (WhatsApp / Activo)**: **Verde Esmeralda (`emerald-600` / `emerald-400`)** — reservado para el botón de contacto directo por WhatsApp, estados activos operativos e insignias de verificación comercial.
+- **Directriz para Futuras Integraciones de Objetos**:
+  - Cualquier nuevo objeto, tarjeta, modal, pasarela, gráfico, animación o componente interactivo que se integre en el futuro DEBE adoptar el **Dorado Corporativo** como color rector de marca, combinando sus títulos, textos y fondos según esta matriz cromática y respetando los colores semánticos de productos nuevos, usados, servicios y usuarios.
 
 ---
 

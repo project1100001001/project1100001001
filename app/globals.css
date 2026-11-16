@@ -5,11 +5,24 @@
 :root {
   --background: #fafafa;
   --foreground: #18181b;
+  /* Color Corporativo Oficial: Dorado (Indie Clasificados) */
+  --corporate-gold-light: #fde047;
+  --corporate-gold: #fbbf24;
+  --corporate-gold-deep: #f59e0b;
+  --corporate-gold-dark: #d97706;
+  --corporate-gold-surface: #fffbeb;
+  /* Paleta Semántica Armonizada por Teoría del Color con el Dorado (43° HSL) */
+  --semantic-new-product: #2563eb;   /* Azul Zafiro (Complementario Directo 215°) */
+  --semantic-used-article: #d97706;  /* Ámbar Bronce (Análogo Directo 38°) */
+  --semantic-service: #9333ea;       /* Púrpura Amatista (Complementario Dividido 271°) */
+  --semantic-users: #4f46e5;         /* Índigo Comunidad (Triádico 243°) */
+  --semantic-whatsapp: #059669;      /* Verde Esmeralda Transaccional / Verificado */
 }
 
 .dark {
   --background: #09090b;
   --foreground: #f4f4f5;
+  --corporate-gold-surface: rgba(120, 53, 15, 0.25);
 }
 
 @theme inline {
@@ -39,114 +52,140 @@ body {
 }
 
 /* ========================================================================= */
-/* AVANT-GARDE QUANTUM & LIQUID MORPHING LOADER ANIMATIONS                   */
+/* GOLDEN SPHERE NETWORK INTERCONNECTION & LIGHT FLOW ANIMATIONS             */
+/* Ultra-lightweight, zero-filter GPU animations using pathLength="100"      */
 /* ========================================================================= */
-@keyframes ic-orbit-cw {
+@keyframes ic-sphere-stream-fwd {
   0% {
-    transform: rotate3d(1, 0.4, 0, 58deg) rotateZ(0deg);
+    stroke-dashoffset: 100;
   }
   100% {
-    transform: rotate3d(1, 0.4, 0, 58deg) rotateZ(360deg);
+    stroke-dashoffset: 0;
   }
 }
 
-@keyframes ic-orbit-ccw {
+@keyframes ic-sphere-stream-rev {
   0% {
-    transform: rotate3d(-0.6, 1, 0.2, 62deg) rotateZ(360deg);
+    stroke-dashoffset: 0;
   }
   100% {
-    transform: rotate3d(-0.6, 1, 0.2, 62deg) rotateZ(0deg);
+    stroke-dashoffset: 100;
   }
 }
 
-@keyframes ic-orbit-diag {
-  0% {
-    transform: rotate3d(0.8, -0.8, 0.3, 66deg) rotateZ(0deg);
-  }
-  100% {
-    transform: rotate3d(0.8, -0.8, 0.3, 66deg) rotateZ(360deg);
-  }
-}
-
-@keyframes ic-liquid-blob-1 {
+@keyframes ic-sphere-node-soft {
   0%, 100% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  33% {
-    transform: translate(11px, -8px) scale(1.22);
-  }
-  66% {
-    transform: translate(-10px, 9px) scale(0.92);
-  }
-}
-
-@keyframes ic-liquid-blob-2 {
-  0%, 100% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  33% {
-    transform: translate(-11px, 8px) scale(0.92);
-  }
-  66% {
-    transform: translate(10px, -9px) scale(1.24);
-  }
-}
-
-@keyframes ic-liquid-blob-center {
-  0%, 100% {
-    transform: scale(1);
+    opacity: 0.15;
+    transform: scale(0.88);
   }
   50% {
-    transform: scale(1.18);
+    opacity: 0.8;
+    transform: scale(1.12);
   }
 }
 
 @keyframes ic-shimmer-wave {
   0% {
-    transform: translateX(-100%);
+    transform: translateX(-120%);
   }
   100% {
-    transform: translateX(200%);
+    transform: translateX(240%);
   }
 }
 
-.ic-orbit-ring-1 {
-  animation: ic-orbit-cw 2.4s linear infinite;
-  will-change: transform;
+@keyframes ic-gold-bar-glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(245, 158, 11, 0.85),
+      0 0 20px rgba(251, 191, 36, 0.6),
+      0 0 32px rgba(217, 119, 6, 0.38);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow:
+      0 0 15px rgba(251, 191, 36, 1),
+      0 0 28px rgba(245, 158, 11, 0.85),
+      0 0 44px rgba(254, 240, 138, 0.55);
+    filter: brightness(1.12);
+  }
 }
 
-.ic-orbit-ring-2 {
-  animation: ic-orbit-ccw 3.1s linear infinite;
-  will-change: transform;
+@keyframes ic-gold-tip-sparkle {
+  0%, 100% {
+    transform: translate(50%, -50%) scale(0.92);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(50%, -50%) scale(1.22);
+    opacity: 1;
+  }
 }
 
-.ic-orbit-ring-3 {
-  animation: ic-orbit-diag 3.8s linear infinite;
-  will-change: transform;
+/* Cada arco usa pathLength="100" y un patrón de 50 (16 + 34 = 50), divisor exacto de 100 para flujo infinito sin saltos */
+.ic-sphere-flow-1 {
+  stroke-dasharray: 16 34;
+  animation: ic-sphere-stream-fwd 2.8s linear infinite;
+  will-change: stroke-dashoffset;
 }
 
-.ic-blob-1,
-.ic-svg-blob-1 {
+.ic-sphere-flow-2 {
+  stroke-dasharray: 14 36;
+  animation: ic-sphere-stream-rev 3.2s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+.ic-sphere-flow-3 {
+  stroke-dasharray: 18 32;
+  animation: ic-sphere-stream-fwd 3.6s linear infinite;
+  animation-delay: -1.2s;
+  will-change: stroke-dashoffset;
+}
+
+.ic-sphere-flow-4 {
+  stroke-dasharray: 15 35;
+  animation: ic-sphere-stream-rev 3.0s linear infinite;
+  animation-delay: -1.8s;
+  will-change: stroke-dashoffset;
+}
+
+.ic-node-pulse-1 {
   transform-box: fill-box;
   transform-origin: center;
-  animation: ic-liquid-blob-1 2.6s ease-in-out infinite;
+  animation: ic-sphere-node-soft 2.6s ease-in-out infinite;
+  will-change: opacity, transform;
 }
 
-.ic-blob-2,
-.ic-svg-blob-2 {
+.ic-node-pulse-2 {
   transform-box: fill-box;
   transform-origin: center;
-  animation: ic-liquid-blob-2 2.6s ease-in-out infinite;
+  animation: ic-sphere-node-soft 3.1s ease-in-out infinite;
+  animation-delay: -0.9s;
+  will-change: opacity, transform;
 }
 
-.ic-svg-blob-center {
+.ic-node-pulse-3 {
   transform-box: fill-box;
   transform-origin: center;
-  animation: ic-liquid-blob-center 2s ease-in-out infinite;
+  animation: ic-sphere-node-soft 3.5s ease-in-out infinite;
+  animation-delay: -1.7s;
+  will-change: opacity, transform;
 }
 
 .ic-shimmer-bar {
-  animation: ic-shimmer-wave 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: ic-shimmer-wave 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.ic-shimmer-bar-secondary {
+  animation: ic-shimmer-wave 1.75s linear infinite;
+  animation-delay: -0.6s;
+}
+
+.ic-gold-progress-fill {
+  animation: ic-gold-bar-glow-pulse 1.6s ease-in-out infinite;
+}
+
+.ic-gold-tip-flare {
+  animation: ic-gold-tip-sparkle 0.9s ease-in-out infinite;
 }
 
 @keyframes ic-hero-progress {

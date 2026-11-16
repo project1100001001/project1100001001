@@ -33,8 +33,8 @@ export default function AppMobileHeader() {
           onClick={toggle}
           className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all shadow-2xs cursor-pointer ${
             isOpen
-              ? 'border-emerald-500 bg-emerald-600 text-white shadow-emerald-600/20'
-              : 'border-zinc-300 bg-zinc-50 text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700'
+              ? 'border-amber-400 bg-amber-400 text-zinc-950 shadow-[0_0_12px_rgba(245,158,11,0.45)]'
+              : 'border-zinc-300 bg-zinc-50 text-zinc-800 hover:border-amber-400/60 hover:bg-amber-50/40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:border-amber-500/50 dark:hover:bg-zinc-700'
           }`}
           aria-label={t.nav.menu}
           title={t.nav.menu}

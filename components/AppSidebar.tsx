@@ -115,19 +115,19 @@ function SidebarNavContent({
 
   return (
     <nav className={`space-y-1 text-xs font-medium ${isMobile ? 'text-center' : ''}`}>
-      {/* OPCIÓN 1: Inicio */}
+      {/* OPCIÓN 1: Inicio (Color Corporativo Dorado) */}
       <Link
         href="/"
         onClick={close}
         className={`flex items-center ${itemLayoutClass} rounded-xl px-3 py-2 transition-all ${
           isHomeActive
-            ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+            ? 'bg-amber-50 text-amber-900 font-bold dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-500/35 shadow-2xs'
             : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
         }`}
       >
         <span>{t.nav.home}</span>
         {isHomeActive && (
-          <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+          <span className="h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400 shrink-0" />
         )}
       </Link>
 
@@ -147,20 +147,20 @@ function SidebarNavContent({
         )}
       </Link>
 
-      {/* OPCIÓN 1.B: Dashboard / Pantalla de Bienvenida */}
+      {/* OPCIÓN 1.B: Dashboard / Pantalla de Bienvenida (Color Corporativo Dorado) */}
       {isLoggedIn && (
         <Link
           href={role ? `/bienvenida?role=${role}` : '/bienvenida'}
           onClick={close}
           className={`flex items-center ${itemLayoutClass} rounded-xl px-3 py-2 transition-all ${
             isDashboardActive
-              ? 'bg-emerald-50 text-emerald-800 font-bold dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-500/30 shadow-2xs'
+              ? 'bg-amber-50 text-amber-900 font-bold dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-500/35 shadow-2xs'
               : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
           }`}
         >
           <span>Dashboard</span>
           {isDashboardActive && (
-            <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
+            <span className="h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400 shrink-0" />
           )}
         </Link>
       )}
@@ -840,7 +840,7 @@ export default function AppSidebar() {
                 <span className="block">Indie</span>
                 <span className="block">Clasificados</span>
               </span>
-              <span className="mt-0.5 text-[9px] text-zinc-500 font-semibold uppercase tracking-wider leading-tight">
+              <span className="mt-0.5 text-[9px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider leading-tight">
                 {locale === 'en' ? 'Economy in Circulation' : 'Economía en Circulación'}
               </span>
             </div>
@@ -1153,12 +1153,12 @@ export default function AppSidebar() {
 
   return (
     <>
-      {/* Botón flotante de alta visibilidad para MOSTRAR / DESPLEGAR el menú cuando está abatido */}
+      {/* Botón flotante de alta visibilidad para MOSTRAR / DESPLEGAR el menú cuando está abatido (Color Corporativo Dorado) */}
       {isCollapsed && (
         <button
           type="button"
           onClick={toggleCollapsed}
-          className="hidden md:flex items-center gap-2 rounded-r-xl border-y border-r border-emerald-500 bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-xl shadow-emerald-950/30 hover:bg-emerald-500 hover:pl-3.5 transition-all fixed left-0 top-2 z-40 select-none animate-in slide-in-from-left duration-200 cursor-pointer"
+          className="hidden md:flex items-center gap-2 rounded-r-xl border-y border-r border-amber-400 bg-amber-400 px-3 py-1.5 text-xs font-black text-zinc-950 shadow-xl shadow-amber-950/25 hover:bg-amber-300 hover:pl-3.5 transition-all fixed left-0 top-2 z-40 select-none animate-in slide-in-from-left duration-200 cursor-pointer"
           title={t.nav.expandSidebar}
           aria-label={t.nav.expandSidebar}
         >

@@ -28,5 +28,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
    - El recuadro de la Gran Vitrina en el Inicio (`/`) DEBE mantener dimensiones y altura **estáticas y fijas**.
    - Bajo ninguna circunstancia debe cambiar de tamaño, brincar o deformarse con el movimiento o rotación del contenido interior, evitando cualquier desplazamiento en la ventana.
    - Los textos interiores (títulos con límite estricto de 2 líneas, descripciones acotadas y botones) deben ajustarse con coherencia para habitar el recuadro fijo sin alterar su altura.
-4. **Consulta de referencia**:
+4. **Identidad Cromática Corporativa (Color Dorado Oficial) y Teoría del Color**:
+   - El **Dorado (`Amber / Gold`: `#fbbf24` `amber-400`, `#f59e0b` `amber-500`, `#d97706` `amber-600`)** es el color corporativo oficial que representa la imagen del producto **Indie Clasificados**.
+   - **Armonía en Títulos, Textos y Fondos**: Combinar fondos neutros de alto contraste (Marfil `#fafafa` / Blanco en modo claro; Obsidiana `#09090b` / `zinc-900` en modo oscuro) con títulos nítidos (`text-zinc-900 dark:text-zinc-50`), acentos de marca en Dorado Corporativo (`text-amber-700 dark:text-amber-400`, `border-amber-400`, sombras de luz dorada) y textos secundarios equilibrados (`text-zinc-600 dark:text-zinc-300`).
+   - **Compatibilidad Semántica**: Mantener la identificación cromática de **Productos Nuevos** (`blue`, complementario directo del dorado), **Artículos Usados** (`amber`, análogo directo del dorado), **Servicios** (`purple`, complementario dividido), **Usuarios/Solicitudes** (`indigo`/`teal`, triádico) y **WhatsApp/Verificado** (`emerald`), integrándolos armónicamente con el Dorado Corporativo en cualquier nuevo objeto o componente futuro.
+5. **Consulta de referencia**:
    - Ver detalles adicionales en `DESIGN_RULES.md`.

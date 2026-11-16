@@ -60,7 +60,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100 selection:bg-emerald-500 selection:text-white">
+      <body className="min-h-full bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-100 selection:bg-amber-400 selection:text-zinc-950">
         <ClientProviders>
           <div className="min-h-screen flex flex-col md:flex-row">
             {/* Left Sidebar Navigation (Exclusive navigation driver) */}

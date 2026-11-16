@@ -34,13 +34,13 @@ export default function Footer() {
         <div className="flex flex-wrap items-center justify-center gap-5">
           <Link
             href="/catalogo"
-            className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
           >
             {t.footer.catalog}
           </Link>
           <Link
             href="/publicar"
-            className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
           >
             {t.footer.publish}
           </Link>

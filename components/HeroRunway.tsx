@@ -347,14 +347,14 @@ function HeroRunwayComponent({
     <section
       className="relative overflow-hidden bg-gradient-to-b from-white via-zinc-50 to-white py-10 sm:py-14 dark:from-zinc-900 dark:via-zinc-900/80 dark:to-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800"
     >
-      {/* Luces y efectos visuales de fondo */}
-      <div className="absolute top-0 left-1/4 -z-10 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 right-1/4 -z-10 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+      {/* Luces y efectos visuales de fondo armonizados con el Dorado Corporativo y Púrpura Complementario */}
+      <div className="absolute top-0 left-1/4 -z-10 h-96 w-96 rounded-full bg-amber-500/12 blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 right-1/4 -z-10 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Cabecera centrada de la Gran Vitrina sin íconos ni botones de control */}
+        {/* Cabecera centrada de la Gran Vitrina en Dorado Corporativo sin íconos ni botones de control */}
         <div className="flex flex-col items-center justify-center text-center pb-6">
-          <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
+          <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
             {t.home.featuredRunwayBadge}
           </h2>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
@@ -667,15 +667,15 @@ function HeroRunwayComponent({
                               ? `ic-hero-progress ${durationSec}s linear forwards`
                               : undefined,
                           }}
-                          className="absolute inset-0 origin-left rounded-full bg-gradient-to-r from-emerald-400 via-purple-500 to-indigo-500 shadow-[0_0_10px_rgba(168,85,247,0.6)]"
+                          className="absolute inset-0 origin-left rounded-full bg-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.75)]"
                         >
-                          <span className="ic-shimmer-bar absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+                          <span className="ic-shimmer-bar absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-yellow-100/90 to-transparent" />
                         </span>
                       ) : (
                         <span
                           className={`absolute inset-0 rounded-full transition-opacity duration-300 ${
                             isPast
-                              ? 'bg-purple-500/45 dark:bg-purple-400/40 opacity-100'
+                              ? 'bg-amber-500/45 dark:bg-amber-400/40 opacity-100'
                               : 'bg-zinc-400/40 dark:bg-zinc-600/40 opacity-0 group-hover:opacity-100'
                           }`}
                         />
